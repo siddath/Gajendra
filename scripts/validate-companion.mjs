@@ -13,6 +13,7 @@ const info = path.join(app, "Contents/Info.plist");
 const menuBarSource = path.resolve("companion/macos/Sources/GajendraApp/main.swift");
 const contentSource = path.resolve("companion/macos/Sources/GajendraKit/DeckContentView.swift");
 const overlaySource = path.resolve("companion/macos/Sources/GajendraKit/DeckWidgetView.swift");
+const visualSettingsSource = path.resolve("companion/macos/Sources/GajendraKit/GajendraVisualSettings.swift");
 
 await Promise.all([
   access(executable, constants.X_OK),
@@ -23,6 +24,7 @@ await Promise.all([
   access(menuBarSource, constants.R_OK),
   access(contentSource, constants.R_OK),
   access(overlaySource, constants.R_OK),
+  access(visualSettingsSource, constants.R_OK),
 ]);
 
 run("codesign", ["--verify", "--deep", "--strict", app]);
@@ -35,10 +37,11 @@ if (bundleDisplayName !== "Gaja") throw new Error("The visible bundle name must 
 const bundleVersion = run("plutil", ["-extract", "CFBundleShortVersionString", "raw", info]).stdout.trim();
 if (bundleVersion !== "0.3.1") throw new Error("The Gaja bundle version must be 0.3.1.");
 
-const [menuBar, content, overlay] = await Promise.all([
+const [menuBar, content, overlay, visualSettings] = await Promise.all([
   readFile(menuBarSource, "utf8"),
   readFile(contentSource, "utf8"),
   readFile(overlaySource, "utf8"),
+  readFile(visualSettingsSource, "utf8"),
 ]);
 for (const required of [
   "showPill(on: preferredScreen())",
@@ -53,7 +56,9 @@ for (const required of [
   "DispatchQueue.main.asyncAfter(deadline: .now() + 0.22",
   "SMAppService.mainApp.register()",
   "Launch Gaja at Login",
-  "if !wasVisible { model.refresh() }",
+  "let enteredPill = hoverState.setPillHovered(hovered)",
+  "if enteredPill { model.refresh() }",
+  "if !wasVisible && !hoverState.pillHovered { model.refresh() }",
   "panel.orderFrontRegardless()",
   "NSAnimationContext.runAnimationGroup",
   "accessibilityDisplayShouldReduceMotion",
@@ -62,6 +67,19 @@ for (const required of [
 }
 for (const required of ["bottomTrailingOrigin", "cardOrigin", "pillHovered || cardHovered", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".ultraThinMaterial"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra hover contract is missing: ${required}`);
+}
+for (const required of ["GajendraPillEditState", "LongPressGesture(minimumDuration: 0.55)", "editState.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin"]) {
+  if (!overlay.includes(required)) throw new Error(`Gajendra pill edit contract is missing: ${required}`);
+}
+for (const required of [".draggable(threadId)", ".dropDestination(for: String.self)", "moveDroppedThread"]) {
+  if (!content.includes(required)) throw new Error(`Gajendra organizer drag contract is missing: ${required}`);
+}
+for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark"]) {
+  if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
+}
+if (visualSettings.includes("command-capsule")) throw new Error("Command Capsule must not be a production theme.");
+for (const required of ["visualSettings: visualSettings", "configureAppearance()", "gajendra.pill.hidden", "Hide Gaja Lotus", "Show Gaja Lotus"]) {
+  if (!menuBar.includes(required)) throw new Error(`Gajendra shared visual or pill recovery contract is missing: ${required}`);
 }
 const markBody = overlay.slice(overlay.indexOf("public struct GajendraMark"), overlay.indexOf("public struct GajendraGlassSurface"));
 if (markBody.includes(".fill(")) throw new Error("The native lotus petals must remain outline-only.");
@@ -141,6 +159,10 @@ console.log(JSON.stringify({
   isolatedMutationPassed: true,
   isolatedStatePermissionsPrivate: true,
   privateTaskContentRecorded: false,
+  productionThemeCount: 2,
+  appearanceModes: ["automatic", "light", "dark"],
+  longPressPillEditMode: true,
+  organizerDragAndDrop: true,
 }));
 
 function run(command, args) {

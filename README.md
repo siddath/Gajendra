@@ -14,7 +14,7 @@
 
 The repository and compatibility identity is **Gajendra** (`gajendra` in packages, plugin IDs, URLs, bundle identifiers, and state paths). The user-facing product is **Gaja**. Keeping that boundary avoids breaking existing installations and priority state.
 
-The daily surface is an icon-only outlined lotus at the bottom right. Hover or press it to reveal the current thread; choose **Open thread** to resume in the owning agent. A resizable organizer is available from the card, Dock, menu bar, or `⇧⌘O`.
+The daily surface is an icon-only outlined lotus at the bottom right. Hover or press it to reveal the current thread; choose **Open thread** or the provider badge to resume that exact thread in the owning agent. Press and hold the lotus to move or hide it. A resizable drag-and-drop organizer is available from the card, Dock, menu bar, or `⇧⌘O`.
 
 > “Widget” describes the compact experience. The current release is a native AppKit/SwiftUI floating utility, not a WidgetKit extension. WidgetKit cannot implement a cross-application, always-on-top hover pill.
 
@@ -46,6 +46,8 @@ See [thread source configuration](docs/THREAD_SOURCES.md) for the generic adapte
 ## macOS design
 
 On macOS 26 and later, native surfaces use SwiftUI Liquid Glass. macOS 13–15 use semantic system material as a compatible fallback. Glass is limited to the navigation/overlay layer; list rows and controls remain standard SwiftUI components. The minimal lotus stays outline-only and adapts to light and dark appearances.
+
+The visual palette offers two production themes: **Native Popover** (default) and **Focus Deck**. Both support Auto, Light, and Dark across the native companion and portable MCP App. Command Capsule is intentionally excluded.
 
 The implementation follows Apple’s guidance on [Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/liquid-glass), [materials](https://developer.apple.com/design/human-interface-guidelines/materials), [macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/), and [widgets](https://developer.apple.com/design/human-interface-guidelines/widgets/). See [Apple design compliance](docs/APPLE_DESIGN_COMPLIANCE.md).
 

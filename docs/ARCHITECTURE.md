@@ -42,6 +42,8 @@ The canonical macOS file is `~/Library/Application Support/Gajendra/gajendra.v2.
 
 Writes create a `0600` temporary file inside a `0700` directory, then atomically rename it. If v2 state is absent, compatible Aadi and Priority Deck state is normalized to `codex:` IDs and copied. Legacy files are never moved or deleted.
 
+Visual preferences are separate from priority state. The native companion stores only validated theme, appearance, pill visibility, and pill position values in `UserDefaults`. The MCP App stores only the validated theme and appearance enum values in guarded browser-local storage; a host that denies storage falls back safely without affecting queue state. Neither path stores thread metadata or content.
+
 ## Resume routing
 
 - Codex threads open `codex://threads/<provider-id>`.

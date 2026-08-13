@@ -29,6 +29,7 @@ Codex uses its registered URL scheme. CLI-owned sessions use a temporary `.comma
 
 - Native panels request no Accessibility automation, screen recording, App Group, listener, or local network server.
 - The MCP UI runs in the host sandbox and can call only the declared Gaja tools and open declared links.
+- Native `UserDefaults` persists only validated visual-theme, appearance, pill-visibility, and pill-position values. MCP browser storage persists only the validated visual-theme and appearance enum strings; storage failures are non-fatal. No thread IDs, titles, projects, source results, or content enter either visual-preference store.
 - The native app and plugin bundle the byte-identical service artifact.
 - No updater daemon, LaunchAgent, or Codex-process monitor is installed. Launch at Login is an `SMAppService` main-app registration that the user can disable.
 

@@ -73,4 +73,29 @@ describe("thread source adapters", () => {
     })]);
     expect(result.sources).toContainEqual(expect.objectContaining({ id: "my-agent", state: "ready", threadCount: 1 }));
   });
+
+  it("rejects configured threads that cannot resume in their owning agent", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-non-resumable-source-"));
+    temporaryDirectories.push(directory);
+    const catalogPath = path.join(directory, "threads.json");
+    const configPath = path.join(directory, "sources.json");
+    await writeFile(catalogPath, JSON.stringify({
+      version: 1,
+      threads: [{ id: "thread-without-destination", title: "Cannot resume", project: "example" }],
+    }));
+    await writeFile(configPath, JSON.stringify({
+      version: 1,
+      sources: [{ id: "my-agent", name: "My Agent", catalog: catalogPath, enabled: true }],
+    }));
+    const codexStub = { close: async () => undefined, listThreads: async () => [] } as unknown as CodexAppServerClient;
+    const registry = new ThreadSourceRegistry(codexStub, { GAJENDRA_SOURCES_CONFIG: configPath });
+    const result = await registry.collect({ codex: false, claude: false, cursor: false });
+    expect(result.threads).toEqual([]);
+    expect(result.sources).toContainEqual(expect.objectContaining({
+      id: "my-agent",
+      state: "error",
+      threadCount: 0,
+      detail: expect.stringContaining("deepLink or resumeCommand"),
+    }));
+  });
 });

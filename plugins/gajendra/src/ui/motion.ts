@@ -33,36 +33,36 @@ export function createDeckMotion(root: HTMLElement) {
 
   function animateRender(layoutState: DeckLayoutState | null, reason: RenderReason): void {
     if (!motionEnabled) return;
-    markAnimating(0.58);
+    markAnimating(0.36);
     const flipTargets = root.querySelectorAll<HTMLElement>("[data-flip-id]");
     if (layoutState && flipTargets.length) {
       Flip.from(layoutState, {
         targets: flipTargets,
-        duration: 0.38,
+        duration: 0.24,
         ease: "power3.out",
         fade: true,
         prune: true,
         scale: true,
         simple: true,
         onEnter: (elements) => {
-          gsap.fromTo(elements, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.3, ease: "power3.out", stagger: 0.025 });
+          gsap.fromTo(elements, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.2, ease: "power3.out", stagger: 0.02 });
         },
       });
     } else if (reason === "initial" || reason === "external") {
       const panels = root.querySelectorAll<HTMLElement>(".deck-header, .now-card, .deck-section, .available-section, .deck-footer");
-      gsap.fromTo(panels, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.42, ease: "power3.out", stagger: 0.045 });
+      gsap.fromTo(panels, { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.24, ease: "power3.out", stagger: 0.025 });
     }
 
     if (reason === "expand") {
       const expanded = root.querySelectorAll<HTMLElement>('.section-toggle[aria-expanded="true"] + .thread-list > *');
-      gsap.fromTo(expanded, { autoAlpha: 0, y: -7 }, { autoAlpha: 1, y: 0, duration: 0.28, ease: "power3.out", stagger: 0.03 });
+      gsap.fromTo(expanded, { autoAlpha: 0, y: -7 }, { autoAlpha: 1, y: 0, duration: 0.2, ease: "power3.out", stagger: 0.025 });
       const chevrons = root.querySelectorAll<HTMLElement>('.section-toggle[aria-expanded="true"] .chevron');
       gsap.fromTo(chevrons, { rotation: -90 }, { rotation: 0, duration: 0.24, ease: "power3.out" });
     }
 
     if (reason === "refresh") {
       const now = root.querySelector<HTMLElement>(".now-card");
-      if (now) gsap.fromTo(now, { scale: 0.992, autoAlpha: 0.82 }, { scale: 1, autoAlpha: 1, duration: 0.32, ease: "power3.out" });
+      if (now) gsap.fromTo(now, { scale: 0.992, autoAlpha: 0.82 }, { scale: 1, autoAlpha: 1, duration: 0.22, ease: "power3.out" });
     }
 
     if (reason === "error") {

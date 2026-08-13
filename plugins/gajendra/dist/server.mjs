@@ -32455,17 +32455,20 @@ var resumeCommandSchema = external_exports.object({
   args: external_exports.array(external_exports.string()).max(24).default([]),
   cwd: external_exports.string().min(1).optional()
 });
+var catalogThreadSchema = external_exports.object({
+  id: external_exports.string().min(1).max(300),
+  title: external_exports.string().max(500),
+  project: external_exports.string().max(500).default(""),
+  updatedAt: external_exports.union([external_exports.number(), external_exports.string()]).optional(),
+  status: external_exports.string().max(80).default("unknown"),
+  deepLink: external_exports.string().url().optional(),
+  resumeCommand: resumeCommandSchema.optional()
+}).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
+  message: "A configured thread must declare deepLink or resumeCommand."
+});
 var threadCatalogSchema = external_exports.object({
   version: external_exports.literal(1),
-  threads: external_exports.array(external_exports.object({
-    id: external_exports.string().min(1).max(300),
-    title: external_exports.string().max(500),
-    project: external_exports.string().max(500).default(""),
-    updatedAt: external_exports.union([external_exports.number(), external_exports.string()]).optional(),
-    status: external_exports.string().max(80).default("unknown"),
-    deepLink: external_exports.string().url().optional(),
-    resumeCommand: resumeCommandSchema.optional()
-  })).max(2e3)
+  threads: external_exports.array(catalogThreadSchema).max(2e3)
 });
 var sourcesConfigSchema = external_exports.object({
   version: external_exports.literal(1),
