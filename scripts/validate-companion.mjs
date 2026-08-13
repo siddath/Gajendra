@@ -57,18 +57,25 @@ for (const required of [
   "SMAppService.mainApp.register()",
   "Launch Gaja at Login",
   "let enteredPill = hoverState.setPillHovered(hovered)",
-  "if enteredPill { model.refresh() }",
+  "if enteredPill && !pillEditController.isEditing { model.refresh() }",
   "if !wasVisible && !hoverState.pillHovered { model.refresh() }",
   "panel.orderFrontRegardless()",
   "NSAnimationContext.runAnimationGroup",
   "accessibilityDisplayShouldReduceMotion",
+  "NSEvent.addLocalMonitorForEvents",
+  "NSEvent.addGlobalMonitorForEvents",
+  "removePillEditDismissalMonitors()",
+  "NSEvent.pressedMouseButtons",
+  "pollForOutsidePillEditClick()",
+  "NSEvent.mouseLocation",
+  "GajendraOverlayPlacement.draggedOrigin",
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
 }
 for (const required of ["bottomTrailingOrigin", "cardOrigin", "pillHovered || cardHovered", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".ultraThinMaterial"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra hover contract is missing: ${required}`);
 }
-for (const required of ["GajendraPillEditState", "LongPressGesture(minimumDuration: 0.55)", "editState.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin"]) {
+for (const required of ["GajendraPillEditController", "dismissIfOutside", "LongPressGesture(minimumDuration: 0.55)", "editController.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin", "pointerStart", "draggedOrigin"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra pill edit contract is missing: ${required}`);
 }
 for (const required of [".draggable(threadId)", ".dropDestination(for: String.self)", "moveDroppedThread"]) {
@@ -78,6 +85,9 @@ for (const required of ["ThreadContext.allCases", ".setContext(threadId:", "cont
   if (!content.includes(required)) throw new Error(`Gajendra context-label contract is missing: ${required}`);
 }
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
+for (const required of ["nativePopoverLayout", "focusDeckLayout", ".lineLimit(3)", "openButtonForeground", "Fresh on hover · Local metadata"]) {
+  if (!overlay.includes(required)) throw new Error(`Gajendra redesigned hover card contract is missing: ${required}`);
+}
 for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark"]) {
   if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
 }
@@ -159,6 +169,9 @@ console.log(JSON.stringify({
   dockRecoverable: true,
   menuBarFallback: true,
   refreshOnReveal: true,
+  outsideClickEndsPillEdit: true,
+  globalPointerDragCoordinates: true,
+  distinctNativeAndFocusDeckLayouts: true,
   reversibleLaunchAtLogin: true,
   rowMenuIndicatorHidden: true,
   bundledServiceMatchesPlugin: true,

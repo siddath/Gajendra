@@ -134,12 +134,17 @@ public struct DeckContentView: View {
                 }
             }
         } label: {
-            Image(systemName: "paintpalette")
-                .frame(width: 20, height: 20)
-                .contentShape(Rectangle())
+            HStack(spacing: 5) {
+                Image(systemName: "paintpalette")
+                Text(visualSettings.theme.title)
+                    .font(.caption.weight(.medium))
+                    .lineLimit(1)
+            }
+            .frame(height: 20)
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
-        .frame(width: 28)
+        .fixedSize()
         .help("Theme and appearance")
         .accessibilityLabel("Theme and appearance")
     }
@@ -366,9 +371,6 @@ public struct DeckContentView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        if let context = thread.context {
-                            contextBadge(context)
-                        }
                         sourceBadge(thread)
                     }
                 }
@@ -376,6 +378,8 @@ public struct DeckContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+
+            contextControl(thread)
 
             if level == .focus && !thread.isCurrent {
                 Button("Make NOW") {
@@ -406,21 +410,6 @@ public struct DeckContentView: View {
                 .help("Move down")
                 .accessibilityLabel("Move \(thread.title) down")
                 Menu {
-                    Menu("Context") {
-                        ForEach(ThreadContext.allCases) { context in
-                            Button {
-                                model.apply(.setContext(threadId: thread.id, context: context))
-                            } label: {
-                                Label(context.title, systemImage: thread.context == context ? "checkmark" : "circle")
-                            }
-                        }
-                        if thread.context != nil {
-                            Divider()
-                            Button("Clear Context") {
-                                model.apply(.setContext(threadId: thread.id, context: nil))
-                            }
-                        }
-                    }
                     if level == .focus {
                         Button("Move to Important") {
                             model.apply(.setLevel(threadId: thread.id, level: .important))
@@ -447,6 +436,49 @@ public struct DeckContentView: View {
         .padding(10)
         .background(thread.isCurrent ? nowSurfaceColor : Color.clear)
         return priorityDragRow(row, threadId: thread.id, level: level, before: thread.id)
+    }
+
+    @ViewBuilder
+    private func contextControl(_ thread: DeckThread) -> some View {
+        if isPreview {
+            if let context = thread.context {
+                contextBadge(context)
+            } else {
+                Label("Add label", systemImage: "tag")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            Menu {
+                ForEach(ThreadContext.allCases) { context in
+                    Button {
+                        model.apply(.setContext(threadId: thread.id, context: context))
+                    } label: {
+                        Label(context.title, systemImage: thread.context == context ? "checkmark" : "circle")
+                    }
+                }
+                if thread.context != nil {
+                    Divider()
+                    Button("Clear label") {
+                        model.apply(.setContext(threadId: thread.id, context: nil))
+                    }
+                }
+            } label: {
+                if let context = thread.context {
+                    contextBadge(context)
+                } else {
+                    Label("Add label", systemImage: "tag")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .menuIndicator(.hidden)
+            .menuStyle(.borderlessButton)
+            .fixedSize()
+            .disabled(model.isLoading)
+            .help(thread.context == nil ? "Add Design, Engineering, or Life label" : "Change label")
+            .accessibilityLabel(thread.context == nil ? "Add label to \(thread.title)" : "Change label for \(thread.title)")
+        }
     }
 
     private func previewRowActions(index: Int, count: Int) -> some View {

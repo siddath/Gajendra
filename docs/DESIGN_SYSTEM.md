@@ -55,10 +55,10 @@ Both themes support Auto, Light, and Dark. Auto follows the macOS appearance in 
 - Primary Open thread action is vertically centered at the trailing edge of NOW.
 - Focus and Important counts sit beside their labels, not against the far edge.
 - Provider badges are text-backed and use supplemental source accents; activating a badge resumes that exact thread in its owning provider.
-- Prioritized threads may show one compact Design, Engineering, or Life context badge. The organizer assigns it from the existing row menu on macOS or a native select in the MCP App; the hover card is display-only.
+- Prioritized threads may show one compact Design, Engineering, or Life context badge. The organizer exposes a direct Add label control on macOS and a native select in the MCP App; the hover card is display-only.
 - Recent and prioritized rows are draggable between Focus and Important. Visible move and tier controls remain the keyboard-accessible equivalent.
 - Menus and disclosure indicators have separate hit targets and never overlap.
-- Press and hold the floating lotus for 550 ms to enter edit mode. The lotus jiggles, can be dragged within the visible display, or hidden; the app menu restores it.
+- Press and hold the floating lotus for 550 ms to enter edit mode. The lotus jiggles, can be dragged within the visible display using global pointer coordinates, or hidden. Clicking outside or pressing Escape exits edit mode without hiding it; the app menu restores a hidden lotus.
 
 ## Motion
 

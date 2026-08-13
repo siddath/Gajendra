@@ -36,13 +36,13 @@ enum GajendraSelfTest {
         )
         try require(pillOrigin == CGPoint(x: 1434, y: 43), "pill placement changed")
         let cardOrigin = GajendraOverlayPlacement.cardOrigin(
-            cardSize: CGSize(width: 404, height: 310),
+            cardSize: CGSize(width: 428, height: 326),
             pillFrame: CGRect(origin: pillOrigin, size: CGSize(width: 60, height: 60)),
             visibleFrame: visibleFrame
         )
-        try require(cardOrigin == CGPoint(x: 1090, y: 113), "hover card placement changed")
+        try require(cardOrigin == CGPoint(x: 1066, y: 113), "hover card placement changed")
         let clampedCardOrigin = GajendraOverlayPlacement.cardOrigin(
-            cardSize: CGSize(width: 404, height: 310),
+            cardSize: CGSize(width: 428, height: 326),
             pillFrame: CGRect(x: -20, y: 43, width: 60, height: 60),
             visibleFrame: CGRect(x: 0, y: 25, width: 1512, height: 950)
         )
@@ -53,6 +53,23 @@ enum GajendraSelfTest {
             visibleFrame: visibleFrame
         )
         try require(movedPillOrigin == CGPoint(x: 8, y: 907), "dragged pill must clamp to the visible screen")
+        let pointerStart = GajendraOverlayPlacement.pointerStart(
+            pointerLocation: CGPoint(x: 1_205, y: 85),
+            gestureTranslation: CGSize(width: -25, height: -25)
+        )
+        try require(
+            pointerStart == CGPoint(x: 1_230, y: 60),
+            "first drag event must reconstruct the global pointer start without losing motion"
+        )
+        let globallyDraggedOrigin = GajendraOverlayPlacement.draggedOrigin(
+            startOrigin: CGPoint(x: 1_200, y: 40),
+            pointerStart: CGPoint(x: 1_230, y: 70),
+            pointerLocation: CGPoint(x: -760, y: 420)
+        )
+        try require(
+            globallyDraggedOrigin == CGPoint(x: -790, y: 390),
+            "pill drag must use stable global pointer coordinates across displays"
+        )
         var hover = GajendraHoverState()
         try require(!hover.wantsCardVisible, "card must start hidden")
         try require(hover.setPillHovered(true), "a new pill hover must request fresh data")
@@ -64,16 +81,34 @@ enum GajendraSelfTest {
         hover.setCardHovered(false)
         try require(!hover.wantsCardVisible, "card must hide after both hover targets exit")
         try require(hover.setPillHovered(true), "a new hover during the hide grace period must request fresh data")
-        var pillEdit = GajendraPillEditState()
-        try require(!pillEdit.acceptsDrag, "pill drag must be locked before the long-press edit transition")
-        try require(!pillEdit.requestHide(), "pill hide must be locked before the long-press edit transition")
-        pillEdit.enter()
-        try require(pillEdit.acceptsDrag, "long-press edit mode must unlock pill dragging")
-        try require(pillEdit.requestHide(), "edit mode must expose the pill hide action")
-        try require(!pillEdit.acceptsDrag, "hiding the pill must leave edit mode")
-        pillEdit.enter()
-        pillEdit.exit()
-        try require(!pillEdit.acceptsDrag, "Escape must leave pill edit mode")
+        try await MainActor.run {
+            let editController = GajendraPillEditController()
+            try require(!editController.acceptsDrag, "pill drag must be locked before the long-press edit transition")
+            try require(!editController.requestHide(), "pill hide must be locked before the long-press edit transition")
+            editController.enter()
+            try require(
+                !editController.dismissIfOutside(
+                    point: CGPoint(x: 25, y: 25),
+                    pillFrame: CGRect(x: 0, y: 0, width: 60, height: 60)
+                ),
+                "clicking the pill must preserve edit mode"
+            )
+            try require(editController.isEditing, "an inside click unexpectedly ended edit mode")
+            try require(
+                editController.dismissIfOutside(
+                    point: CGPoint(x: -1, y: 25),
+                    pillFrame: CGRect(x: 0, y: 0, width: 60, height: 60)
+                ),
+                "an outside click must end edit mode"
+            )
+            try require(!editController.isEditing, "outside dismissal left edit mode active")
+            editController.enter()
+            try require(editController.requestHide(), "edit mode must expose the pill hide action")
+            try require(!editController.acceptsDrag, "hiding the pill must leave edit mode")
+            editController.enter()
+            editController.exit()
+            try require(!editController.acceptsDrag, "Escape must leave pill edit mode")
+        }
         try await verifyVisualSettings()
         try await verifyQueuedRefresh(with: snapshot)
         try await verifyQueuedMutation(with: snapshot)

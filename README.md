@@ -14,7 +14,7 @@
 
 The repository and compatibility identity is **Gajendra** (`gajendra` in packages, plugin IDs, URLs, bundle identifiers, and state paths). The user-facing product is **Gaja**. Keeping that boundary avoids breaking existing installations and priority state.
 
-The daily surface is an icon-only outlined lotus at the bottom right. Hover or press it to reveal the current thread; choose **Open thread** or the provider badge to resume that exact thread in the owning agent. Press and hold the lotus to move or hide it. A resizable drag-and-drop organizer is available from the card, Dock, menu bar, or `⇧⌘O`.
+The daily surface is an icon-only outlined lotus at the bottom right. Hover or press it to reveal the current thread; choose **Open** or the provider badge to resume that exact thread in the owning agent. Press and hold the lotus to move or hide it; click outside or press Escape to leave edit mode without hiding it. Dragging uses stable global display coordinates and persists the final clamped position. A resizable drag-and-drop organizer is available from the card, Dock, menu bar, or `⇧⌘O`.
 
 > “Widget” describes the compact experience. The current release is a native AppKit/SwiftUI floating utility, not a WidgetKit extension. WidgetKit cannot implement a cross-application, always-on-top hover pill.
 
