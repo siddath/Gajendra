@@ -2,7 +2,7 @@
 
 **Candidate:** Gaja, Elephant Focus for AI Power Users 0.3.1
 **Reconciled:** 2026-08-13
-**Publication state:** local source-release candidate; not published
+**Publication state:** public source repository at [siddath/Gajendra](https://github.com/siddath/Gajendra); macOS binary distribution remains separate
 
 **Repository/compatibility identity:** Gajendra (`gajendra` packages, plugin ID, URL scheme, bundle identifier, executable, and state paths)
 
@@ -20,6 +20,7 @@
 
 ## Local verification
 
+- Hosted GitHub Actions: initial public `main` commit `8f9360c` passed both `plugin` and `macos-companion` jobs in [run 31662304586](https://github.com/siddath/Gajendra/actions/runs/31662304586).
 - Release gauntlet: passed from `2026-08-12T18:52:39.700Z` to `2026-08-12T18:54:15.936Z`, 18/18 receipts; report SHA-256 `b49f7930061ef80ac56324fceda838d71f20cfa5b8d0956ede7932bb02d6c6e6`.
 - Tests: 19 unit/integration tests, 7 browser journeys, 35 repeated browser journeys, and five repeated unit suites all passed.
 - Supply chain: `npm audit --omit=dev --audit-level=high` found 0 vulnerabilities.
@@ -39,7 +40,6 @@
 
 ## Still external or unproven
 
-- No public GitHub URL, release, tag, or hosted CI receipt is claimed.
 - The app is ad-hoc signed, not Developer ID signed or notarized.
 - Codex’s experimental global MCP App destination remains host/account gated; the native utility and inline MCP App do not depend on it.
 - The 14-day adoption trial has not yet produced three real reuse receipts.
