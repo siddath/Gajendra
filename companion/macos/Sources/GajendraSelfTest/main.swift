@@ -9,6 +9,11 @@ enum GajendraSelfTest {
         try require(snapshot.focus.filter(\.isCurrent).count == 1, "NOW must remain singular")
         try require(snapshot.current?.deepLink == "codex://threads/focus-1", "deep link changed")
         try require(snapshot.sources.count == 2, "thread sources did not decode")
+        try require(
+            snapshot.available.first?.resumeCommand
+                == ResumeCommand(executable: "/usr/local/bin/claude", arguments: ["--resume", "claude-1"], cwd: "/tmp/project"),
+            "service resume-command args did not decode"
+        )
 
         let data = try JSONEncoder().encode(DeckMutation.setLevel(threadId: "codex:focus-1", level: nil))
         guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -140,7 +145,13 @@ enum GajendraSelfTest {
         "status": "idle", "level": "focus", "isCurrent": true,
         "deepLink": "codex://threads/focus-1", "resumeCommand": null
       }],
-      "important": [], "available": [],
+      "important": [],
+      "available": [{
+        "id": "claude:claude-1", "sourceId": "claude", "sourceName": "Claude Code", "title": "Claude task", "project": "Fixture", "updatedAt": 1,
+        "status": "resumable", "level": null, "isCurrent": false,
+        "deepLink": "gajendra://thread/claude%3Aclaude-1",
+        "resumeCommand": {"executable":"/usr/local/bin/claude","args":["--resume","claude-1"],"cwd":"/tmp/project"}
+      }],
       "collapsed": {"focus": false, "important": false},
       "focusGuide": 5, "focusOverGuide": false, "staleEntryCount": 0,
       "source": "fixture",

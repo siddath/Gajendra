@@ -10,6 +10,12 @@ public struct ResumeCommand: Codable, Equatable, Sendable {
     public let arguments: [String]
     public let cwd: String?
 
+    private enum CodingKeys: String, CodingKey {
+        case executable
+        case arguments = "args"
+        case cwd
+    }
+
     public init(executable: String, arguments: [String], cwd: String? = nil) {
         self.executable = executable
         self.arguments = arguments
