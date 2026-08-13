@@ -1,0 +1,65 @@
+{
+  "contractVersion": 1,
+  "product": "Gaja, Elephant Focus for AI Power Users",
+  "repositoryIdentity": "Gajendra",
+  "version": "0.3.1",
+  "observedAt": "2026-08-12T18:54:29.907Z",
+  "status": "passed-with-codex-host-reload-pending",
+  "bundle": {
+    "identifier": "dev.sid.gajendra",
+    "displayName": "Gaja",
+    "executable": "Gajendra",
+    "signature": "valid-ad-hoc",
+    "installedMatchesBuild": true,
+    "binarySha256": "02865e04d0cb2bd2ed1a47a24f231ee40bb89d87505c72890f6fbc6bfb9d504b",
+    "iconSha256": "0e44c3fa05a98925aac3e8e1f52ffaeda9ef61c2f3be01c052f5a7e230db444c"
+  },
+  "artwork": {
+    "canonicalSvgSha256": "9b37a08596c0c6c03d345da34703aed549f93dfb7791955ffd8672847d04bef9",
+    "generatedPngSha256": "ef1e549403186e8c020ac2c5587bdb1020811c3968e6721164b22aaaf2189546",
+    "outlineOnly": true,
+    "canonicalStrokeCount": 7,
+    "crossSurfaceGeometryValidated": true
+  },
+  "nativeSurface": {
+    "controlBounds": { "x": 1434, "y": 904, "width": 60, "height": 60 },
+    "cardBounds": { "x": 1090, "y": 584, "width": 404, "height": 310 },
+    "bottomRightMarginPoints": 18,
+    "hoverRevealObserved": true,
+    "cursorRestoredAfterProbe": true,
+    "organizerContractValidated": true,
+    "liquidGlassAvailabilityGate": true,
+    "systemMaterialFallback": true
+  },
+  "sources": {
+    "codex": { "state": "ready", "enabled": true, "boundedThreadCount": 123, "proof": "live" },
+    "claude": { "state": "ready", "enabled": true, "boundedThreadCount": 200, "proof": "live-metadata-adapter" },
+    "cursor": { "state": "not-installed", "enabled": true, "boundedThreadCount": 0, "proof": "fixture-parser-only" }
+  },
+  "integration": {
+    "pluginVersion": "0.3.1",
+    "installedArtifactCount": 9,
+    "installedArtifactsMatchSource": true,
+    "registeredToolCount": 6,
+    "registeredResourceCount": 1,
+    "uniqueGlobalNowInvariant": true,
+    "stateFileMode": "0600",
+    "stateDirectoryMode": "0700",
+    "privateThreadContentRecorded": false,
+    "codexHostReloadPending": true
+  },
+  "gauntlet": {
+    "status": "passed",
+    "startedAt": "2026-08-12T18:52:39.700Z",
+    "completedAt": "2026-08-12T18:54:15.936Z",
+    "receiptCount": 18,
+    "finalArtifactGatePassed": true,
+    "reportSha256": "b49f7930061ef80ac56324fceda838d71f20cfa5b8d0956ede7932bb02d6c6e6"
+  },
+  "notProven": [
+    "Cursor live discovery or resume because cursor-agent is absent",
+    "Developer ID signing or notarization",
+    "Hosted CI or public GitHub release",
+    "Codex experimental global destination after the 0.3.1 plugin refresh"
+  ]
+}

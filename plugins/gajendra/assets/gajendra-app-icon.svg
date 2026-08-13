@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Gaja app icon</title>
+  <desc id="desc">A precise thin-line gold lotus on a deep indigo glass surface.</desc>
+  <defs>
+    <linearGradient id="field" x1=".1" y1=".06" x2=".9" y2=".96">
+      <stop stop-color="#29456f"/>
+      <stop offset=".48" stop-color="#0d1c3b"/>
+      <stop offset="1" stop-color="#050b18"/>
+    </linearGradient>
+    <radialGradient id="light" cx=".3" cy=".17" r=".82">
+      <stop stop-color="#fff" stop-opacity=".18"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity=".025"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1=".18" y1=".05" x2=".82" y2=".95">
+      <stop stop-color="#fff3c4"/>
+      <stop offset=".44" stop-color="#f2ca69"/>
+      <stop offset="1" stop-color="#b27418"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4" flood-color="#000" flood-opacity=".48"/>
+    </filter>
+  </defs>
+  <rect x="52" y="52" width="920" height="920" rx="220" fill="url(#field)"/>
+  <rect x="52" y="52" width="920" height="920" rx="220" fill="url(#light)"/>
+  <rect x="60" y="60" width="904" height="904" rx="212" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="8"/>
+  <g transform="translate(102 80) scale(6.4)" filter="url(#shadow)" fill="none" stroke="url(#gold)" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M64 101C48 83 49 47 64 24C79 47 80 83 64 101Z"/>
+    <path d="M61 101C42 91 29 70 31 49C49 56 61 73 64 96"/>
+    <path d="M67 101C86 91 99 70 97 49C79 56 67 73 64 96"/>
+    <path d="M59 105C38 105 18 92 11 72C31 70 50 82 63 103"/>
+    <path d="M69 105C90 105 110 92 117 72C97 70 78 82 65 103"/>
+    <path d="M24 102C42 116 86 116 104 102"/>
+    <path d="M38 113C51 121 77 121 90 113"/>
+  </g>
+</svg>

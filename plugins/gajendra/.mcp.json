@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "gajendra": {
+      "title": "Gaja, Elephant Focus for AI Power Users",
+      "description": "Keep one clearly highlighted NOW thread across configured AI-agent sources.",
+      "icons": [
+        {
+          "src": "./assets/gajendra.svg",
+          "mimeType": "image/svg+xml",
+          "sizes": ["24x24"]
+        }
+      ],
+      "cwd": ".",
+      "command": "node",
+      "args": ["./dist/server.mjs", "--stdio"]
+    }
+  }
+}

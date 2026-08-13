@@ -1,0 +1,36 @@
+{
+  "name": "gajendra",
+  "version": "0.3.1",
+  "private": true,
+  "type": "module",
+  "description": "Gaja: one local focus layer for threads across configured AI agents.",
+  "scripts": {
+    "build": "npm run build:ui && npm run build:server",
+    "build:ui": "cross-env GAJENDRA_ENTRY=gajendra.html vite build && node scripts/normalize-build.mjs dist/gajendra.html",
+    "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.mjs --banner:js='import { createRequire as __createRequire } from \"module\"; const require = __createRequire(import.meta.url);' && node scripts/normalize-build.mjs dist/server.mjs",
+    "check": "npm run typecheck && npm run test && npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "1.7.5",
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "gsap": "^3.15.0",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.3.0",
+    "cross-env": "^10.0.0",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.4",
+    "vite-plugin-singlefile": "^2.3.0",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

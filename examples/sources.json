@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "my-agent",
+      "name": "My Agent",
+      "catalog": "~/Library/Application Support/My Agent/gajendra-threads.json",
+      "enabled": true
+    }
+  ]
+}

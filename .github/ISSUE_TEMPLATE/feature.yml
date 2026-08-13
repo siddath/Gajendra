@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a focused improvement that preserves Gajendra's product boundaries.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What repeated decision or workflow problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Explain the smallest useful behavior and its fallback.
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Product boundaries
+      options:
+        - label: This keeps one global NOW and does not claim to change native provider pins.
+          required: true
+        - label: This does not require prompts or transcripts to be persisted.
+          required: true
+        - label: Any new source is explicit, bounded, and failure-isolated.
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/siddath/Gajendra/security/advisories/new
+    about: Report undisclosed vulnerabilities privately. Do not include secrets or private AI-agent content.
+  - name: Usage questions and ideas
+    url: https://github.com/siddath/Gajendra/discussions
+    about: Ask for help or discuss ideas that are not yet actionable bug reports.

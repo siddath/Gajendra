@@ -1,0 +1,9 @@
+GSAP 3.15.0
+
+Package-declared license:
+Standard "no charge" license: https://gsap.com/standard-license
+
+Copyright (c) 2008-2026, GreenSock. All rights reserved.
+
+The npm package does not include a standalone license-text file. Consult the URL above for the
+license terms governing GSAP. Gajendra uses GSAP core and Flip for user-interface transitions.

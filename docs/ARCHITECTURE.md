@@ -1,0 +1,75 @@
+# Architecture
+
+## Product contract
+
+Gaja lets one person choose one current thread across configured AI agents, see the short queue behind it, and resume work in the source product. AI agents own sessions; Gaja owns only priority metadata. Gajendra remains the repository and compatibility identity.
+
+```mermaid
+flowchart LR
+    Pill["Bottom-right lotus"] -->|"hover or press"| Card["Glass focus card"]
+    Card --> Organizer["Resizable organizer"]
+    MCP["Portable MCP App"] --> Service["Gajendra service core"]
+    Organizer --> Service
+    Service --> Policy["One global NOW"]
+    Policy --> Store["Private v2 metadata store"]
+    Service --> Registry["Thread source registry"]
+    Registry --> Codex["Codex app-server"]
+    Registry --> Claude["Claude metadata adapter"]
+    Registry --> Cursor["Cursor Agent CLI"]
+    Registry --> Catalogs["Configured JSON catalogs"]
+    Organizer -->|"Open thread"| Owner["Owning AI agent"]
+```
+
+## Canonical model
+
+Every thread ID is namespaced as `source-id:provider-thread-id`. Gaja stores only these IDs and its policy fields.
+
+- NOW is absent or exactly one Focus entry.
+- A thread appears at most once across Focus and Important.
+- Moving NOW out of Focus selects the next Focus entry when available.
+- Five Focus threads is guidance, not a hard limit.
+- Disabling a source hides live threads without deleting stored priority metadata; re-enabling restores resolvable entries.
+
+## Source registry
+
+Sources execute concurrently and return a bounded list of normalized `AgentThread` values plus health status. One failing optional source does not block a ready source. A snapshot reports an aggregate error only when every enabled source is unavailable.
+
+Built-in source preferences default to Codex on, Cursor on, and Claude off. Configured catalogs choose their own initial state. See [Thread sources](THREAD_SOURCES.md).
+
+## Persistence and migration
+
+The canonical macOS file is `~/Library/Application Support/Gajendra/gajendra.v2.json`. `GAJENDRA_DATA_DIR`, host `PLUGIN_DATA`, and XDG configuration are supported for tests and non-macOS hosts.
+
+Writes create a `0600` temporary file inside a `0700` directory, then atomically rename it. If v2 state is absent, compatible Aadi and Priority Deck state is normalized to `codex:` IDs and copied. Legacy files are never moved or deleted.
+
+## Resume routing
+
+- Codex threads open `codex://threads/<provider-id>`.
+- CLI-backed threads expose a structured `{executable, args, cwd}` value and a `gajendra://thread/<canonical-id>` route.
+- The native app resolves that ID from its current snapshot and opens a short-lived, quoted `.command` file in Terminal.
+- Generic catalogs may instead provide a direct URL.
+
+The service never accepts a free-form shell string.
+
+## macOS surfaces
+
+The lotus and hover card are borderless, nonactivating floating `NSPanel` instances. They join Spaces and supported full-screen application contexts, re-clamp after display changes, and remain independent of Codex’s view hierarchy. Hovering either panel keeps the card visible; a 220 ms grace period bridges the physical gap.
+
+The organizer is a normal resizable macOS window with Dock, menu-bar, keyboard, and reopen recovery. macOS 26 uses SwiftUI `glassEffect`; macOS 13–15 use semantic material fallback. Reduce Motion is respected.
+
+This is intentionally not a WidgetKit extension. WidgetKit is suitable for passive desktop/Notification Center summaries and click-through, but not an always-on-top cross-app hover interaction.
+
+## MCP App surface
+
+The portable contract is `_meta.ui.resourceUri` plus `text/html;profile=mcp-app`. Only `gajendra_open` advertises the experimental global entry point. Hosts that ignore it still retain the inline MCP App and native companion.
+
+The web UI uses GSAP/Flip for user-action feedback and disables motion under `prefers-reduced-motion`. Native SwiftUI uses system animation only.
+
+## Failure model
+
+- Source failures remain visible per source and retry on refresh.
+- Codex RPC uses a configurable 15-second timeout and rejects cursor loops.
+- Cursor listing uses a 10-second timeout and bounded output.
+- Mutations made during refresh are queued and drained in order.
+- Deleted/unavailable thread references become a stale count, never synthetic sessions.
+- No background updater or Codex restart loop exists.

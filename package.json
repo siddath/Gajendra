@@ -1,0 +1,28 @@
+{
+  "name": "gajendra-repository",
+  "version": "0.3.1",
+  "private": true,
+  "description": "Gaja, Elephant Focus for AI Power Users, from the open-source Gajendra repository.",
+  "workspaces": [
+    "plugins/gajendra"
+  ],
+  "scripts": {
+    "build": "npm --workspace gajendra run build",
+    "check": "npm run check:scripts && npm --workspace gajendra run check && npm run validate:plugin",
+    "check:scripts": "node --check scripts/host-preflight.mjs && node --check scripts/install-local.mjs && node --check scripts/live-mcp-probe.mjs && node --check scripts/run-gauntlet.mjs && node --check scripts/validate-companion.mjs && node --check scripts/validate-plugin.mjs",
+    "companion:build": "zsh companion/macos/scripts/build-app.zsh",
+    "companion:preview": "zsh companion/macos/scripts/render-preview.zsh",
+    "companion:test": "swift run --package-path companion/macos GajendraSelfTest",
+    "companion:validate": "node scripts/validate-companion.mjs",
+    "gauntlet": "node scripts/run-gauntlet.mjs",
+    "host:preflight": "node scripts/host-preflight.mjs",
+    "install:local": "node scripts/install-local.mjs",
+    "test": "npm --workspace gajendra run test",
+    "test:e2e": "npm --workspace gajendra run test:e2e",
+    "probe:live": "node scripts/live-mcp-probe.mjs",
+    "validate:plugin": "node scripts/validate-plugin.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

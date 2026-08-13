@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "thread-123",
+      "title": "Finish the synthetic release audit",
+      "project": "example-project",
+      "updatedAt": "2026-08-12T12:00:00Z",
+      "status": "idle",
+      "deepLink": "my-agent://threads/thread-123"
+    }
+  ]
+}

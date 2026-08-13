@@ -1,0 +1,24 @@
+{
+  "name": "gajendra",
+  "version": "0.3.1",
+  "description": "Elephant Focus for AI Power Users: one local priority layer across AI-agent threads.",
+  "author": {
+    "name": "Gajendra contributors"
+  },
+  "license": "MIT",
+  "keywords": ["codex", "claude", "cursor", "focus", "threads", "mcp-app", "macos"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Gaja, Elephant Focus for AI Power Users",
+    "shortDescription": "Keep one AI-agent thread unmistakably in focus.",
+    "longDescription": "Gaja unifies recent threads from Codex, Claude, Cursor, and configured metadata catalogs into one highlighted NOW item, Focus queue, and Important list.",
+    "developerName": "Gajendra",
+    "category": "Productivity",
+    "capabilities": ["MCP App", "Multi-agent thread organization", "Local metadata adapters", "Native macOS companion"],
+    "defaultPrompt": "Open Gaja and help me choose the one AI-agent thread I should focus on now.",
+    "brandColor": "#E8B447",
+    "composerIcon": "./assets/gajendra.svg",
+    "logo": "./assets/gajendra-icon.png"
+  },
+  "mcpServers": "./.mcp.json"
+}

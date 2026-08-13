@@ -1,0 +1,20 @@
+{
+  "name": "gajendra",
+  "interface": {
+    "displayName": "Gaja, Elephant Focus for AI Power Users"
+  },
+  "plugins": [
+    {
+      "name": "gajendra",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gajendra"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
