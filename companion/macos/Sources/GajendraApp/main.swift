@@ -57,6 +57,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private var launchAtLoginItem: NSMenuItem?
     private var pillVisibilityItem: NSMenuItem?
     private var appearanceCancellable: AnyCancellable?
+    private var hoverCardSizeCancellable: AnyCancellable?
     private var pillEditCancellable: AnyCancellable?
     private var localEditDismissMonitor: Any?
     private var globalEditDismissMonitor: Any?
@@ -66,7 +67,6 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private var pillDragPointerStart: CGPoint?
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
-    private let cardSize = NSSize(width: 428, height: 326)
     private let pillHiddenKey = "gajendra.pill.hidden"
     private let pillHasCustomOriginKey = "gajendra.pill.has-custom-origin"
     private let pillOriginXKey = "gajendra.pill.origin.x"
@@ -191,7 +191,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
         UserDefaults.standard.set(false, forKey: pillHiddenKey)
         updatePillVisibilityMenuState()
-        if cardWindow?.isVisible == true { positionCard() }
+        if cardWindow?.isVisible == true {
+            resizeCard(for: targetScreen, animated: false)
+            positionCard()
+        }
     }
 
     private func hidePill() {
@@ -296,6 +299,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         let wasVisible = panel.isVisible
         cardWindow = panel
         cardAnimationGeneration += 1
+        resizeCard(for: pillWindow?.screen ?? preferredScreen(), animated: false)
         positionCard()
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             panel.alphaValue = 1
@@ -352,6 +356,38 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
                 visibleFrame: screen.visibleFrame
             )
         )
+    }
+
+    private func resizeCard(for screen: NSScreen, animated: Bool) {
+        guard let panel = cardWindow else { return }
+        let targetSize = GajendraHoverCardSizing.size(
+            for: visualSettings.hoverCardSize,
+            visibleFrame: screen.visibleFrame
+        )
+        panel.contentMaxSize = NSSize(
+            width: max(320, screen.visibleFrame.width - 24),
+            height: max(360, screen.visibleFrame.height - 24)
+        )
+        guard panel.frame.size != targetSize else { return }
+        let targetOrigin = pillWindow.map {
+            GajendraOverlayPlacement.cardOrigin(
+                cardSize: targetSize,
+                pillFrame: $0.frame,
+                visibleFrame: screen.visibleFrame
+            )
+        } ?? panel.frame.origin
+        let targetFrame = NSRect(origin: targetOrigin, size: targetSize)
+        if animated,
+           panel.isVisible,
+           !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            panel.setFrame(targetFrame, display: panel.isVisible)
+        }
     }
 
     private func configureApplicationMenu() {
@@ -423,6 +459,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         appearanceCancellable = visualSettings.$appearance.sink { appearance in
             NSApplication.shared.appearance = appearance.appKitName.flatMap(NSAppearance.init(named:))
         }
+        hoverCardSizeCancellable = visualSettings.$hoverCardSize
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.resizeCard(for: self.pillWindow?.screen ?? self.preferredScreen(), animated: true)
+            }
     }
 
     private func configurePillInteraction() {
@@ -564,7 +607,17 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makeCardPanel() -> NSPanel {
+        let screen = pillWindow?.screen ?? preferredScreen()
+        let cardSize = GajendraHoverCardSizing.size(
+            for: visualSettings.hoverCardSize,
+            visibleFrame: screen.visibleFrame
+        )
         let panel = makeOverlayPanel(title: "Gaja Details", size: cardSize)
+        panel.contentMinSize = NSSize(width: 320, height: 360)
+        panel.contentMaxSize = NSSize(
+            width: max(320, screen.visibleFrame.width - 24),
+            height: max(360, screen.visibleFrame.height - 24)
+        )
         panel.setAccessibilityLabel("Gaja priority details")
         panel.contentViewController = NSHostingController(
             rootView: GajendraHoverCardView(

@@ -47,6 +47,29 @@ enum GajendraSelfTest {
             visibleFrame: CGRect(x: 0, y: 25, width: 1512, height: 950)
         )
         try require(clampedCardOrigin.x == 12, "hover card must stay inside the visible screen")
+        let referenceCardSize = GajendraHoverCardSizing.size(
+            for: .comfortable,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
+        )
+        try require(referenceCardSize == CGSize(width: 660, height: 500), "14-inch reference card size changed")
+        let compactCardSize = GajendraHoverCardSizing.size(
+            for: .compact,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
+        )
+        let expandedCardSize = GajendraHoverCardSizing.size(
+            for: .expanded,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
+        )
+        try require(compactCardSize.width < referenceCardSize.width, "Compact must be narrower than Comfortable")
+        try require(expandedCardSize.width > referenceCardSize.width, "Expanded must be wider than Comfortable")
+        let smallDisplayCardSize = GajendraHoverCardSizing.size(
+            for: .expanded,
+            visibleFrame: CGRect(x: 0, y: 0, width: 620, height: 500)
+        )
+        try require(
+            smallDisplayCardSize.width <= 596 && smallDisplayCardSize.height <= 476,
+            "card size must clamp to a small display's visible frame"
+        )
         let movedPillOrigin = GajendraOverlayPlacement.clampedOrigin(
             windowSize: CGSize(width: 60, height: 60),
             proposedOrigin: CGPoint(x: -400, y: 2_000),
@@ -127,17 +150,22 @@ enum GajendraSelfTest {
             var settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .nativePopover, "Native Popover must be the default theme")
             try require(settings.appearance == .automatic, "Auto must be the default appearance")
+            try require(settings.hoverCardSize == .comfortable, "Comfortable must be the default hover-card size")
             settings.theme = .focusDeck
             settings.appearance = .dark
+            settings.hoverCardSize = .expanded
             settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .focusDeck, "theme choice did not survive reinitialization")
             try require(settings.appearance == .dark, "appearance choice did not survive reinitialization")
+            try require(settings.hoverCardSize == .expanded, "hover-card size did not survive reinitialization")
 
             defaults.set("command-capsule", forKey: GajendraVisualSettings.themeKey)
             defaults.set("sepia", forKey: GajendraVisualSettings.appearanceKey)
+            defaults.set("cinema", forKey: GajendraVisualSettings.hoverCardSizeKey)
             settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .nativePopover, "invalid theme must fall back safely")
             try require(settings.appearance == .automatic, "invalid appearance must fall back safely")
+            try require(settings.hoverCardSize == .comfortable, "invalid hover-card size must fall back safely")
             try require(GajendraAppearance.automatic.appKitName == nil, "Auto must follow the system appearance")
             try require(GajendraAppearance.light.appKitName == .aqua, "Light must map to Aqua")
             try require(GajendraAppearance.dark.appKitName == .darkAqua, "Dark must map to Dark Aqua")

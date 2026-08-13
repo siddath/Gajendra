@@ -72,7 +72,7 @@ for (const required of [
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
 }
-for (const required of ["bottomTrailingOrigin", "cardOrigin", "pillHovered || cardHovered", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".ultraThinMaterial"]) {
+for (const required of ["bottomTrailingOrigin", "cardOrigin", "pillHovered || cardHovered", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".thinMaterial"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra hover contract is missing: ${required}`);
 }
 for (const required of ["GajendraPillEditController", "dismissIfOutside", "LongPressGesture(minimumDuration: 0.55)", "editController.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin", "pointerStart", "draggedOrigin"]) {
@@ -84,15 +84,18 @@ for (const required of [".draggable(threadId)", ".dropDestination(for: String.se
 for (const required of ["ThreadContext.allCases", ".setContext(threadId:", "contextBadge("]) {
   if (!content.includes(required)) throw new Error(`Gajendra context-label contract is missing: ${required}`);
 }
+for (const required of ['Picker("Hover card size"', "$visualSettings.hoverCardSize"]) {
+  if (!content.includes(required)) throw new Error(`Gajendra organizer visual-settings contract is missing: ${required}`);
+}
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
-for (const required of ["nativePopoverLayout", "focusDeckLayout", ".lineLimit(3)", "openButtonForeground", "Fresh on hover · Local metadata"]) {
+for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "hoveredThreadId", "providerBadge(", "openButtonForeground", "Fresh on hover · Local metadata"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra redesigned hover card contract is missing: ${required}`);
 }
-for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark"]) {
+for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark", "case compact", "case comfortable", "case expanded", "hoverCardSizeKey", "GajendraHoverCardSizing"]) {
   if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
 }
 if (visualSettings.includes("command-capsule")) throw new Error("Command Capsule must not be a production theme.");
-for (const required of ["visualSettings: visualSettings", "configureAppearance()", "gajendra.pill.hidden", "Hide Gaja Lotus", "Show Gaja Lotus"]) {
+for (const required of ["visualSettings: visualSettings", "configureAppearance()", "resizeCard(for:", "GajendraHoverCardSizing.size(", "gajendra.pill.hidden", "Hide Gaja Lotus", "Show Gaja Lotus"]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra shared visual or pill recovery contract is missing: ${required}`);
 }
 const markBody = overlay.slice(overlay.indexOf("public struct GajendraMark"), overlay.indexOf("public struct GajendraGlassSurface"));
@@ -171,7 +174,10 @@ console.log(JSON.stringify({
   refreshOnReveal: true,
   outsideClickEndsPillEdit: true,
   globalPointerDragCoordinates: true,
-  distinctNativeAndFocusDeckLayouts: true,
+  adaptiveHoverCardSizing: true,
+  visibleQueueLimitPerTier: 5,
+  hoverCardSizes: ["compact", "comfortable", "expanded"],
+  distinctNativeAndFocusDeckSurfaces: true,
   reversibleLaunchAtLogin: true,
   rowMenuIndicatorHidden: true,
   bundledServiceMatchesPlugin: true,

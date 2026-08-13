@@ -205,7 +205,7 @@ public struct GajendraGlassSurface: View {
                     .overlay(shape.stroke(Color.primary.opacity(0.13), lineWidth: 0.5))
             } else {
                 shape
-                    .fill(.ultraThinMaterial)
+                    .fill(.thinMaterial)
                     .overlay(
                         shape.fill(themeTint)
                     )
@@ -218,10 +218,10 @@ public struct GajendraGlassSurface: View {
     private var themeTint: Color {
         if theme == .focusDeck {
             return colorScheme == .dark
-                ? Color.gajendraIndigo.opacity(0.72)
-                : Color(red: 0.97, green: 0.94, blue: 0.86).opacity(0.78)
+                ? Color.gajendraIndigo.opacity(0.58)
+                : Color(red: 0.97, green: 0.94, blue: 0.86).opacity(0.6)
         }
-        return Color(nsColor: .windowBackgroundColor).opacity(0.92)
+        return Color(nsColor: .windowBackgroundColor).opacity(colorScheme == .dark ? 0.56 : 0.46)
     }
 }
 
@@ -370,6 +370,7 @@ public struct GajendraHoverCardView: View {
     @ObservedObject private var visualSettings: GajendraVisualSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @State private var hoveredThreadId: String?
     private let isPreview: Bool
     private let onHoverChanged: (Bool) -> Void
     private let onOpenOrganizer: () -> Void
@@ -389,22 +390,22 @@ public struct GajendraHoverCardView: View {
     }
 
     public var body: some View {
-        Group {
-            if visualSettings.theme == .focusDeck {
-                focusDeckLayout
-            } else {
-                nativePopoverLayout
-            }
+        GeometryReader { proxy in
+            cardLayout
+                .padding(contentInset)
+                .frame(
+                    width: max(0, proxy.size.width - 24),
+                    height: max(0, proxy.size.height - 24),
+                    alignment: .top
+                )
+                .background(
+                    GajendraGlassSurface(
+                        cornerRadius: visualSettings.theme == .focusDeck ? 14 : 16,
+                        theme: visualSettings.theme
+                    )
+                )
+                .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
         }
-        .padding(visualSettings.theme == .focusDeck ? 14 : 15)
-        .frame(width: 404, height: 302)
-        .background(
-            GajendraGlassSurface(
-                cornerRadius: visualSettings.theme == .focusDeck ? 13 : 18,
-                theme: visualSettings.theme
-            )
-        )
-        .padding(12)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
             if let current = model.snapshot?.current { model.open(current) }
@@ -414,63 +415,58 @@ public struct GajendraHoverCardView: View {
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.errorMessage)
     }
 
-    private var nativePopoverLayout: some View {
+    private var cardLayout: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
-            Divider().padding(.top, 10)
+            Divider().padding(.top, 8)
             nowSection.padding(.vertical, 10)
-            Divider()
-            nativeQueueSummary.padding(.vertical, 8)
-            footer
-        }
-    }
-
-    private var focusDeckLayout: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            header
-            nowSection
             queueSummary
-            footer
+            Spacer(minLength: 6)
+            footer.padding(.top, 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var header: some View {
         HStack(spacing: 0) {
-            GajendraMark(size: 20)
-                .frame(width: 90, alignment: .leading)
+            GajendraMark(size: 24 * contentScale)
+                .frame(width: 116, alignment: .leading)
             VStack(alignment: .center, spacing: 1) {
                 Text("Gaja")
-                    .font(.headline)
+                    .font(scaledFont(17, weight: .semibold))
                 Text("Elephant Focus for AI Power Users")
-                    .font(.caption2)
+                    .font(scaledFont(11, weight: .regular))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             .frame(maxWidth: .infinity)
-            HStack(spacing: 7) {
+            HStack(spacing: 5) {
                 if isPreview {
                     Image(systemName: "rectangle.3.group")
                         .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                        .frame(width: 28, height: 28)
                 } else {
                     Button(action: onOpenOrganizer) {
                         Image(systemName: "rectangle.3.group")
-                            .frame(width: 18, height: 18)
+                            .frame(width: 28, height: 28)
                     }
-                        .buttonStyle(.borderless)
-                        .help("Open organizer")
-                        .accessibilityLabel("Open organizer")
+                    .buttonStyle(.plain)
+                    .gajendraHoverSurface()
+                    .help("Open organizer")
+                    .accessibilityLabel("Open organizer")
                 }
                 if isPreview {
                     Image(systemName: "paintpalette")
-                        .frame(width: 18, height: 18)
+                        .frame(width: 28, height: 28)
                         .foregroundStyle(.secondary)
                 } else {
                     visualSettingsMenu
                 }
                 refreshControl
             }
-            .frame(width: 90, alignment: .trailing)
+            .frame(width: 116, alignment: .trailing)
         }
+        .frame(height: 38 * contentScale, alignment: .center)
     }
 
     private var visualSettingsMenu: some View {
@@ -486,243 +482,234 @@ public struct GajendraHoverCardView: View {
                     Text(appearance.title).tag(appearance)
                 }
             }
+            Divider()
+            Picker("Hover card size", selection: $visualSettings.hoverCardSize) {
+                ForEach(GajendraHoverCardSize.allCases) { size in
+                    Text(size.title).tag(size)
+                }
+            }
         } label: {
             Image(systemName: "paintpalette")
-                .frame(width: 18, height: 18)
+                .frame(width: 28, height: 28)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("Theme and appearance")
-        .accessibilityLabel("Theme and appearance")
+        .gajendraHoverSurface()
+        .help("Theme, appearance, and card size")
+        .accessibilityLabel("Theme, appearance, and card size")
     }
 
     @ViewBuilder
     private var nowSection: some View {
         if let current = model.snapshot?.current {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 7 * contentScale) {
                 HStack(spacing: 6) {
                     Image(systemName: visualSettings.theme == .focusDeck ? "star.fill" : "scope")
                     Text("NOW")
-                        .tracking(0.7)
-                    Spacer()
                     Text("Current focus")
-                        .font(.caption2.weight(.medium))
+                        .font(scaledFont(10.5, weight: .medium))
                         .foregroundStyle(.secondary)
+                    Spacer()
                 }
-                .font(.caption.bold())
+                .font(scaledFont(12.5, weight: .bold))
                 .foregroundStyle(Color.gajendraAccent(for: colorScheme))
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(current.title)
-                            .font(visualSettings.theme == .focusDeck ? .headline : .subheadline.weight(.semibold))
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack(spacing: 5) {
-                            Text(current.project)
-                                .font(.caption2)
-                                .lineLimit(1)
-                                .foregroundStyle(.secondary)
-                            if let context = current.context {
-                                contextBadge(context)
-                            }
-                            Spacer(minLength: 2)
-                            Button { model.open(current) } label: { sourceBadge(current) }
-                                .buttonStyle(.plain)
-                                .help("Open in \(current.sourceName)")
-                        }
+
+                Text(current.title)
+                    .font(scaledFont(17, weight: .semibold))
+                    .lineLimit(visualSettings.hoverCardSize == .compact ? 2 : 3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(alignment: .center, spacing: 7) {
+                    Text(current.project)
+                        .font(scaledFont(11.5, weight: .regular))
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    if let context = current.context {
+                        contextBadge(context)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer(minLength: 8)
+                    Button { model.open(current) } label: { sourceBadge(current) }
+                        .buttonStyle(.plain)
+                        .help("Open in \(current.sourceName)")
                     Button { model.open(current) } label: {
                         Text("Open")
-                            .font(.caption.weight(.semibold))
+                            .font(scaledFont(11.5, weight: .semibold))
                             .foregroundStyle(openButtonForeground)
                     }
-                        .buttonStyle(.borderedProminent)
-                        .tint(openButtonTint)
-                        .fixedSize()
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .tint(openButtonTint)
+                    .fixedSize()
                 }
             }
-            .padding(visualSettings.theme == .focusDeck ? 12 : 10)
-            .background(nowSurfaceColor, in: RoundedRectangle(cornerRadius: visualSettings.theme == .focusDeck ? 10 : 8))
+            .padding(.horizontal, 13 * contentScale)
+            .padding(.vertical, 11 * contentScale)
+            .background(nowSurfaceColor, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: visualSettings.theme == .focusDeck ? 10 : 8)
-                    .stroke(Color.gajendraAccent(for: colorScheme).opacity(visualSettings.theme == .focusDeck ? 0.72 : 0.5), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.gajendraAccent(for: colorScheme).opacity(visualSettings.theme == .focusDeck ? 0.72 : 0.42), lineWidth: 1)
             )
         } else if model.isLoading {
             Text("Reading your configured thread sources…")
-                .font(.caption)
+                .font(scaledFont(13, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
         } else {
             Text("Choose one Focus thread as NOW in Gaja.")
-                .font(.caption)
+                .font(scaledFont(13, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 14)
+                .padding(.vertical, 18)
         }
     }
 
     @ViewBuilder
     private var queueSummary: some View {
         if let snapshot = model.snapshot {
-            HStack(alignment: .top, spacing: 10) {
-                compactList(
+            HStack(alignment: .top, spacing: 10 * contentScale) {
+                queueColumn(
                     title: "Focus",
                     systemImage: "star.fill",
-                    count: snapshot.focus.count,
                     threads: snapshot.focus.filter { !$0.isCurrent }
                 )
-                compactList(
+                queueColumn(
                     title: "Important",
-                    systemImage: "bookmark",
-                    count: snapshot.important.count,
+                    systemImage: "bookmark.fill",
                     threads: snapshot.important
                 )
             }
         }
+    }
+
+    private func queueColumn(title: String, systemImage: String, threads: [DeckThread]) -> some View {
+        let visibleThreads = Array(threads.prefix(5))
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: systemImage)
+                    .font(scaledFont(11.5, weight: .semibold))
+                    .foregroundStyle(title == "Focus" ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
+                Text(title)
+                    .font(scaledFont(13.5, weight: .semibold))
+                Text("\(threads.count)")
+                    .font(scaledFont(10.5, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                if threads.count > 5 {
+                    moreButton(remaining: threads.count - 5, title: title)
+                }
+            }
+            .frame(height: 30 * contentScale)
+            .padding(.horizontal, 10 * contentScale)
+
+            if threads.isEmpty {
+                Text("No tasks")
+                    .font(scaledFont(11.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 39 * contentScale, alignment: .leading)
+                    .padding(.horizontal, 10 * contentScale)
+            } else {
+                ForEach(visibleThreads.indices, id: \.self) { index in
+                    if index > 0 { Divider().padding(.leading, 10 * contentScale) }
+                    queueRow(visibleThreads[index])
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(queueSurfaceColor(title), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
+        )
+    }
+
+    private func queueRow(_ thread: DeckThread) -> some View {
+        Button { model.open(thread) } label: {
+            VStack(alignment: .leading, spacing: 2 * contentScale) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Text(thread.title)
+                        .font(scaledFont(12.5, weight: .medium))
+                        .lineLimit(1)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 5)
+                    providerBadge(thread, compact: true)
+                }
+                HStack(spacing: 5) {
+                    Text(thread.project)
+                        .font(scaledFont(10.5, weight: .regular))
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    if let context = thread.context {
+                        contextBadge(context, compact: true)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(.horizontal, 10 * contentScale)
+            .padding(.vertical, 6 * contentScale)
+            .frame(maxWidth: .infinity, minHeight: 39 * contentScale, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(hoveredThreadId == thread.id ? rowHoverColor : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered in
+            hoveredThreadId = hovered ? thread.id : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
+        }
+        .help("Open \(thread.title) in \(thread.sourceName)")
+        .accessibilityLabel("\(thread.title), \(thread.sourceName)")
+        .accessibilityHint("Open this thread")
     }
 
     @ViewBuilder
-    private var nativeQueueSummary: some View {
-        if let snapshot = model.snapshot {
-            VStack(alignment: .leading, spacing: 6) {
-                nativePriorityLane(
-                    title: "Focus",
-                    systemImage: "star.fill",
-                    count: snapshot.focus.count,
-                    threads: snapshot.focus.filter { !$0.isCurrent }
-                )
-                nativePriorityLane(
-                    title: "Important",
-                    systemImage: "bookmark",
-                    count: snapshot.important.count,
-                    threads: snapshot.important
-                )
-            }
-        }
-    }
-
-    private func nativePriorityLane(title: String, systemImage: String, count: Int, threads: [DeckThread]) -> some View {
-        Group {
-            if let thread = threads.first {
-                Button { model.open(thread) } label: {
-                    nativePriorityLaneContent(
-                        title: title,
-                        systemImage: systemImage,
-                        count: count,
-                        thread: thread
-                    )
-                    .contentShape(Rectangle())
-                }
+    private func moreButton(remaining: Int, title: String) -> some View {
+        if isPreview {
+            Text("More \(remaining)")
+                .font(scaledFont(10.5, weight: .medium))
+                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+        } else {
+            Button("More \(remaining)", action: onOpenOrganizer)
+                .font(scaledFont(10.5, weight: .medium))
                 .buttonStyle(.plain)
-                .help("Open \(thread.title) in \(thread.sourceName)")
-            } else {
-                nativePriorityLaneContent(title: title, systemImage: systemImage, count: count, thread: nil)
-            }
+                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                .gajendraHoverSurface(cornerRadius: 6)
+                .help("View all \(title) tasks in the organizer")
         }
-        .frame(minHeight: 18)
-    }
-
-    private func nativePriorityLaneContent(
-        title: String,
-        systemImage: String,
-        count: Int,
-        thread: DeckThread?
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: systemImage)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(title == "Focus" ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
-            Text(title)
-                .font(.caption.weight(title == "Focus" ? .bold : .semibold))
-            Text("\(count)")
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.secondary)
-            if let thread {
-                Text(thread.title)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-                Spacer(minLength: 2)
-                if let context = thread.context { contextBadge(context, compact: true) }
-                Text(thread.sourceName)
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(providerColor(thread))
-            } else {
-                Spacer()
-                Text("No tasks")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private func compactList(title: String, systemImage: String, count: Int, threads: [DeckThread]) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 5) {
-                Image(systemName: systemImage)
-                    .font(.caption2)
-                    .foregroundStyle(title == "Focus" ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
-                Text(title)
-                    .font(.caption.weight(title == "Focus" ? .bold : .semibold))
-                Text("\(count)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            ForEach(Array(threads.prefix(1))) { thread in
-                Button { model.open(thread) } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(thread.title)
-                            .font(.caption2)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                        HStack(spacing: 5) {
-                            if let context = thread.context {
-                                contextBadge(context, compact: true)
-                            }
-                            Text(thread.sourceName)
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(providerColor(thread))
-                                .padding(.horizontal, 4)
-                                .padding(.vertical, 1)
-                                .background(providerColor(thread).opacity(0.1), in: Capsule())
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-            }
-            if threads.isEmpty {
-                Text("No tasks")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(9)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(compactListSurface(title), in: RoundedRectangle(cornerRadius: 9))
     }
 
     private var footer: some View {
-        HStack {
+        HStack(spacing: 8) {
             if let error = model.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2)
+                    .font(scaledFont(10.5, weight: .regular))
                     .foregroundStyle(.orange)
                     .lineLimit(1)
             } else {
-                Text("Fresh on hover · Local metadata · \(visualSettings.theme.title)")
-                    .font(.caption2)
+                Text("Fresh on hover · Local metadata")
+                    .font(scaledFont(10.5, weight: .regular))
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text("Double-click to open NOW")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            if visualSettings.hoverCardSize != .compact {
+                Text("Double-click to open NOW")
+                    .font(scaledFont(10.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+            }
         }
+    }
+
+    private var contentInset: CGFloat {
+        (visualSettings.theme == .focusDeck ? 17 : 16) * contentScale
+    }
+
+    private var contentScale: CGFloat {
+        GajendraHoverCardSizing.contentScale(for: visualSettings.hoverCardSize)
+    }
+
+    private func scaledFont(_ size: CGFloat, weight: Font.Weight) -> Font {
+        .system(size: size * contentScale, weight: weight, design: .default)
     }
 
     private var openButtonTint: Color {
@@ -739,24 +726,30 @@ public struct GajendraHoverCardView: View {
     }
 
     private func sourceBadge(_ thread: DeckThread) -> some View {
-        Text(thread.sourceName)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(providerColor(thread))
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(providerColor(thread).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
-            .overlay(Capsule().stroke(providerColor(thread).opacity(0.34), lineWidth: 0.75))
+        providerBadge(thread, compact: false)
             .accessibilityLabel("Open in \(thread.sourceName)")
+    }
+
+    private func providerBadge(_ thread: DeckThread, compact: Bool) -> some View {
+        Text(thread.sourceName)
+            .font(scaledFont(compact ? 9.5 : 10.5, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(providerColor(thread))
+            .padding(.horizontal, compact ? 6 : 8)
+            .padding(.vertical, compact ? 2 : 3)
+            .background(providerColor(thread).opacity(colorScheme == .dark ? 0.2 : 0.1), in: Capsule())
+            .overlay(Capsule().stroke(providerColor(thread).opacity(0.38), lineWidth: 0.75))
     }
 
     private func contextBadge(_ context: ThreadContext, compact: Bool = false) -> some View {
         Text(context.title)
-            .font(.system(size: compact ? 8 : 9, weight: .semibold))
+            .font(scaledFont(compact ? 9 : 10, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
             .foregroundStyle(contextColor(context))
-            .padding(.horizontal, compact ? 4 : 6)
-            .padding(.vertical, compact ? 1 : 2)
+            .padding(.horizontal, compact ? 5 : 7)
+            .padding(.vertical, compact ? 1.5 : 2.5)
             .background(contextColor(context).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
             .overlay(Capsule().stroke(contextColor(context).opacity(0.34), lineWidth: 0.75))
             .accessibilityLabel("Context: \(context.title)")
@@ -784,40 +777,74 @@ public struct GajendraHoverCardView: View {
 
     private var nowSurfaceColor: Color {
         if visualSettings.theme == .focusDeck {
-            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.52) : Color.gajendraGold.opacity(0.16)
+            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.5) : Color.gajendraGold.opacity(0.16)
         }
-        return Color.gajendraGold.opacity(colorScheme == .dark ? 0.12 : 0.09)
+        return colorScheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.34)
     }
 
-    private func compactListSurface(_ title: String) -> Color {
-        if visualSettings.theme == .focusDeck && title == "Focus" {
-            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.34) : Color.white.opacity(0.52)
+    private func queueSurfaceColor(_ title: String) -> Color {
+        if visualSettings.theme == .focusDeck {
+            if title == "Focus" {
+                return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.36) : Color.white.opacity(0.48)
+            }
+            return colorScheme == .dark ? Color.black.opacity(0.16) : Color.gajendraGold.opacity(0.07)
         }
-        return Color.primary.opacity(0.035)
+        return colorScheme == .dark ? Color.black.opacity(0.12) : Color.white.opacity(0.25)
+    }
+
+    private var rowHoverColor: Color {
+        visualSettings.theme == .focusDeck
+            ? Color.gajendraAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.12 : 0.09)
+            : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.15 : 0.09)
     }
 
     @ViewBuilder
     private var refreshControl: some View {
         if isPreview {
             Image(systemName: "arrow.clockwise")
-                .frame(width: 20, height: 20)
+                .frame(width: 28, height: 28)
                 .foregroundStyle(.secondary)
         } else {
             Button { model.refresh() } label: {
                 if model.isLoading {
                     ProgressView()
                         .controlSize(.small)
-                        .frame(width: 20, height: 20)
+                        .frame(width: 28, height: 28)
                 } else {
                     Image(systemName: "arrow.clockwise")
-                        .frame(width: 20, height: 20)
+                        .frame(width: 28, height: 28)
                 }
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
+            .gajendraHoverSurface()
             .disabled(model.isLoading)
             .help(model.isLoading ? "Refreshing" : "Refresh")
             .accessibilityLabel(model.isLoading ? "Refreshing Gaja" : "Refresh Gaja")
         }
+    }
+}
+
+private struct GajendraHoverSurfaceModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        content
+            .padding(2)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(isHovered ? Color.primary.opacity(0.08) : Color.clear)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .onHover { isHovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+    }
+}
+
+private extension View {
+    func gajendraHoverSurface(cornerRadius: CGFloat = 7) -> some View {
+        modifier(GajendraHoverSurfaceModifier(cornerRadius: cornerRadius))
     }
 }
 
