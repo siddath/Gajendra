@@ -5,6 +5,7 @@
 | macOS daily access | AppKit/SwiftUI bottom-right nonactivating utility | Swift tests, bundle validator, installed-window proof | Dock, normal window, menu bar |
 | Liquid Glass | `glassEffect` on macOS 26+ | SDK compile and source gate | Semantic `.ultraThinMaterial` on macOS 13–15 |
 | Light/dark and motion | System appearance and Reduce Motion | Native previews and browser journeys | Functional layout without blur/motion |
+| Adaptive hover card | Active-display visible-frame sizing plus Compact/Comfortable/Expanded preference | Swift sizing self-test and native preview matrix | Clamped Comfortable layout on unknown displays |
 | Codex discovery | `codex app-server` `thread/list` | Live local probe | Source health error; other sources continue |
 | Claude Code discovery | Documented local session JSONL metadata | Unit/fixture plus local layout validation | Disabled by default or source health error |
 | Cursor discovery | `cursor-agent ls` | Parser/fixture test | `not-installed` when CLI is absent |

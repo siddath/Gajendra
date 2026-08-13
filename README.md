@@ -50,6 +50,8 @@ On macOS 26 and later, native surfaces use SwiftUI Liquid Glass. macOS 13–15 u
 
 The visual palette offers two production themes: **Native Popover** (default) and **Focus Deck**. Both support Auto, Light, and Dark across the native companion and portable MCP App. Command Capsule is intentionally excluded.
 
+The native hover card adapts to the active display and offers **Compact**, **Comfortable**, and **Expanded** sizes under Theme & Appearance. Comfortable is tuned for the 1512 × 949-point usable frame of the 14-inch MacBook Pro reference display. Each Focus and Important lane shows up to five queued threads; **More** opens the full Organizer without changing priority state.
+
 The implementation follows Apple’s guidance on [Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/liquid-glass), [materials](https://developer.apple.com/design/human-interface-guidelines/materials), [macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/), and [widgets](https://developer.apple.com/design/human-interface-guidelines/widgets/). See [Apple design compliance](docs/APPLE_DESIGN_COMPLIANCE.md).
 
 ## Install from source

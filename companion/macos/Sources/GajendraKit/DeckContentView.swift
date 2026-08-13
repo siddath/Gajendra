@@ -60,7 +60,7 @@ public struct DeckContentView: View {
             footer
         }
         .padding(16)
-        .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650)
+        .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650, alignment: .topLeading)
         .background(organizerSurface)
         .animation(deckAnimation, value: model.snapshot)
         .animation(deckAnimation, value: model.errorMessage)
@@ -133,6 +133,12 @@ public struct DeckContentView: View {
                     Text(appearance.title).tag(appearance)
                 }
             }
+            Divider()
+            Picker("Hover card size", selection: $visualSettings.hoverCardSize) {
+                ForEach(GajendraHoverCardSize.allCases) { size in
+                    Text(size.title).tag(size)
+                }
+            }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "paintpalette")
@@ -145,8 +151,8 @@ public struct DeckContentView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("Theme and appearance")
-        .accessibilityLabel("Theme and appearance")
+        .help("Theme, appearance, and hover-card size")
+        .accessibilityLabel("Theme, appearance, and hover-card size")
     }
 
     @ViewBuilder
