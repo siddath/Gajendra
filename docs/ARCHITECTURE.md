@@ -56,7 +56,7 @@ The service never accepts a free-form shell string.
 
 ## macOS surfaces
 
-The lotus and hover card are borderless, nonactivating floating `NSPanel` instances. They join Spaces and supported full-screen application contexts, re-clamp after display changes, and remain independent of Codex’s view hierarchy. Hovering either panel keeps the card visible; a 220 ms grace period bridges the physical gap.
+The lotus and hover card are borderless, nonactivating floating `NSPanel` instances. They join Spaces and supported full-screen application contexts, re-clamp after display changes, and remain independent of Codex’s view hierarchy. Hovering either panel keeps the card visible; a 220 ms grace period bridges the physical gap. A single app-owned edit controller suppresses the card while the lotus jiggles, dismisses edit mode for outside clicks, and derives movement from the global pointer so the moving panel cannot feed back into its own drag coordinates.
 
 The organizer is a normal resizable macOS window with Dock, menu-bar, keyboard, and reopen recovery. macOS 26 uses SwiftUI `glassEffect`; macOS 13–15 use semantic material fallback. Reduce Motion is respected.
 

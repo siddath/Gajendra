@@ -9,9 +9,9 @@ Gaja’s default surface is a bottom-right icon-only native utility. Hover or pr
 - Organizer: standard resizable 620 × 700 window, 520 × 620 minimum.
 - Menu bar: optional template icon and compact organizer fallback.
 - Dock/app menu: reopen, refresh (`⌘R`), open organizer (`⇧⌘O`), launch-at-login toggle, quit.
-- Pill edit mode: press and hold for 550 ms, then drag across the visible display or hide the lotus. The app menu can restore or re-anchor it.
+- Pill edit mode: press and hold for 550 ms, then drag smoothly across the visible display or hide the lotus. Click outside or press Escape to leave edit mode without hiding it. The app menu can restore or re-anchor it.
 - Organizer: drag recent or prioritized rows into Focus or Important; arrow and tier controls remain available for keyboard operation.
-- Context: assign Design, Engineering, or Life from a prioritized row’s existing action menu; the label follows that entry into NOW, Focus, Important, and the hover card.
+- Context: use the visible **Add label** control on a prioritized row to assign Design, Engineering, or Life; the label follows that entry into NOW, Focus, Important, and the hover card.
 
 The utility does not inspect or inject into Codex, Claude, Cursor, or other app windows. It requests no Accessibility permission.
 

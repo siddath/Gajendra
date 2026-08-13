@@ -44,6 +44,7 @@ enum GajendraMenuBarMain {
 final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     let model = DeckViewModel()
     let visualSettings = GajendraVisualSettings()
+    let pillEditController = GajendraPillEditController()
     private var organizerWindow: NSWindow?
     private var pillWindow: NSPanel?
     private var cardWindow: NSPanel?
@@ -56,10 +57,16 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private var launchAtLoginItem: NSMenuItem?
     private var pillVisibilityItem: NSMenuItem?
     private var appearanceCancellable: AnyCancellable?
+    private var pillEditCancellable: AnyCancellable?
+    private var localEditDismissMonitor: Any?
+    private var globalEditDismissMonitor: Any?
+    private var editDismissPollTimer: Timer?
+    private var editDismissMouseWasDown = false
     private var pillDragStart: CGPoint?
+    private var pillDragPointerStart: CGPoint?
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
-    private let cardSize = NSSize(width: 404, height: 310)
+    private let cardSize = NSSize(width: 428, height: 326)
     private let pillHiddenKey = "gajendra.pill.hidden"
     private let pillHasCustomOriginKey = "gajendra.pill.has-custom-origin"
     private let pillOriginXKey = "gajendra.pill.origin.x"
@@ -68,6 +75,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureApplicationMenu()
         configureAppearance()
+        configurePillInteraction()
         configureStatusItem()
         configurePopover()
         observeDesktopChanges()
@@ -80,6 +88,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         hideCardWorkItem?.cancel()
+        removePillEditDismissalMonitors()
         let center = NSWorkspace.shared.notificationCenter
         if let workspaceActivationObserver { center.removeObserver(workspaceActivationObserver) }
         if let screenParametersObserver {
@@ -186,7 +195,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hidePill() {
-        hideCard()
+        pillEditController.exit()
+        hideCardImmediately()
         pillWindow?.orderOut(nil)
         UserDefaults.standard.set(true, forKey: pillHiddenKey)
         updatePillVisibilityMenuState()
@@ -194,10 +204,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     private func handlePillDrag(translation: CGSize, ended: Bool) {
         guard let panel = pillWindow else { return }
-        if pillDragStart == nil { pillDragStart = panel.frame.origin }
-        guard let start = pillDragStart else { return }
-        let proposed = CGPoint(x: start.x + translation.width, y: start.y - translation.height)
-        let targetScreen = NSScreen.screens.first(where: { $0.visibleFrame.contains(NSEvent.mouseLocation) })
+        let pointerLocation = NSEvent.mouseLocation
+        if pillDragStart == nil {
+            pillDragStart = panel.frame.origin
+            pillDragPointerStart = GajendraOverlayPlacement.pointerStart(
+                pointerLocation: pointerLocation,
+                gestureTranslation: translation
+            )
+        }
+        guard let start = pillDragStart, let pointerStart = pillDragPointerStart else { return }
+        let proposed = GajendraOverlayPlacement.draggedOrigin(
+            startOrigin: start,
+            pointerStart: pointerStart,
+            pointerLocation: pointerLocation
+        )
+        let targetScreen = NSScreen.screens.first(where: { $0.frame.contains(pointerLocation) })
             ?? panel.screen
             ?? preferredScreen()
         let origin = GajendraOverlayPlacement.clampedOrigin(
@@ -206,13 +227,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             visibleFrame: targetScreen.visibleFrame
         )
         panel.setFrameOrigin(origin)
-        if cardWindow?.isVisible == true { positionCard() }
         if ended {
             let defaults = UserDefaults.standard
             defaults.set(true, forKey: pillHasCustomOriginKey)
             defaults.set(origin.x, forKey: pillOriginXKey)
             defaults.set(origin.y, forKey: pillOriginYKey)
             pillDragStart = nil
+            pillDragPointerStart = nil
         }
     }
 
@@ -230,7 +251,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     private func setPillHovered(_ hovered: Bool) {
         let enteredPill = hoverState.setPillHovered(hovered)
-        if enteredPill { model.refresh() }
+        if enteredPill && !pillEditController.isEditing { model.refresh() }
         updateCardPresentation()
     }
 
@@ -240,6 +261,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func activatePill() {
+        guard !pillEditController.isEditing else { return }
         hideCardWorkItem?.cancel()
         if cardWindow?.isVisible == true {
             hideCard()
@@ -250,6 +272,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     private func updateCardPresentation() {
         hideCardWorkItem?.cancel()
+        if pillEditController.isEditing {
+            hideCardImmediately()
+            return
+        }
         if hoverState.wantsCardVisible {
             showCard()
             return
@@ -264,6 +290,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showCard() {
+        guard !pillEditController.isEditing else { return }
         hideCardWorkItem?.cancel()
         let panel = cardWindow ?? makeCardPanel()
         let wasVisible = panel.isVisible
@@ -307,6 +334,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
                 panel.alphaValue = 1
             }
         }
+    }
+
+    private func hideCardImmediately() {
+        hideCardWorkItem?.cancel()
+        cardAnimationGeneration += 1
+        cardWindow?.orderOut(nil)
+        cardWindow?.alphaValue = 1
     }
 
     private func positionCard() {
@@ -391,6 +425,74 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func configurePillInteraction() {
+        pillEditCancellable = pillEditController.$isEditing
+            .removeDuplicates()
+            .sink { [weak self] isEditing in
+                guard let self else { return }
+                self.pillDragStart = nil
+                self.pillDragPointerStart = nil
+                if isEditing {
+                    self.hideCardImmediately()
+                    self.installPillEditDismissalMonitors()
+                } else {
+                    self.removePillEditDismissalMonitors()
+                    self.updateCardPresentation()
+                }
+            }
+    }
+
+    private func installPillEditDismissalMonitors() {
+        removePillEditDismissalMonitors()
+        let events: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        localEditDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: events) { [weak self] event in
+            self?.dismissPillEditIfOutside()
+            return event
+        }
+        globalEditDismissMonitor = NSEvent.addGlobalMonitorForEvents(matching: events) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.dismissPillEditIfOutside()
+            }
+        }
+        editDismissMouseWasDown = NSEvent.pressedMouseButtons != 0
+        let timer = Timer(
+            timeInterval: 1.0 / 30.0,
+            target: self,
+            selector: #selector(handleEditDismissPoll(_:)),
+            userInfo: nil,
+            repeats: true
+        )
+        RunLoop.main.add(timer, forMode: .common)
+        editDismissPollTimer = timer
+    }
+
+    private func removePillEditDismissalMonitors() {
+        if let localEditDismissMonitor { NSEvent.removeMonitor(localEditDismissMonitor) }
+        if let globalEditDismissMonitor { NSEvent.removeMonitor(globalEditDismissMonitor) }
+        editDismissPollTimer?.invalidate()
+        localEditDismissMonitor = nil
+        globalEditDismissMonitor = nil
+        editDismissPollTimer = nil
+        editDismissMouseWasDown = false
+    }
+
+    private func dismissPillEditIfOutside() {
+        guard let panel = pillWindow else { return }
+        _ = pillEditController.dismissIfOutside(point: NSEvent.mouseLocation, pillFrame: panel.frame)
+    }
+
+    @objc
+    private func handleEditDismissPoll(_ timer: Timer) {
+        pollForOutsidePillEditClick()
+    }
+
+    private func pollForOutsidePillEditClick() {
+        let mouseIsDown = NSEvent.pressedMouseButtons != 0
+        defer { editDismissMouseWasDown = mouseIsDown }
+        guard mouseIsDown, !editDismissMouseWasDown else { return }
+        dismissPillEditIfOutside()
+    }
+
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         guard let button = item.button else { return }
@@ -450,6 +552,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             rootView: GajendraPillView(
                 model: model,
                 visualSettings: visualSettings,
+                editController: pillEditController,
                 onHoverChanged: { [weak self] hovered in self?.setPillHovered(hovered) },
                 onActivate: { [weak self] in self?.activatePill() },
                 onDragChanged: { [weak self] translation, ended in self?.handlePillDrag(translation: translation, ended: ended) },

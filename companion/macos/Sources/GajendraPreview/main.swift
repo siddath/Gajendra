@@ -10,7 +10,7 @@ enum GajendraPreview {
         let snapshot = DeckSnapshot(
             generatedAt: "2026-08-12T00:00:00Z",
             current: now,
-            focus: [now, thread("focus-2", "Review launch evidence", "tooling", level: .focus, context: .engineering)],
+            focus: [now, thread("focus-2", "Review launch evidence", "tooling", level: .focus)],
             important: [thread("important-1", "Prepare the next design pass", "design-system", level: .important, context: .life)],
             available: [thread("recent-1", "Reconcile the weekly plan", "planning")],
             collapsed: CollapsedSections(focus: false, important: true),
@@ -96,13 +96,19 @@ enum GajendraPreview {
         )
         try render(
             GajendraHoverCardView(model: model, visualSettings: setting, isPreview: true),
-            width: 404,
-            height: 310,
+            width: 428,
+            height: 326,
             destination: card,
             colorScheme: appearance
         )
         try render(
-            GajendraPillView(model: model, visualSettings: setting, onHoverChanged: { _ in }, onActivate: {}),
+            GajendraPillView(
+                model: model,
+                visualSettings: setting,
+                editController: GajendraPillEditController(),
+                onHoverChanged: { _ in },
+                onActivate: {}
+            ),
             width: 60,
             height: 60,
             destination: pill,
