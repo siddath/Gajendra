@@ -3,6 +3,7 @@ import SwiftUI
 
 public struct DeckContentView: View {
     @ObservedObject private var model: DeckViewModel
+    @ObservedObject private var visualSettings: GajendraVisualSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var search = ""
@@ -11,10 +12,12 @@ public struct DeckContentView: View {
 
     public init(
         model: DeckViewModel,
+        visualSettings: GajendraVisualSettings,
         usesScrollView: Bool = true,
         isPreview: Bool = false
     ) {
         self.model = model
+        self.visualSettings = visualSettings
         self.usesScrollView = usesScrollView
         self.isPreview = isPreview
     }
@@ -58,7 +61,7 @@ public struct DeckContentView: View {
         }
         .padding(16)
         .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650)
-        .background(GajendraGlassSurface(cornerRadius: 0, castsShadow: false))
+        .background(organizerSurface)
         .animation(deckAnimation, value: model.snapshot)
         .animation(deckAnimation, value: model.errorMessage)
         .task {
@@ -106,36 +109,81 @@ public struct DeckContentView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+            if isPreview {
+                Image(systemName: "paintpalette")
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(.secondary)
+            } else {
+                visualSettingsMenu
+            }
             refreshButton
         }
     }
 
-    private func sourceStrip(_ sources: [ThreadSourceStatus]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(sources) { source in
-                    Button {
-                        model.apply(.setSourceEnabled(sourceId: source.id, enabled: !source.enabled))
-                    } label: {
-                        HStack(spacing: 5) {
-                            Circle().fill(sourceStateColor(source)).frame(width: 6, height: 6)
-                            Text(source.name)
-                            Text("\(source.threadCount)").monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .opacity(source.enabled ? 1 : 0.58)
-                    .disabled(model.isLoading)
-                    .help(source.detail ?? (source.enabled ? "Disable \(source.name)" : "Enable \(source.name)"))
-                    .accessibilityLabel("\(source.name), \(source.state), \(source.threadCount) threads")
+    private var visualSettingsMenu: some View {
+        Menu {
+            Picker("Theme", selection: $visualSettings.theme) {
+                ForEach(GajendraVisualTheme.allCases) { theme in
+                    Text(theme.title).tag(theme)
                 }
             }
+            Divider()
+            Picker("Appearance", selection: $visualSettings.appearance) {
+                ForEach(GajendraAppearance.allCases) { appearance in
+                    Text(appearance.title).tag(appearance)
+                }
+            }
+        } label: {
+            Image(systemName: "paintpalette")
+                .frame(width: 20, height: 20)
+                .contentShape(Rectangle())
         }
-        .accessibilityLabel("Configured thread sources")
+        .menuStyle(.borderlessButton)
+        .frame(width: 28)
+        .help("Theme and appearance")
+        .accessibilityLabel("Theme and appearance")
+    }
+
+    @ViewBuilder
+    private func sourceStrip(_ sources: [ThreadSourceStatus]) -> some View {
+        if isPreview {
+            HStack(spacing: 7) {
+                ForEach(sources) { source in
+                    sourcePill(source)
+                }
+            }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 7) {
+                    ForEach(sources) { source in
+                        Button {
+                            model.apply(.setSourceEnabled(sourceId: source.id, enabled: !source.enabled))
+                        } label: {
+                            sourcePill(source)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(source.enabled ? 1 : 0.58)
+                        .disabled(model.isLoading)
+                        .help(source.detail ?? (source.enabled ? "Disable \(source.name)" : "Enable \(source.name)"))
+                        .accessibilityLabel("\(source.name), \(source.state), \(source.threadCount) threads")
+                    }
+                }
+            }
+            .accessibilityLabel("Configured thread sources")
+        }
+    }
+
+    private func sourcePill(_ source: ThreadSourceStatus) -> some View {
+        HStack(spacing: 5) {
+            Circle().fill(sourceStateColor(source)).frame(width: 6, height: 6)
+            Text(source.name)
+            Text("\(source.threadCount)").monospacedDigit().foregroundStyle(.secondary)
+        }
+        .font(.caption2.weight(.medium))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color.primary.opacity(0.045), in: Capsule())
+        .overlay(Capsule().stroke(Color.secondary.opacity(0.2), lineWidth: 0.75))
     }
 
     private func sourceStateColor(_ source: ThreadSourceStatus) -> Color {
@@ -174,10 +222,17 @@ public struct DeckContentView: View {
 
     private func nowCard(_ current: DeckThread?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("NOW")
-                .font(.caption2.bold())
-                .tracking(1.2)
-                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+            HStack(spacing: 7) {
+                Image(systemName: "scope")
+                    .font(.caption.bold())
+                Text("NOW")
+                    .font(.caption.bold())
+                    .tracking(1.1)
+                Text("Current focus")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(Color.gajendraAccent(for: colorScheme))
             if let current {
                 HStack(alignment: .center, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -185,10 +240,16 @@ public struct DeckContentView: View {
                             .font(.title3.weight(.semibold))
                             .lineLimit(2)
                         HStack(spacing: 6) {
-                            sourceBadge(current)
                             Text(current.project)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            Button {
+                                model.open(current)
+                            } label: {
+                                sourceBadge(current)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Open \(current.title) in \(current.sourceName)")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -210,11 +271,11 @@ public struct DeckContentView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gajendraGold.opacity(0.09))
+                .fill(nowSurfaceColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.gajendraGold.opacity(0.55), lineWidth: 1)
+                .stroke(nowBorderColor, lineWidth: visualSettings.theme == .focusDeck ? 1.25 : 1)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel(current == nil ? "No current NOW task" : "Current NOW task")
@@ -226,17 +287,20 @@ public struct DeckContentView: View {
         threads: [DeckThread],
         collapsed: Bool
     ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let sectionContent = VStack(alignment: .leading, spacing: 0) {
             Button {
                 model.apply(.setCollapsed(level: level, collapsed: !collapsed))
             } label: {
-                HStack {
+                HStack(spacing: 7) {
+                    Image(systemName: level == .focus ? "star.fill" : "bookmark")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(level == .focus ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
                     Text(title)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
+                        .font(.subheadline.weight(level == .focus ? .bold : .semibold))
                     Text("\(threads.count)")
-                        .font(.caption.monospacedDigit())
+                        .font(.caption.monospacedDigit().weight(.semibold))
                         .foregroundStyle(.secondary)
+                    Spacer()
                     Image(systemName: collapsed ? "chevron.right" : "chevron.down")
                         .font(.caption.bold())
                         .accessibilityHidden(true)
@@ -270,16 +334,17 @@ public struct DeckContentView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.primary.opacity(0.035))
+                .fill(sectionSurfaceColor(level))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+                .stroke(sectionBorderColor(level), lineWidth: 1)
         )
+        return priorityDropSection(sectionContent, level: level)
     }
 
     private func priorityRow(_ thread: DeckThread, level: PriorityLevel, index: Int, count: Int) -> some View {
-        HStack(spacing: 8) {
+        let row = HStack(spacing: 8) {
             Button {
                 model.open(thread)
             } label: {
@@ -356,7 +421,8 @@ public struct DeckContentView: View {
             }
         }
         .padding(10)
-        .background(thread.isCurrent ? Color.yellow.opacity(0.08) : Color.clear)
+        .background(thread.isCurrent ? nowSurfaceColor : Color.clear)
+        return priorityDragRow(row, threadId: thread.id, level: level, before: thread.id)
     }
 
     private func previewRowActions(index: Int, count: Int) -> some View {
@@ -393,11 +459,17 @@ public struct DeckContentView: View {
                     .accessibilityLabel("Search recent AI-agent threads")
             }
             ForEach(Array(matches.prefix(8))) { thread in
-                HStack {
+                recentDragRow(HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(thread.title).lineLimit(1)
                         HStack(spacing: 6) {
-                            sourceBadge(thread)
+                            if isPreview {
+                                sourceBadge(thread)
+                            } else {
+                                Button { model.open(thread) } label: { sourceBadge(thread) }
+                                    .buttonStyle(.plain)
+                                    .help("Open in \(thread.sourceName)")
+                            }
                             Text(thread.project)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
@@ -414,7 +486,7 @@ public struct DeckContentView: View {
                     }
                     .controlSize(.small)
                     .disabled(model.isLoading)
-                }
+                }, threadId: thread.id)
                 .padding(.vertical, 3)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -454,11 +526,137 @@ public struct DeckContentView: View {
 
     private func sourceBadge(_ thread: DeckThread) -> some View {
         Text(thread.sourceName)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.primary.opacity(0.055), in: Capsule())
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(providerColor(thread))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(providerColor(thread).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
+            .overlay(Capsule().stroke(providerColor(thread).opacity(0.34), lineWidth: 0.75))
+            .accessibilityLabel("Open in \(thread.sourceName)")
+    }
+
+    private func providerColor(_ thread: DeckThread) -> Color {
+        switch thread.sourceId.lowercased() {
+        case "codex": return colorScheme == .dark ? Color(red: 0.49, green: 0.78, blue: 0.96) : Color(red: 0.03, green: 0.36, blue: 0.6)
+        case "claude": return colorScheme == .dark ? Color(red: 1, green: 0.63, blue: 0.34) : Color(red: 0.68, green: 0.27, blue: 0.06)
+        case "cursor": return colorScheme == .dark ? Color(red: 0.76, green: 0.7, blue: 1) : Color(red: 0.35, green: 0.25, blue: 0.62)
+        default: return .secondary
+        }
+    }
+
+    private var organizerSurface: some View {
+        Group {
+            if visualSettings.theme == .focusDeck {
+                Rectangle().fill(focusDeckField)
+            } else {
+                GajendraGlassSurface(cornerRadius: 0, castsShadow: false, theme: .nativePopover)
+            }
+        }
+    }
+
+    private var focusDeckField: Color {
+        colorScheme == .dark
+            ? Color(red: 0.055, green: 0.075, blue: 0.12)
+            : Color(red: 0.965, green: 0.945, blue: 0.9)
+    }
+
+    private var nowSurfaceColor: Color {
+        if visualSettings.theme == .focusDeck {
+            return colorScheme == .dark
+                ? Color.gajendraIndigoSoft.opacity(0.52)
+                : Color.gajendraGold.opacity(0.16)
+        }
+        return Color.gajendraGold.opacity(colorScheme == .dark ? 0.12 : 0.09)
+    }
+
+    private var nowBorderColor: Color {
+        Color.gajendraAccent(for: colorScheme).opacity(visualSettings.theme == .focusDeck ? 0.72 : 0.5)
+    }
+
+    private func sectionSurfaceColor(_ level: PriorityLevel) -> Color {
+        guard visualSettings.theme == .focusDeck else { return Color.primary.opacity(0.035) }
+        if level == .focus {
+            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.34) : Color.white.opacity(0.58)
+        }
+        return Color.primary.opacity(colorScheme == .dark ? 0.028 : 0.02)
+    }
+
+    private func sectionBorderColor(_ level: PriorityLevel) -> Color {
+        if visualSettings.theme == .focusDeck && level == .focus {
+            return Color.gajendraAccent(for: colorScheme).opacity(0.42)
+        }
+        return Color.secondary.opacity(0.22)
+    }
+
+    private func moveDroppedThread(_ threadId: String, to level: PriorityLevel, before targetId: String?) -> Bool {
+        guard !model.isLoading, let snapshot = model.snapshot else { return false }
+        let allThreads = snapshot.focus + snapshot.important + snapshot.available
+        guard let thread = allThreads.first(where: { $0.id == threadId }) else { return false }
+        let targetThreads = level == .focus ? snapshot.focus : snapshot.important
+
+        if thread.level != level {
+            model.apply(.setLevel(threadId: threadId, level: level))
+            guard let targetId, let targetIndex = targetThreads.firstIndex(where: { $0.id == targetId }) else { return true }
+            for _ in 0..<(targetThreads.count - targetIndex) {
+                model.apply(.move(threadId: threadId, direction: .up))
+            }
+            return true
+        }
+
+        guard let sourceIndex = targetThreads.firstIndex(where: { $0.id == threadId }),
+              let targetId,
+              targetId != threadId,
+              let targetIndex = targetThreads.firstIndex(where: { $0.id == targetId }) else { return true }
+        if sourceIndex > targetIndex {
+            for _ in 0..<(sourceIndex - targetIndex) {
+                model.apply(.move(threadId: threadId, direction: .up))
+            }
+        } else {
+            for _ in 0..<max(0, targetIndex - sourceIndex - 1) {
+                model.apply(.move(threadId: threadId, direction: .down))
+            }
+        }
+        return true
+    }
+
+    @ViewBuilder
+    private func priorityDropSection<Content: View>(_ content: Content, level: PriorityLevel) -> some View {
+        if isPreview {
+            content
+        } else {
+            content.dropDestination(for: String.self) { identifiers, _ in
+                guard let threadId = identifiers.first else { return false }
+                return moveDroppedThread(threadId, to: level, before: nil)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func priorityDragRow<Content: View>(
+        _ content: Content,
+        threadId: String,
+        level: PriorityLevel,
+        before targetId: String
+    ) -> some View {
+        if isPreview {
+            content
+        } else {
+            content
+                .draggable(threadId)
+                .dropDestination(for: String.self) { identifiers, _ in
+                    guard let droppedId = identifiers.first else { return false }
+                    return moveDroppedThread(droppedId, to: level, before: targetId)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func recentDragRow<Content: View>(_ content: Content, threadId: String) -> some View {
+        if isPreview {
+            content
+        } else {
+            content.draggable(threadId)
+        }
     }
 
     private var footer: some View {

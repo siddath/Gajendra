@@ -488,17 +488,21 @@ const resumeCommandSchema = z.object({
   cwd: z.string().min(1).optional(),
 });
 
+const catalogThreadSchema = z.object({
+  id: z.string().min(1).max(300),
+  title: z.string().max(500),
+  project: z.string().max(500).default(""),
+  updatedAt: z.union([z.number(), z.string()]).optional(),
+  status: z.string().max(80).default("unknown"),
+  deepLink: z.string().url().optional(),
+  resumeCommand: resumeCommandSchema.optional(),
+}).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
+  message: "A configured thread must declare deepLink or resumeCommand.",
+});
+
 const threadCatalogSchema = z.object({
   version: z.literal(1),
-  threads: z.array(z.object({
-    id: z.string().min(1).max(300),
-    title: z.string().max(500),
-    project: z.string().max(500).default(""),
-    updatedAt: z.union([z.number(), z.string()]).optional(),
-    status: z.string().max(80).default("unknown"),
-    deepLink: z.string().url().optional(),
-    resumeCommand: resumeCommandSchema.optional(),
-  })).max(2_000),
+  threads: z.array(catalogThreadSchema).max(2_000),
 });
 
 const sourcesConfigSchema = z.object({

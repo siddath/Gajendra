@@ -52,7 +52,7 @@ The referenced catalog is versioned and size-bounded:
 }
 ```
 
-Instead of a deep link, a catalog may declare a structured resume command:
+Every catalog thread must declare at least one resumable destination. Instead of a deep link, it may declare a structured resume command:
 
 ```json
 {

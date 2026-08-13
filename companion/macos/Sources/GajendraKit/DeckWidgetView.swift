@@ -27,6 +27,18 @@ public enum GajendraOverlayPlacement {
         let maximumY = visibleFrame.maxY - cardSize.height - edgeMargin
         return CGPoint(x: clampedX, y: min(desiredY, maximumY))
     }
+
+    public static func clampedOrigin(
+        windowSize: CGSize,
+        proposedOrigin: CGPoint,
+        visibleFrame: CGRect,
+        margin: CGFloat = 8
+    ) -> CGPoint {
+        CGPoint(
+            x: min(max(proposedOrigin.x, visibleFrame.minX + margin), visibleFrame.maxX - windowSize.width - margin),
+            y: min(max(proposedOrigin.y, visibleFrame.minY + margin), visibleFrame.maxY - windowSize.height - margin)
+        )
+    }
 }
 
 public struct GajendraHoverState: Equatable, Sendable {
@@ -37,12 +49,38 @@ public struct GajendraHoverState: Equatable, Sendable {
 
     public var wantsCardVisible: Bool { pillHovered || cardHovered }
 
-    public mutating func setPillHovered(_ hovered: Bool) {
+    @discardableResult
+    public mutating func setPillHovered(_ hovered: Bool) -> Bool {
+        let entered = hovered && !pillHovered
         pillHovered = hovered
+        return entered
     }
 
     public mutating func setCardHovered(_ hovered: Bool) {
         cardHovered = hovered
+    }
+}
+
+public struct GajendraPillEditState: Equatable, Sendable {
+    public private(set) var isEditing = false
+
+    public init() {}
+
+    public var acceptsDrag: Bool { isEditing }
+
+    public mutating func enter() {
+        isEditing = true
+    }
+
+    public mutating func exit() {
+        isEditing = false
+    }
+
+    @discardableResult
+    public mutating func requestHide() -> Bool {
+        guard isEditing else { return false }
+        isEditing = false
+        return true
     }
 }
 
@@ -112,11 +150,18 @@ public struct GajendraGlassSurface: View {
     private let cornerRadius: CGFloat
     private let castsShadow: Bool
     private let interactive: Bool
+    private let theme: GajendraVisualTheme
 
-    public init(cornerRadius: CGFloat, castsShadow: Bool = true, interactive: Bool = false) {
+    public init(
+        cornerRadius: CGFloat,
+        castsShadow: Bool = true,
+        interactive: Bool = false,
+        theme: GajendraVisualTheme = .nativePopover
+    ) {
         self.cornerRadius = cornerRadius
         self.castsShadow = castsShadow
         self.interactive = interactive
+        self.theme = theme
     }
 
     public var body: some View {
@@ -128,81 +173,171 @@ public struct GajendraGlassSurface: View {
                         interactive ? .regular.interactive() : .regular,
                         in: .rect(cornerRadius: cornerRadius)
                     )
+                    .background(themeTint, in: shape)
                     .overlay(shape.stroke(Color.primary.opacity(0.13), lineWidth: 0.5))
             } else {
                 shape
                     .fill(.ultraThinMaterial)
                     .overlay(
-                        shape.fill(colorScheme == .dark ? Color.gajendraIndigo.opacity(0.2) : Color.white.opacity(0.18))
+                        shape.fill(themeTint)
                     )
                     .overlay(shape.stroke(Color.primary.opacity(0.14), lineWidth: 0.5))
             }
         }
         .shadow(color: castsShadow ? Color.black.opacity(colorScheme == .dark ? 0.28 : 0.13) : .clear, radius: 18, y: 8)
     }
+
+    private var themeTint: Color {
+        if theme == .focusDeck {
+            return colorScheme == .dark
+                ? Color.gajendraIndigo.opacity(0.72)
+                : Color(red: 0.97, green: 0.94, blue: 0.86).opacity(0.78)
+        }
+        return colorScheme == .dark ? Color.gajendraIndigo.opacity(0.2) : Color.white.opacity(0.18)
+    }
 }
 
 public struct GajendraPillView: View {
     @ObservedObject private var model: DeckViewModel
+    @ObservedObject private var visualSettings: GajendraVisualSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var isHovered = false
+    @State private var editState = GajendraPillEditState()
+    @State private var jigglePhase = false
     private let onHoverChanged: (Bool) -> Void
     private let onActivate: () -> Void
+    private let onDragChanged: (CGSize, Bool) -> Void
+    private let onHide: () -> Void
 
     public init(
         model: DeckViewModel,
+        visualSettings: GajendraVisualSettings,
         onHoverChanged: @escaping (Bool) -> Void,
-        onActivate: @escaping () -> Void
+        onActivate: @escaping () -> Void,
+        onDragChanged: @escaping (CGSize, Bool) -> Void = { _, _ in },
+        onHide: @escaping () -> Void = {}
     ) {
         self.model = model
+        self.visualSettings = visualSettings
         self.onHoverChanged = onHoverChanged
         self.onActivate = onActivate
+        self.onDragChanged = onDragChanged
+        self.onHide = onHide
     }
 
     public var body: some View {
-        Button(action: onActivate) {
-            GajendraMark(size: 27)
-                .frame(width: 48, height: 48)
-                .background(pillSurface)
-                .overlay(
-                    Circle()
-                        .stroke(colorScheme == .dark ? Color.white.opacity(0.2) : Color.gajendraIndigo.opacity(0.18), lineWidth: 1)
-                )
-                .contentShape(Circle())
-                .opacity(model.isLoading ? 0.72 : 1)
-                .scaleEffect(isHovered ? 1.06 : 1)
+        ZStack(alignment: .topTrailing) {
+            Button {
+                if !editState.isEditing { onActivate() }
+            } label: {
+                pillLabel
+                    .opacity(model.isLoading ? 0.72 : 1)
+                    .scaleEffect(isHovered && !editState.isEditing ? 1.05 : 1)
+                    .rotationEffect(.degrees(editState.isEditing ? (jigglePhase ? 1.35 : -1.35) : 0))
+            }
+            .buttonStyle(.plain)
+
+            if editState.isEditing {
+                Button {
+                    if editState.requestHide() { onHide() }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 8, weight: .bold))
+                        .frame(width: 17, height: 17)
+                        .background(Color(nsColor: .controlBackgroundColor), in: Circle())
+                        .overlay(Circle().stroke(Color.secondary.opacity(0.45), lineWidth: 0.75))
+                }
+                .buttonStyle(.plain)
+                .help("Hide Gaja lotus")
+                .accessibilityLabel("Hide Gaja lotus")
+            }
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("Gaja, Elephant Focus for AI Power Users")
-        .accessibilityHint("Hover or press to show your current AI-agent priorities")
+        .accessibilityHint(editState.isEditing ? "Drag to move Gaja. Press Escape to finish." : "Hover or press to show priorities. Press and hold to move or hide Gaja.")
         .onHover { hovered in
             isHovered = hovered
             onHoverChanged(hovered)
         }
         .animation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.82), value: model.isLoading)
         .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.78), value: isHovered)
+        .simultaneousGesture(
+            LongPressGesture(minimumDuration: 0.55)
+                .onEnded { _ in
+                    editState.enter()
+                    jigglePhase.toggle()
+                }
+        )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { gesture in
+                    guard editState.acceptsDrag else { return }
+                    onDragChanged(gesture.translation, false)
+                }
+                .onEnded { gesture in
+                    guard editState.acceptsDrag else { return }
+                    onDragChanged(gesture.translation, true)
+                }
+        )
+        .onChange(of: editState.isEditing) { editing in
+            guard editing, !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.11).repeatForever(autoreverses: true)) {
+                jigglePhase.toggle()
+            }
+        }
+        .onExitCommand {
+            editState.exit()
+        }
         .frame(width: 60, height: 60)
+    }
+
+    private var pillLabel: some View {
+        HStack(spacing: 4) {
+            GajendraMark(size: visualSettings.theme == .focusDeck ? 23 : 27)
+            if visualSettings.theme == .focusDeck {
+                Image(systemName: "star.fill")
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+            }
+        }
+        .frame(width: visualSettings.theme == .focusDeck ? 52 : 48, height: visualSettings.theme == .focusDeck ? 40 : 48)
+        .background(pillSurface)
+        .overlay(pillBorder)
+        .contentShape(RoundedRectangle(cornerRadius: visualSettings.theme == .focusDeck ? 14 : 24, style: .continuous))
     }
 
     @ViewBuilder
     private var pillSurface: some View {
+        let radius: CGFloat = visualSettings.theme == .focusDeck ? 14 : 24
         if #available(macOS 26.0, *) {
-            Circle()
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .circle)
+                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: radius))
+                .background(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.62 : 0.14) : Color.clear, in: RoundedRectangle(cornerRadius: radius))
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.16), radius: 12, y: 5)
         } else {
-            Circle()
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .overlay(Circle().fill(colorScheme == .dark ? Color.gajendraIndigo.opacity(0.28) : Color.white.opacity(0.2)))
+                .overlay(RoundedRectangle(cornerRadius: radius).fill(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.58 : 0.14) : (colorScheme == .dark ? Color.gajendraIndigo.opacity(0.28) : Color.white.opacity(0.2))))
                 .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.16), radius: 12, y: 5)
         }
+    }
+
+    private var pillBorder: some View {
+        let radius: CGFloat = visualSettings.theme == .focusDeck ? 14 : 24
+        return RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .stroke(
+                visualSettings.theme == .focusDeck
+                    ? Color.gajendraAccent(for: colorScheme).opacity(0.46)
+                    : (colorScheme == .dark ? Color.white.opacity(0.2) : Color.gajendraIndigo.opacity(0.18)),
+                lineWidth: 1
+            )
     }
 }
 
 public struct GajendraHoverCardView: View {
     @ObservedObject private var model: DeckViewModel
+    @ObservedObject private var visualSettings: GajendraVisualSettings
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     private let isPreview: Bool
@@ -211,11 +346,13 @@ public struct GajendraHoverCardView: View {
 
     public init(
         model: DeckViewModel,
+        visualSettings: GajendraVisualSettings,
         isPreview: Bool = false,
         onHoverChanged: @escaping (Bool) -> Void = { _ in },
         onOpenOrganizer: @escaping () -> Void = {}
     ) {
         self.model = model
+        self.visualSettings = visualSettings
         self.isPreview = isPreview
         self.onHoverChanged = onHoverChanged
         self.onOpenOrganizer = onOpenOrganizer
@@ -231,9 +368,13 @@ public struct GajendraHoverCardView: View {
         .padding(16)
         .frame(width: 380, height: 286)
         .background(
-            GajendraGlassSurface(cornerRadius: 18)
+            GajendraGlassSurface(cornerRadius: 18, theme: visualSettings.theme)
         )
         .padding(12)
+        .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            if let current = model.snapshot?.current { model.open(current) }
+        }
         .onHover(perform: onHoverChanged)
         .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.88), value: model.snapshot)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.errorMessage)
@@ -250,28 +391,78 @@ public struct GajendraHoverCardView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if isPreview {
+                Image(systemName: "rectangle.3.group")
+                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+            } else {
+                Button(action: onOpenOrganizer) {
+                    Image(systemName: "rectangle.3.group")
+                        .frame(width: 18, height: 18)
+                }
+                    .buttonStyle(.borderless)
+                    .help("Open organizer")
+                    .accessibilityLabel("Open organizer")
+            }
+            if isPreview {
+                Image(systemName: "paintpalette")
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(.secondary)
+            } else {
+                visualSettingsMenu
+            }
             refreshControl
         }
+    }
+
+    private var visualSettingsMenu: some View {
+        Menu {
+            Picker("Theme", selection: $visualSettings.theme) {
+                ForEach(GajendraVisualTheme.allCases) { theme in
+                    Text(theme.title).tag(theme)
+                }
+            }
+            Divider()
+            Picker("Appearance", selection: $visualSettings.appearance) {
+                ForEach(GajendraAppearance.allCases) { appearance in
+                    Text(appearance.title).tag(appearance)
+                }
+            }
+        } label: {
+            Image(systemName: "paintpalette")
+                .frame(width: 18, height: 18)
+        }
+        .menuStyle(.borderlessButton)
+        .frame(width: 24)
+        .help("Theme and appearance")
+        .accessibilityLabel("Theme and appearance")
     }
 
     @ViewBuilder
     private var nowSection: some View {
         if let current = model.snapshot?.current {
             VStack(alignment: .leading, spacing: 7) {
-                Text("NOW")
-                    .font(.caption2.bold())
-                    .tracking(1.2)
-                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                HStack(spacing: 6) {
+                    Image(systemName: "scope")
+                    Text("NOW")
+                        .tracking(1.1)
+                    Text("Current focus")
+                        .fontWeight(.regular)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2.bold())
+                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
                 HStack(alignment: .center, spacing: 14) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(current.title)
                             .font(.subheadline.weight(.semibold))
                             .lineLimit(2)
                         HStack(spacing: 5) {
-                            sourceBadge(current)
                             Text(current.project)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                            Button { model.open(current) } label: { sourceBadge(current) }
+                                .buttonStyle(.plain)
+                                .help("Open in \(current.sourceName)")
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -282,10 +473,10 @@ public struct GajendraHoverCardView: View {
                 }
             }
             .padding(11)
-            .background(Color.gajendraGold.opacity(0.09), in: RoundedRectangle(cornerRadius: 11))
+            .background(nowSurfaceColor, in: RoundedRectangle(cornerRadius: 11))
             .overlay(
                 RoundedRectangle(cornerRadius: 11)
-                    .stroke(Color.gajendraGold.opacity(0.5), lineWidth: 1)
+                    .stroke(Color.gajendraAccent(for: colorScheme).opacity(visualSettings.theme == .focusDeck ? 0.72 : 0.5), lineWidth: 1)
             )
         } else if model.isLoading {
             Text("Reading your configured thread sources…")
@@ -306,21 +497,24 @@ public struct GajendraHoverCardView: View {
     private var queueSummary: some View {
         if let snapshot = model.snapshot {
             HStack(alignment: .top, spacing: 10) {
-                compactList(title: "Focus", threads: snapshot.focus)
-                compactList(title: "Important", threads: snapshot.important)
+                compactList(title: "Focus", systemImage: "star.fill", threads: snapshot.focus)
+                compactList(title: "Important", systemImage: "bookmark", threads: snapshot.important)
             }
         }
     }
 
-    private func compactList(title: String, threads: [DeckThread]) -> some View {
+    private func compactList(title: String, systemImage: String, threads: [DeckThread]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
+            HStack(spacing: 5) {
+                Image(systemName: systemImage)
+                    .font(.caption2)
+                    .foregroundStyle(title == "Focus" ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
                 Text(title)
-                    .font(.caption.weight(.semibold))
-                Spacer()
+                    .font(.caption.weight(title == "Focus" ? .bold : .semibold))
                 Text("\(threads.count)")
                     .font(.caption2.monospacedDigit())
                     .foregroundStyle(.secondary)
+                Spacer()
             }
             ForEach(Array(threads.prefix(2))) { thread in
                 Button { model.open(thread) } label: {
@@ -331,9 +525,12 @@ public struct GajendraHoverCardView: View {
                         Text(thread.title)
                             .font(.caption2)
                             .lineLimit(1)
-                        Text(thread.sourceName.prefix(1))
-                            .font(.caption2.bold())
-                            .foregroundStyle(.secondary)
+                        Text(thread.sourceName)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(providerColor(thread))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(providerColor(thread).opacity(0.1), in: Capsule())
                         Spacer(minLength: 0)
                     }
                     .contentShape(Rectangle())
@@ -348,7 +545,7 @@ public struct GajendraHoverCardView: View {
         }
         .padding(9)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9))
+        .background(compactListSurface(title), in: RoundedRectangle(cornerRadius: 9))
     }
 
     private var footer: some View {
@@ -364,23 +561,44 @@ public struct GajendraHoverCardView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button(action: onOpenOrganizer) {
-                Text("Open organizer")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
-                    .fixedSize()
-            }
-            .buttonStyle(.plain)
+            Text("Double-click the card to open NOW")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
     private func sourceBadge(_ thread: DeckThread) -> some View {
         Text(thread.sourceName)
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Color.primary.opacity(0.055), in: Capsule())
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(providerColor(thread))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(providerColor(thread).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
+            .overlay(Capsule().stroke(providerColor(thread).opacity(0.34), lineWidth: 0.75))
+            .accessibilityLabel("Open in \(thread.sourceName)")
+    }
+
+    private func providerColor(_ thread: DeckThread) -> Color {
+        switch thread.sourceId.lowercased() {
+        case "codex": return colorScheme == .dark ? Color(red: 0.49, green: 0.78, blue: 0.96) : Color(red: 0.03, green: 0.36, blue: 0.6)
+        case "claude": return colorScheme == .dark ? Color(red: 1, green: 0.63, blue: 0.34) : Color(red: 0.68, green: 0.27, blue: 0.06)
+        case "cursor": return colorScheme == .dark ? Color(red: 0.76, green: 0.7, blue: 1) : Color(red: 0.35, green: 0.25, blue: 0.62)
+        default: return .secondary
+        }
+    }
+
+    private var nowSurfaceColor: Color {
+        if visualSettings.theme == .focusDeck {
+            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.52) : Color.gajendraGold.opacity(0.16)
+        }
+        return Color.gajendraGold.opacity(colorScheme == .dark ? 0.12 : 0.09)
+    }
+
+    private func compactListSurface(_ title: String) -> Color {
+        if visualSettings.theme == .focusDeck && title == "Focus" {
+            return colorScheme == .dark ? Color.gajendraIndigoSoft.opacity(0.34) : Color.white.opacity(0.52)
+        }
+        return Color.primary.opacity(0.035)
     }
 
     @ViewBuilder

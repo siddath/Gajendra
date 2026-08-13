@@ -40,18 +40,66 @@ enum GajendraSelfTest {
             visibleFrame: CGRect(x: 0, y: 25, width: 1512, height: 950)
         )
         try require(clampedCardOrigin.x == 12, "hover card must stay inside the visible screen")
+        let movedPillOrigin = GajendraOverlayPlacement.clampedOrigin(
+            windowSize: CGSize(width: 60, height: 60),
+            proposedOrigin: CGPoint(x: -400, y: 2_000),
+            visibleFrame: visibleFrame
+        )
+        try require(movedPillOrigin == CGPoint(x: 8, y: 907), "dragged pill must clamp to the visible screen")
         var hover = GajendraHoverState()
         try require(!hover.wantsCardVisible, "card must start hidden")
-        hover.setPillHovered(true)
+        try require(hover.setPillHovered(true), "a new pill hover must request fresh data")
         try require(hover.wantsCardVisible, "pill hover must reveal the card")
+        try require(!hover.setPillHovered(true), "a continuing pill hover must not duplicate refresh intent")
         hover.setPillHovered(false)
         hover.setCardHovered(true)
         try require(hover.wantsCardVisible, "card hover must keep details visible")
         hover.setCardHovered(false)
         try require(!hover.wantsCardVisible, "card must hide after both hover targets exit")
+        try require(hover.setPillHovered(true), "a new hover during the hide grace period must request fresh data")
+        var pillEdit = GajendraPillEditState()
+        try require(!pillEdit.acceptsDrag, "pill drag must be locked before the long-press edit transition")
+        try require(!pillEdit.requestHide(), "pill hide must be locked before the long-press edit transition")
+        pillEdit.enter()
+        try require(pillEdit.acceptsDrag, "long-press edit mode must unlock pill dragging")
+        try require(pillEdit.requestHide(), "edit mode must expose the pill hide action")
+        try require(!pillEdit.acceptsDrag, "hiding the pill must leave edit mode")
+        pillEdit.enter()
+        pillEdit.exit()
+        try require(!pillEdit.acceptsDrag, "Escape must leave pill edit mode")
+        try await verifyVisualSettings()
         try await verifyQueuedRefresh(with: snapshot)
         try await verifyQueuedMutation(with: snapshot)
         print("Gaja companion self-test passed")
+    }
+
+    private static func verifyVisualSettings() async throws {
+        try await MainActor.run {
+            try require(GajendraVisualTheme.allCases == [.nativePopover, .focusDeck], "exactly two production themes must remain available")
+            let suiteName = "gajendra-visual-settings-\(UUID().uuidString)"
+            guard let defaults = UserDefaults(suiteName: suiteName) else {
+                throw SelfTestError.failed("could not create isolated visual-settings store")
+            }
+            defer { defaults.removePersistentDomain(forName: suiteName) }
+
+            var settings = GajendraVisualSettings(defaults: defaults)
+            try require(settings.theme == .nativePopover, "Native Popover must be the default theme")
+            try require(settings.appearance == .automatic, "Auto must be the default appearance")
+            settings.theme = .focusDeck
+            settings.appearance = .dark
+            settings = GajendraVisualSettings(defaults: defaults)
+            try require(settings.theme == .focusDeck, "theme choice did not survive reinitialization")
+            try require(settings.appearance == .dark, "appearance choice did not survive reinitialization")
+
+            defaults.set("command-capsule", forKey: GajendraVisualSettings.themeKey)
+            defaults.set("sepia", forKey: GajendraVisualSettings.appearanceKey)
+            settings = GajendraVisualSettings(defaults: defaults)
+            try require(settings.theme == .nativePopover, "invalid theme must fall back safely")
+            try require(settings.appearance == .automatic, "invalid appearance must fall back safely")
+            try require(GajendraAppearance.automatic.appKitName == nil, "Auto must follow the system appearance")
+            try require(GajendraAppearance.light.appKitName == .aqua, "Light must map to Aqua")
+            try require(GajendraAppearance.dark.appKitName == .darkAqua, "Dark must map to Dark Aqua")
+        }
     }
 
     private static func verifyQueuedMutation(with snapshot: DeckSnapshot) async throws {

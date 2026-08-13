@@ -33,47 +33,80 @@ enum GajendraPreview {
         let darkOrganizerDestination = arguments.dropFirst(3).first ?? "gajendra-organizer-dark.png"
         let darkCardDestination = arguments.dropFirst(4).first ?? "gajendra-hover-card-dark.png"
         let darkPillDestination = arguments.dropFirst(5).first ?? "gajendra-pill-dark.png"
+        let focusOrganizerDestination = arguments.dropFirst(6).first ?? "gajendra-focus-deck-organizer.png"
+        let focusCardDestination = arguments.dropFirst(7).first ?? "gajendra-focus-deck-hover-card.png"
+        let focusPillDestination = arguments.dropFirst(8).first ?? "gajendra-focus-deck-pill.png"
+        let focusDarkOrganizerDestination = arguments.dropFirst(9).first ?? "gajendra-focus-deck-organizer-dark.png"
+        let focusDarkCardDestination = arguments.dropFirst(10).first ?? "gajendra-focus-deck-hover-card-dark.png"
+        let focusDarkPillDestination = arguments.dropFirst(11).first ?? "gajendra-focus-deck-pill-dark.png"
+
+        try renderSuite(
+            model: model,
+            theme: .nativePopover,
+            appearance: .light,
+            organizer: organizerDestination,
+            card: cardDestination,
+            pill: pillDestination
+        )
+        try renderSuite(
+            model: model,
+            theme: .nativePopover,
+            appearance: .dark,
+            organizer: darkOrganizerDestination,
+            card: darkCardDestination,
+            pill: darkPillDestination
+        )
+        try renderSuite(
+            model: model,
+            theme: .focusDeck,
+            appearance: .light,
+            organizer: focusOrganizerDestination,
+            card: focusCardDestination,
+            pill: focusPillDestination
+        )
+        try renderSuite(
+            model: model,
+            theme: .focusDeck,
+            appearance: .dark,
+            organizer: focusDarkOrganizerDestination,
+            card: focusDarkCardDestination,
+            pill: focusDarkPillDestination
+        )
+    }
+
+    @MainActor
+    private static func renderSuite(
+        model: DeckViewModel,
+        theme: GajendraVisualTheme,
+        appearance: ColorScheme,
+        organizer: String,
+        card: String,
+        pill: String
+    ) throws {
+        let setting = GajendraVisualSettings(
+            theme: theme,
+            appearance: appearance == .dark ? .dark : .light
+        )
         try render(
-            DeckContentView(model: model, usesScrollView: false, isPreview: true),
+            DeckContentView(model: model, visualSettings: setting, usesScrollView: false, isPreview: true),
             width: 620,
             height: 650,
-            destination: organizerDestination,
-            colorScheme: .light
+            destination: organizer,
+            colorScheme: appearance
         )
         try render(
-            GajendraHoverCardView(model: model, isPreview: true),
+            GajendraHoverCardView(model: model, visualSettings: setting, isPreview: true),
             width: 404,
             height: 310,
-            destination: cardDestination,
-            colorScheme: .light
+            destination: card,
+            colorScheme: appearance
         )
         try render(
-            GajendraPillView(model: model, onHoverChanged: { _ in }, onActivate: {}),
+            GajendraPillView(model: model, visualSettings: setting, onHoverChanged: { _ in }, onActivate: {}),
             width: 60,
             height: 60,
-            destination: pillDestination,
-            colorScheme: .light
-        )
-        try render(
-            DeckContentView(model: model, usesScrollView: false, isPreview: true),
-            width: 620,
-            height: 650,
-            destination: darkOrganizerDestination,
-            colorScheme: .dark
-        )
-        try render(
-            GajendraHoverCardView(model: model, isPreview: true),
-            width: 404,
-            height: 310,
-            destination: darkCardDestination,
-            colorScheme: .dark
-        )
-        try render(
-            GajendraPillView(model: model, onHoverChanged: { _ in }, onActivate: {}),
-            width: 60,
-            height: 60,
-            destination: darkPillDestination,
-            colorScheme: .dark
+            destination: pill,
+            colorScheme: appearance
         )
     }
 

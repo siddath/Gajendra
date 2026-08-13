@@ -1,6 +1,6 @@
 # Native macOS companion
 
-Gaja’s default surface is a bottom-right icon-only native utility. Hover or press the lotus to reveal the focus card; open the organizer for source controls and queue editing.
+Gaja’s default surface is a bottom-right icon-only native utility. Hover or press the lotus to reveal the focus card; open the organizer for source controls and queue editing. Native Popover is the default theme; Focus Deck is selectable from the palette menu. Each supports Auto, Light, and Dark.
 
 ## Surfaces
 
@@ -9,6 +9,8 @@ Gaja’s default surface is a bottom-right icon-only native utility. Hover or pr
 - Organizer: standard resizable 620 × 700 window, 520 × 620 minimum.
 - Menu bar: optional template icon and compact organizer fallback.
 - Dock/app menu: reopen, refresh (`⌘R`), open organizer (`⇧⌘O`), launch-at-login toggle, quit.
+- Pill edit mode: press and hold for 550 ms, then drag across the visible display or hide the lotus. The app menu can restore or re-anchor it.
+- Organizer: drag recent or prioritized rows into Focus or Important; arrow and tier controls remain available for keyboard operation.
 
 The utility does not inspect or inject into Codex, Claude, Cursor, or other app windows. It requests no Accessibility permission.
 

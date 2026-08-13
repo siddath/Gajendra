@@ -1,5 +1,6 @@
 import GajendraKit
 import AppKit
+import Combine
 import ServiceManagement
 import SwiftUI
 
@@ -42,6 +43,7 @@ enum GajendraMenuBarMain {
 @MainActor
 final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     let model = DeckViewModel()
+    let visualSettings = GajendraVisualSettings()
     private var organizerWindow: NSWindow?
     private var pillWindow: NSPanel?
     private var cardWindow: NSPanel?
@@ -52,18 +54,28 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private var hideCardWorkItem: DispatchWorkItem?
     private var cardAnimationGeneration = 0
     private var launchAtLoginItem: NSMenuItem?
+    private var pillVisibilityItem: NSMenuItem?
+    private var appearanceCancellable: AnyCancellable?
+    private var pillDragStart: CGPoint?
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
     private let cardSize = NSSize(width: 404, height: 310)
+    private let pillHiddenKey = "gajendra.pill.hidden"
+    private let pillHasCustomOriginKey = "gajendra.pill.has-custom-origin"
+    private let pillOriginXKey = "gajendra.pill.origin.x"
+    private let pillOriginYKey = "gajendra.pill.origin.y"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureApplicationMenu()
+        configureAppearance()
         configureStatusItem()
         configurePopover()
         observeDesktopChanges()
         configureLaunchAtLogin()
         model.refresh()
-        showPill(on: preferredScreen())
+        if !UserDefaults.standard.bool(forKey: pillHiddenKey) {
+            showPill(on: preferredScreen())
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -100,7 +112,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc
     private func movePillHere(_ sender: Any?) {
+        UserDefaults.standard.set(false, forKey: pillHasCustomOriginKey)
+        UserDefaults.standard.set(false, forKey: pillHiddenKey)
         showPill(on: preferredScreen())
+        updatePillVisibilityMenuState()
+    }
+
+    @objc
+    private func togglePillVisibility(_ sender: Any?) {
+        if pillWindow?.isVisible == true {
+            hidePill()
+        } else {
+            UserDefaults.standard.set(false, forKey: pillHiddenKey)
+            showPill(on: preferredScreen())
+            updatePillVisibilityMenuState()
+        }
     }
 
     @objc
@@ -143,18 +169,68 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private func showPill(on screen: NSScreen) {
         let panel = pillWindow ?? makePillPanel()
         pillWindow = panel
-        panel.setFrameOrigin(
-            GajendraOverlayPlacement.bottomTrailingOrigin(
-                windowSize: panel.frame.size,
-                visibleFrame: screen.visibleFrame
-            )
+        let origin = storedPillOrigin() ?? GajendraOverlayPlacement.bottomTrailingOrigin(
+            windowSize: panel.frame.size,
+            visibleFrame: screen.visibleFrame
         )
+        let targetScreen = screenContaining(origin) ?? screen
+        panel.setFrameOrigin(GajendraOverlayPlacement.clampedOrigin(
+            windowSize: panel.frame.size,
+            proposedOrigin: origin,
+            visibleFrame: targetScreen.visibleFrame
+        ))
         panel.orderFrontRegardless()
+        UserDefaults.standard.set(false, forKey: pillHiddenKey)
+        updatePillVisibilityMenuState()
         if cardWindow?.isVisible == true { positionCard() }
     }
 
+    private func hidePill() {
+        hideCard()
+        pillWindow?.orderOut(nil)
+        UserDefaults.standard.set(true, forKey: pillHiddenKey)
+        updatePillVisibilityMenuState()
+    }
+
+    private func handlePillDrag(translation: CGSize, ended: Bool) {
+        guard let panel = pillWindow else { return }
+        if pillDragStart == nil { pillDragStart = panel.frame.origin }
+        guard let start = pillDragStart else { return }
+        let proposed = CGPoint(x: start.x + translation.width, y: start.y - translation.height)
+        let targetScreen = NSScreen.screens.first(where: { $0.visibleFrame.contains(NSEvent.mouseLocation) })
+            ?? panel.screen
+            ?? preferredScreen()
+        let origin = GajendraOverlayPlacement.clampedOrigin(
+            windowSize: panel.frame.size,
+            proposedOrigin: proposed,
+            visibleFrame: targetScreen.visibleFrame
+        )
+        panel.setFrameOrigin(origin)
+        if cardWindow?.isVisible == true { positionCard() }
+        if ended {
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: pillHasCustomOriginKey)
+            defaults.set(origin.x, forKey: pillOriginXKey)
+            defaults.set(origin.y, forKey: pillOriginYKey)
+            pillDragStart = nil
+        }
+    }
+
+    private func storedPillOrigin() -> CGPoint? {
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: pillHasCustomOriginKey) else { return nil }
+        return CGPoint(x: defaults.double(forKey: pillOriginXKey), y: defaults.double(forKey: pillOriginYKey))
+    }
+
+    private func screenContaining(_ origin: CGPoint) -> NSScreen? {
+        NSScreen.screens.first { screen in
+            screen.visibleFrame.insetBy(dx: -pillSize.width, dy: -pillSize.height).contains(origin)
+        }
+    }
+
     private func setPillHovered(_ hovered: Bool) {
-        hoverState.setPillHovered(hovered)
+        let enteredPill = hoverState.setPillHovered(hovered)
+        if enteredPill { model.refresh() }
         updateCardPresentation()
     }
 
@@ -206,7 +282,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
                 panel.animator().alphaValue = 1
             }
         }
-        if !wasVisible { model.refresh() }
+        if !wasVisible && !hoverState.pillHovered { model.refresh() }
     }
 
     private func hideCard() {
@@ -268,6 +344,15 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         moveItem.target = self
         appMenu.addItem(moveItem)
 
+        let visibilityItem = NSMenuItem(
+            title: "Hide Gaja Lotus",
+            action: #selector(togglePillVisibility(_:)),
+            keyEquivalent: ""
+        )
+        visibilityItem.target = self
+        pillVisibilityItem = visibilityItem
+        appMenu.addItem(visibilityItem)
+
         let refreshItem = NSMenuItem(
             title: "Refresh Threads",
             action: #selector(refreshFromMenu(_:)),
@@ -293,6 +378,17 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         )
         appMenuItem.submenu = appMenu
         NSApplication.shared.mainMenu = mainMenu
+        updatePillVisibilityMenuState()
+    }
+
+    private func updatePillVisibilityMenuState() {
+        pillVisibilityItem?.title = pillWindow?.isVisible == true ? "Hide Gaja Lotus" : "Show Gaja Lotus"
+    }
+
+    private func configureAppearance() {
+        appearanceCancellable = visualSettings.$appearance.sink { appearance in
+            NSApplication.shared.appearance = appearance.appKitName.flatMap(NSAppearance.init(named:))
+        }
     }
 
     private func configureStatusItem() {
@@ -326,7 +422,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         popover.animates = true
         popover.contentSize = NSSize(width: 520, height: 650)
         popover.contentViewController = NSHostingController(
-            rootView: DeckContentView(model: model)
+            rootView: DeckContentView(model: model, visualSettings: visualSettings)
         )
     }
 
@@ -338,7 +434,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "Gaja"
-        window.contentViewController = NSHostingController(rootView: DeckContentView(model: model))
+        window.contentViewController = NSHostingController(rootView: DeckContentView(model: model, visualSettings: visualSettings))
         window.setContentSize(NSSize(width: 620, height: 700))
         window.contentMinSize = NSSize(width: 520, height: 620)
         window.isReleasedWhenClosed = false
@@ -353,8 +449,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         panel.contentViewController = NSHostingController(
             rootView: GajendraPillView(
                 model: model,
+                visualSettings: visualSettings,
                 onHoverChanged: { [weak self] hovered in self?.setPillHovered(hovered) },
-                onActivate: { [weak self] in self?.activatePill() }
+                onActivate: { [weak self] in self?.activatePill() },
+                onDragChanged: { [weak self] translation, ended in self?.handlePillDrag(translation: translation, ended: ended) },
+                onHide: { [weak self] in self?.hidePill() }
             )
         )
         panel.setContentSize(pillSize)
@@ -367,6 +466,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         panel.contentViewController = NSHostingController(
             rootView: GajendraHoverCardView(
                 model: model,
+                visualSettings: visualSettings,
                 onHoverChanged: { [weak self] hovered in self?.setCardHovered(hovered) },
                 onOpenOrganizer: { [weak self] in self?.showOrganizer() }
             )
@@ -431,6 +531,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
+                guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey) else { return }
                 self.pillWindow?.orderFrontRegardless()
                 if self.cardWindow?.isVisible == true { self.cardWindow?.orderFrontRegardless() }
             }
@@ -443,6 +544,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
+                guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey) else { return }
                 self.showPill(on: self.preferredScreen())
             }
         }

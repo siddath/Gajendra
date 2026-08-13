@@ -10,12 +10,30 @@ if (!queriedRoot) throw new Error("Gaja root was not found.");
 const root: HTMLDivElement = queriedRoot;
 const motion = createDeckMotion(root);
 
+type VisualTheme = "native" | "focus-deck";
+type AppearancePreference = "auto" | "light" | "dark";
+type ResolvedAppearance = "light" | "dark";
+
+const themeStorageKey = "gajendra.ui.theme.v1";
+const appearanceStorageKey = "gajendra.ui.appearance.v1";
+const systemDarkMode = window.matchMedia("(prefers-color-scheme: dark)");
+
+let visualTheme: VisualTheme = readEnumPreference(themeStorageKey, ["native", "focus-deck"], "native");
+let appearancePreference: AppearancePreference = readEnumPreference(appearanceStorageKey, ["auto", "light", "dark"], "auto");
+let hostAppearance: ResolvedAppearance | null = null;
+
 let snapshot: DeckSnapshot | null = null;
 let app: App | null = null;
 let busy = false;
 const fixtureNow = new Date("2026-08-11T15:00:00.000Z").valueOf();
 
-window.addEventListener("pagehide", () => motion.destroy(), { once: true });
+applyVisualPreferences();
+systemDarkMode.addEventListener("change", handleSystemAppearanceChange);
+
+window.addEventListener("pagehide", () => {
+  systemDarkMode.removeEventListener("change", handleSystemAppearanceChange);
+  motion.destroy();
+}, { once: true });
 
 void start();
 
@@ -27,6 +45,12 @@ async function start(): Promise<void> {
   }
 
   app = new App({ name: "Gaja, Elephant Focus for AI Power Users", version: "0.3.1" });
+  app.addEventListener("hostcontextchanged", (context) => {
+    const changedAppearance = normalizeAppearance(context.theme);
+    if (!changedAppearance) return;
+    hostAppearance = changedAppearance;
+    if (appearancePreference === "auto") applyVisualPreferences();
+  });
   app.ontoolresult = (result) => {
     if (!busy) acceptSnapshot(result.structuredContent, "external");
   };
@@ -34,6 +58,8 @@ async function start(): Promise<void> {
   busy = true;
   try {
     await app.connect();
+    hostAppearance = normalizeAppearance(app.getHostContext()?.theme);
+    applyVisualPreferences();
     const result = await app.callServerTool({ name: "gajendra_open", arguments: {} });
     acceptSnapshot(result.structuredContent, "initial");
   } catch (error) {
@@ -71,6 +97,7 @@ function render(reason: RenderReason = "external", layoutState: DeckLayoutState 
         </button>
       </div>
       <p class="lede">One source of truth across Codex, Claude, Cursor, and the agents you connect.</p>
+      ${visualPreferenceControls()}
       <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gaja is up to date</span>
     </header>
     ${snapshot.error ? errorPanel(snapshot.error) : ""}
@@ -97,7 +124,7 @@ function currentPanel(current: DeckThread | null): string {
     </section>`;
   }
   return `<section class="now-card" aria-labelledby="now-heading">
-    <div class="now-topline"><p class="now-label">NOW</p><span><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">Task status: ${escapeHtml(current.status)}</span></span></div>
+    <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p><span><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">Task status: ${escapeHtml(current.status)}</span></span></div>
     <div class="now-content">
       <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${sourceBadge(current)} ${escapeHtml(current.project)}</p></div>
       <a class="primary-action" href="${escapeAttribute(current.deepLink)}" data-open-thread="${escapeAttribute(current.deepLink)}" aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
@@ -110,21 +137,20 @@ function section(level: PriorityLevel, title: string, description: string, threa
   const warning = level === "focus" && snapshot?.focusOverGuide
     ? `<p class="section-warning" role="status">You have more than the ${snapshot.focusGuide}-task focus guide. Keep only what can truly win.</p>`
     : "";
-  return `<section class="deck-section" aria-labelledby="${level}-heading">
+  return `<section class="deck-section" data-drop-level="${level}" aria-labelledby="${level}-heading">
     <button class="section-toggle" type="button" data-collapse="${level}" aria-expanded="${String(!isCollapsed)}" aria-controls="${level}-list">
-      <span><span class="section-title" id="${level}-heading">${escapeHtml(title)}</span><span class="section-description">${escapeHtml(description)}</span></span>
-      <span class="section-count">${threads.length}</span>
+      <span><span class="section-heading"><span class="section-symbol" aria-hidden="true">${level === "focus" ? "★" : "◆"}</span><span class="section-title" id="${level}-heading">${escapeHtml(title)}</span><span class="section-count">${threads.length}</span></span><span class="section-description">${escapeHtml(description)}</span></span>
       <span class="chevron" aria-hidden="true">⌄</span>
     </button>
     ${warning}
-    <ol class="thread-list" id="${level}-list" ${isCollapsed ? "hidden" : ""}>
+    <ol class="thread-list" id="${level}-list" data-drop-level="${level}" ${isCollapsed ? "hidden" : ""}>
       ${threads.length ? threads.map((thread, index) => threadRow(thread, index, threads.length)).join("") : emptyRow(level)}
     </ol>
   </section>`;
 }
 
 function threadRow(thread: DeckThread, index: number, count: number): string {
-  return `<li class="thread-row ${thread.isCurrent ? "is-current" : ""}" data-flip-id="thread-${escapeAttribute(thread.id)}">
+  return `<li class="thread-row ${thread.isCurrent ? "is-current" : ""}" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-level="${escapeAttribute(thread.level ?? "")}" data-flip-id="thread-${escapeAttribute(thread.id)}">
     <div class="thread-main">
       <div class="thread-heading-line">
         ${thread.isCurrent ? '<span class="now-pill">NOW</span>' : ""}
@@ -153,7 +179,7 @@ function availableSection(threads: DeckThread[]): string {
 }
 
 function availableRow(thread: DeckThread): string {
-  return `<li class="available-row" data-flip-id="thread-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName}`.toLowerCase())}">
+  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="thread-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName}`.toLowerCase())}">
     <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${sourceBadge(thread)} ${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)}</p></div>
     <div class="available-actions">${actionButton("Important", "level-important", thread.id)}${actionButton("Focus ✦✦", "level-focus", thread.id, true)}</div>
   </li>`;
@@ -183,7 +209,21 @@ function sourcesPanel(sources: DeckSnapshot["sources"]): string {
 }
 
 function sourceBadge(thread: DeckThread): string {
-  return `<span class="source-badge">${escapeHtml(thread.sourceName)}</span>`;
+  return `<a class="source-badge" href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-source-id="${escapeAttribute(thread.sourceId)}" aria-label="Open ${escapeAttribute(thread.title)} in ${escapeAttribute(thread.sourceName)}">${escapeHtml(thread.sourceName)}</a>`;
+}
+
+function visualPreferenceControls(): string {
+  return `<div class="visual-controls" aria-label="Gaja visual preferences">
+    <span class="visual-control-label">Theme</span>
+    <div class="segmented-control" role="group" aria-label="Theme">
+      <button type="button" data-action="theme-native" aria-pressed="${String(visualTheme === "native")}">Native</button>
+      <button type="button" data-action="theme-focus-deck" aria-pressed="${String(visualTheme === "focus-deck")}">Focus Deck</button>
+    </div>
+    <span class="visual-control-label">Appearance</span>
+    <div class="segmented-control" role="group" aria-label="Appearance">
+      ${(["auto", "light", "dark"] as const).map((appearance) => `<button type="button" data-action="appearance-${appearance}" aria-pressed="${String(appearancePreference === appearance)}">${appearance[0]?.toUpperCase()}${appearance.slice(1)}</button>`).join("")}
+    </div>
+  </div>`;
 }
 
 function bindInteractions(): void {
@@ -204,7 +244,6 @@ function bindInteractions(): void {
 
   root.querySelectorAll<HTMLAnchorElement>("a[data-open-thread]").forEach((anchor) => {
     anchor.addEventListener("click", async (event) => {
-      if (!app) return;
       event.preventDefault();
       const url = anchor.dataset.openThread;
       if (url) {
@@ -215,6 +254,83 @@ function bindInteractions(): void {
   });
 
   root.querySelectorAll<HTMLElement>("button, a").forEach((element) => motion.bindPress(element));
+  bindDragAndDrop();
+
+  root.querySelector<HTMLElement>(".now-card")?.addEventListener("dblclick", (event) => {
+    if ((event.target as HTMLElement).closest("a, button, input")) return;
+    const current = snapshot?.current;
+    if (current) void openThreadLink(current.deepLink);
+  });
+}
+
+function bindDragAndDrop(): void {
+  root.querySelectorAll<HTMLElement>(".thread-row[draggable=true], .available-row[draggable=true]").forEach((row) => {
+    row.addEventListener("dragstart", (event) => {
+      const threadId = row.dataset.threadId;
+      if (!threadId || !event.dataTransfer) return;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", threadId);
+      row.classList.add("is-dragging");
+    });
+    row.addEventListener("dragend", clearDragState);
+  });
+
+  root.querySelectorAll<HTMLElement>(".deck-section[data-drop-level]").forEach((sectionElement) => {
+    sectionElement.addEventListener("dragover", (event) => {
+      if (busy || !event.dataTransfer?.types.includes("text/plain")) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      clearDropTargets();
+      (event.target as HTMLElement).closest<HTMLElement>(".thread-row")?.classList.add("is-drop-target");
+      sectionElement.classList.add("is-drop-zone");
+    });
+    sectionElement.addEventListener("dragleave", (event) => {
+      if (!sectionElement.contains(event.relatedTarget as Node | null)) sectionElement.classList.remove("is-drop-zone");
+    });
+    sectionElement.addEventListener("drop", (event) => {
+      event.preventDefault();
+      const threadId = event.dataTransfer?.getData("text/plain");
+      const level = sectionElement.dataset.dropLevel as PriorityLevel | undefined;
+      const targetRow = (event.target as HTMLElement).closest<HTMLElement>(".thread-row");
+      const beforeId = targetRow?.dataset.threadId;
+      clearDragState();
+      if (threadId && level) void moveDroppedThread(threadId, level, beforeId);
+    });
+  });
+}
+
+function clearDropTargets(): void {
+  root.querySelectorAll(".is-drop-target").forEach((element) => element.classList.remove("is-drop-target"));
+}
+
+function clearDragState(): void {
+  root.querySelectorAll(".is-dragging, .is-drop-target, .is-drop-zone").forEach((element) => {
+    element.classList.remove("is-dragging", "is-drop-target", "is-drop-zone");
+  });
+}
+
+async function moveDroppedThread(threadId: string, level: PriorityLevel, beforeId?: string): Promise<void> {
+  if (!snapshot || busy) return;
+  const allThreads = [...snapshot.focus, ...snapshot.important, ...snapshot.available];
+  const thread = allThreads.find((candidate) => candidate.id === threadId);
+  if (!thread) return;
+
+  if (thread.level !== level) await mutate("gajendra_set_level", { threadId, level });
+  if (!snapshot || !beforeId || beforeId === threadId) return;
+
+  const targetThreads = level === "focus" ? snapshot.focus : snapshot.important;
+  let sourceIndex = targetThreads.findIndex((candidate) => candidate.id === threadId);
+  const targetIndex = targetThreads.findIndex((candidate) => candidate.id === beforeId);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+
+  while (sourceIndex > targetIndex) {
+    await mutate("gajendra_move", { threadId, direction: "up" });
+    sourceIndex -= 1;
+  }
+  while (sourceIndex < targetIndex - 1) {
+    await mutate("gajendra_move", { threadId, direction: "down" });
+    sourceIndex += 1;
+  }
 }
 
 async function handleCollapse(button: HTMLButtonElement): Promise<void> {
@@ -236,6 +352,15 @@ async function handleCollapse(button: HTMLButtonElement): Promise<void> {
 async function handleAction(button: HTMLButtonElement): Promise<void> {
   const action = button.dataset.action;
   const threadId = button.dataset.threadId;
+  if (action?.startsWith("theme-")) {
+    setVisualTheme(action === "theme-focus-deck" ? "focus-deck" : "native");
+    return;
+  }
+  if (action?.startsWith("appearance-")) {
+    const appearance = action.slice("appearance-".length);
+    if (appearance === "auto" || appearance === "light" || appearance === "dark") setAppearancePreference(appearance);
+    return;
+  }
   if (action === "retry" || action === "refresh") return refresh();
   if (action === "source-toggle") {
     const sourceId = button.dataset.sourceId;
@@ -347,6 +472,10 @@ async function refresh(): Promise<void> {
 }
 
 async function openThreadLink(url: string): Promise<void> {
+  if (!app && shouldUseFixture()) {
+    root.dataset.lastOpenedThread = url;
+    return;
+  }
   const candidate = app as (App & { openLink?(input: { url: string }): Promise<unknown> }) | null;
   if (candidate?.openLink) {
     try {
@@ -383,6 +512,69 @@ function relativeDate(timestamp: number): string {
   if (days === 0) return "Updated today";
   if (days === 1) return "Updated yesterday";
   return `Updated ${days} days ago`;
+}
+
+function readEnumPreference<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const value = window.localStorage.getItem(key);
+    return allowed.includes(value as T) ? value as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writePreference(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Sandboxed MCP hosts may deny storage. The in-memory preference still applies for this mount.
+  }
+}
+
+function normalizeAppearance(value: unknown): ResolvedAppearance | null {
+  return value === "light" || value === "dark" ? value : null;
+}
+
+function resolvedAppearance(): ResolvedAppearance {
+  if (appearancePreference !== "auto") return appearancePreference;
+  return hostAppearance ?? (systemDarkMode.matches ? "dark" : "light");
+}
+
+function applyVisualPreferences(): void {
+  const appearance = resolvedAppearance();
+  document.documentElement.dataset.gajaTheme = visualTheme;
+  document.documentElement.dataset.theme = appearance;
+  document.documentElement.style.colorScheme = appearance;
+  root.dataset.gajaTheme = visualTheme;
+  root.dataset.theme = appearance;
+  updateVisualPreferenceControls();
+}
+
+function updateVisualPreferenceControls(): void {
+  root.querySelectorAll<HTMLButtonElement>("[data-action^=theme-]").forEach((button) => {
+    const selected = button.dataset.action === `theme-${visualTheme}`;
+    button.setAttribute("aria-pressed", String(selected));
+  });
+  root.querySelectorAll<HTMLButtonElement>("[data-action^=appearance-]").forEach((button) => {
+    const selected = button.dataset.action === `appearance-${appearancePreference}`;
+    button.setAttribute("aria-pressed", String(selected));
+  });
+}
+
+function setVisualTheme(theme: VisualTheme): void {
+  visualTheme = theme;
+  writePreference(themeStorageKey, theme);
+  applyVisualPreferences();
+}
+
+function setAppearancePreference(appearance: AppearancePreference): void {
+  appearancePreference = appearance;
+  writePreference(appearanceStorageKey, appearance);
+  applyVisualPreferences();
+}
+
+function handleSystemAppearanceChange(): void {
+  if (appearancePreference === "auto" && !hostAppearance) applyVisualPreferences();
 }
 
 function escapeHtml(value: string): string {

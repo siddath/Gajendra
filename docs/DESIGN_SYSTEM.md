@@ -29,6 +29,15 @@ Gaja is a quiet focus beacon: persistent enough to become a habit, restrained en
 | Primary action | System accent | System accent | Standard bordered-prominent control |
 | Source health | System green/orange/red plus text/help | Same | Color is supplemental |
 
+## Selectable themes
+
+Gaja ships two visual themes over one interaction and data model:
+
+- **Native Popover** is the default. It follows macOS materials, semantic colors, standard controls, and a restrained gold NOW cue.
+- **Focus Deck** uses a warmer light field and a deep indigo dark field, with stronger gold hierarchy for NOW and Focus. Important remains deliberately quieter.
+
+Both themes support Auto, Light, and Dark. Auto follows the macOS appearance in the companion and the MCP host theme when available, with the browser preference as a fallback. Command Capsule is not a production theme.
+
 ## Materials
 
 - macOS 26+: SwiftUI Liquid Glass on pill, card, and organizer field.
@@ -43,7 +52,11 @@ Gaja is a quiet focus beacon: persistent enough to become a habit, restrained en
 - Hover card: 404 × 310 points, bottom-trailing aligned and clamped to the visible display.
 - Organizer: resizable, initial 620 × 700 points, minimum 520 × 620.
 - Primary Open thread action is vertically centered at the trailing edge of NOW.
+- Focus and Important counts sit beside their labels, not against the far edge.
+- Provider badges are text-backed and use supplemental source accents; activating a badge resumes that exact thread in its owning provider.
+- Recent and prioritized rows are draggable between Focus and Important. Visible move and tier controls remain the keyboard-accessible equivalent.
 - Menus and disclosure indicators have separate hit targets and never overlap.
+- Press and hold the floating lotus for 550 ms to enter edit mode. The lotus jiggles, can be dragged within the visible display, or hidden; the app menu restores it.
 
 ## Motion
 
@@ -54,6 +67,6 @@ Gaja is a quiet focus beacon: persistent enough to become a habit, restrained en
 
 ## Evidence
 
-- Native: `evidence/companion/gajendra-*.png`.
-- MCP App: `evidence/gauntlet/gajendra-*.png`.
+- Native: `evidence/companion/gajendra-*.png`, including the `gajendra-focus-deck-*` matrix.
+- MCP App: `evidence/gauntlet/gajendra-*.png`, including Native and Focus Deck light/dark/compact states.
 - Source: `plugins/gajendra/assets/gajendra*.svg`, `DeckWidgetView.swift`, and `styles.css`.
