@@ -2,12 +2,14 @@ export const STORE_VERSION = 2 as const;
 export const FOCUS_GUIDE = 5;
 
 export type PriorityLevel = "focus" | "important";
+export type ThreadContext = "design" | "engineering" | "life";
 export type SourceState = "ready" | "disabled" | "not-installed" | "not-configured" | "error";
 
 export type StoredEntry = {
   threadId: string;
   level: PriorityLevel;
   addedAt: string;
+  context?: ThreadContext;
 };
 
 export type PriorityStore = {
@@ -39,6 +41,7 @@ export type AgentThread = {
 export type DeckThread = AgentThread & {
   level: PriorityLevel | null;
   isCurrent: boolean;
+  context: ThreadContext | null;
 };
 
 export type ThreadSourceStatus = {
@@ -80,6 +83,7 @@ export type DeckMutation =
   | { type: "set-level"; threadId: string; level: PriorityLevel | null }
   | { type: "set-current"; threadId: string }
   | { type: "move"; threadId: string; direction: "up" | "down" }
+  | { type: "set-context"; threadId: string; context: ThreadContext | null }
   | { type: "set-collapsed"; level: PriorityLevel; collapsed: boolean }
   | { type: "set-source-enabled"; sourceId: string; enabled: boolean };
 

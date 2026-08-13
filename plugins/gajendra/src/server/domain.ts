@@ -10,6 +10,7 @@ import {
   type PriorityStore,
   type StoredEntry,
   type ThreadSourceStatus,
+  type ThreadContext,
 } from "../shared/contracts.js";
 
 export function canonicalThreadId(sourceId: string, threadId: string): string {
@@ -22,7 +23,7 @@ export function normalizeStore(value: unknown): PriorityStore {
   const entries = Array.isArray(candidate.entries)
     ? candidate.entries
         .filter(isStoredEntry)
-        .map((entry) => ({ ...entry, threadId: normalizeLegacyThreadId(entry.threadId) }))
+        .map(normalizeStoredEntry)
         .filter(uniqueByThreadId())
     : [];
   const candidateCurrent = typeof candidate.currentFocusThreadId === "string"
@@ -60,10 +61,20 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
 
   const index = next.entries.findIndex((entry) => entry.threadId === mutation.threadId);
 
+  if (mutation.type === "set-context") {
+    if (index < 0) return next;
+    const entry = next.entries[index];
+    if (!entry) return next;
+    if (mutation.context) entry.context = mutation.context;
+    else delete entry.context;
+    return next;
+  }
+
   if (mutation.type === "set-level") {
+    const existing = index >= 0 ? next.entries[index] : undefined;
     if (index >= 0) next.entries.splice(index, 1);
     if (mutation.level) {
-      next.entries.push({ threadId: mutation.threadId, level: mutation.level, addedAt: now.toISOString() });
+      next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
     if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
     if (mutation.level !== "focus" && next.currentFocusThreadId === mutation.threadId) {
@@ -73,8 +84,9 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
   }
 
   if (mutation.type === "set-current") {
+    const existing = index >= 0 ? next.entries[index] : undefined;
     if (index >= 0) next.entries.splice(index, 1);
-    next.entries.unshift({ threadId: mutation.threadId, level: "focus", addedAt: now.toISOString() });
+    next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
     next.currentFocusThreadId = mutation.threadId;
     return next;
   }
@@ -108,14 +120,19 @@ export function buildSnapshot(
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry: StoredEntry): DeckThread | null => {
     const thread = threadsById.get(entry.threadId);
-    return thread ? { ...thread, level: entry.level, isCurrent: normalized.currentFocusThreadId === entry.threadId } : null;
+    return thread ? {
+      ...thread,
+      level: entry.level,
+      isCurrent: normalized.currentFocusThreadId === entry.threadId,
+      context: entry.context ?? null,
+    } : null;
   };
   const focus = normalized.entries.filter((entry) => entry.level === "focus").map(resolve).filter(isPresent);
   const important = normalized.entries.filter((entry) => entry.level === "important").map(resolve).filter(isPresent);
   const available = threads
     .filter((thread) => !entriesById.has(thread.id))
     .sort((left, right) => right.updatedAt - left.updatedAt)
-    .map((thread) => ({ ...thread, level: null, isCurrent: false }));
+    .map((thread) => ({ ...thread, level: null, isCurrent: false, context: null }));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -135,6 +152,28 @@ export function buildSnapshot(
 
 function normalizeLegacyThreadId(threadId: string): string {
   return threadId.includes(":") ? threadId : canonicalThreadId("codex", threadId);
+}
+
+function normalizeStoredEntry(entry: StoredEntry): StoredEntry {
+  return storedEntry(
+    normalizeLegacyThreadId(entry.threadId),
+    entry.level,
+    entry.addedAt,
+    normalizeThreadContext(entry.context),
+  );
+}
+
+function storedEntry(
+  threadId: string,
+  level: StoredEntry["level"],
+  addedAt: string,
+  context?: ThreadContext,
+): StoredEntry {
+  return context ? { threadId, level, addedAt, context } : { threadId, level, addedAt };
+}
+
+function normalizeThreadContext(value: unknown): ThreadContext | undefined {
+  return value === "design" || value === "engineering" || value === "life" ? value : undefined;
 }
 
 function normalizeSourcePreferences(value: unknown): Record<string, boolean> {

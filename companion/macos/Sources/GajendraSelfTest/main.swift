@@ -8,6 +8,7 @@ enum GajendraSelfTest {
         try require(snapshot.current?.id == "codex:focus-1", "current thread did not decode")
         try require(snapshot.focus.filter(\.isCurrent).count == 1, "NOW must remain singular")
         try require(snapshot.current?.deepLink == "codex://threads/focus-1", "deep link changed")
+        try require(snapshot.current?.context == .design, "thread context did not decode")
         try require(snapshot.sources.count == 2, "thread sources did not decode")
         try require(
             snapshot.available.first?.resumeCommand
@@ -22,6 +23,12 @@ enum GajendraSelfTest {
         try require(object["type"] as? String == "set-level", "mutation type changed")
         try require(object["threadId"] as? String == "codex:focus-1", "mutation thread ID changed")
         try require(object["level"] is NSNull, "removal must encode an explicit null level")
+        let contextData = try JSONEncoder().encode(DeckMutation.setContext(threadId: "codex:focus-1", context: .engineering))
+        guard let contextObject = try JSONSerialization.jsonObject(with: contextData) as? [String: Any] else {
+            throw SelfTestError.failed("context mutation did not encode as an object")
+        }
+        try require(contextObject["type"] as? String == "set-context", "context mutation type changed")
+        try require(contextObject["context"] as? String == "engineering", "bounded context did not encode")
         let visibleFrame = CGRect(x: 0, y: 25, width: 1512, height: 950)
         let pillOrigin = GajendraOverlayPlacement.bottomTrailingOrigin(
             windowSize: CGSize(width: 60, height: 60),
@@ -186,17 +193,20 @@ enum GajendraSelfTest {
       "current": {
         "id": "codex:focus-1", "sourceId": "codex", "sourceName": "Codex", "title": "Current", "project": "Fixture", "updatedAt": 1,
         "status": "idle", "level": "focus", "isCurrent": true,
+        "context": "design",
         "deepLink": "codex://threads/focus-1", "resumeCommand": null
       },
       "focus": [{
         "id": "codex:focus-1", "sourceId": "codex", "sourceName": "Codex", "title": "Current", "project": "Fixture", "updatedAt": 1,
         "status": "idle", "level": "focus", "isCurrent": true,
+        "context": "design",
         "deepLink": "codex://threads/focus-1", "resumeCommand": null
       }],
       "important": [],
       "available": [{
         "id": "claude:claude-1", "sourceId": "claude", "sourceName": "Claude Code", "title": "Claude task", "project": "Fixture", "updatedAt": 1,
         "status": "resumable", "level": null, "isCurrent": false,
+        "context": null,
         "deepLink": "gajendra://thread/claude%3Aclaude-1",
         "resumeCommand": {"executable":"/usr/local/bin/claude","args":["--resume","claude-1"],"cwd":"/tmp/project"}
       }],

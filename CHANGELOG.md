@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added user-assigned Design, Engineering, and Life context labels across the native organizer, hover card, and MCP App without persisting provider content or free text.
 - Publication, hosted CI, signing, notarization, and an optional WidgetKit extension remain separate owner-gated work.
 
 ## 0.3.1 - 2026-08-13

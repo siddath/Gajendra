@@ -7,7 +7,7 @@ Preserve these hard boundaries:
 - one global NOW, and it must belong to Focus;
 - canonical thread IDs are namespaced by source;
 - no direct provider database, signed-app, feature-rollout, prompt, or transcript mutation;
-- persist only Gajendra priority/source preferences, never live thread content;
+- persist only Gajendra priority/source preferences and the bounded Design/Engineering/Life context enum, never live thread content or free-text labels;
 - Claude metadata scanning stays opt-in;
 - generic sources are explicit bounded catalogs, not arbitrary directory or command discovery;
 - migrate Aadi/Priority Deck state by copy, never destructive move;

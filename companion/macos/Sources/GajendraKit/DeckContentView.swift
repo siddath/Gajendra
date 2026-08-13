@@ -243,6 +243,9 @@ public struct DeckContentView: View {
                             Text(current.project)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if let context = current.context {
+                                contextBadge(context)
+                            }
                             Button {
                                 model.open(current)
                             } label: {
@@ -358,10 +361,16 @@ public struct DeckContentView: View {
                         Text(thread.title)
                             .lineLimit(1)
                     }
-                    Text(thread.project)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    sourceBadge(thread)
+                    HStack(spacing: 5) {
+                        Text(thread.project)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        if let context = thread.context {
+                            contextBadge(context)
+                        }
+                        sourceBadge(thread)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -397,6 +406,21 @@ public struct DeckContentView: View {
                 .help("Move down")
                 .accessibilityLabel("Move \(thread.title) down")
                 Menu {
+                    Menu("Context") {
+                        ForEach(ThreadContext.allCases) { context in
+                            Button {
+                                model.apply(.setContext(threadId: thread.id, context: context))
+                            } label: {
+                                Label(context.title, systemImage: thread.context == context ? "checkmark" : "circle")
+                            }
+                        }
+                        if thread.context != nil {
+                            Divider()
+                            Button("Clear Context") {
+                                model.apply(.setContext(threadId: thread.id, context: nil))
+                            }
+                        }
+                    }
                     if level == .focus {
                         Button("Move to Important") {
                             model.apply(.setLevel(threadId: thread.id, level: .important))
@@ -533,6 +557,28 @@ public struct DeckContentView: View {
             .background(providerColor(thread).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
             .overlay(Capsule().stroke(providerColor(thread).opacity(0.34), lineWidth: 0.75))
             .accessibilityLabel("Open in \(thread.sourceName)")
+    }
+
+    private func contextBadge(_ context: ThreadContext) -> some View {
+        Text(context.title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(contextColor(context))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(contextColor(context).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
+            .overlay(Capsule().stroke(contextColor(context).opacity(0.36), lineWidth: 0.75))
+            .accessibilityLabel("Context: \(context.title)")
+    }
+
+    private func contextColor(_ context: ThreadContext) -> Color {
+        switch context {
+        case .design:
+            return colorScheme == .dark ? Color(red: 0.57, green: 0.73, blue: 1) : Color(red: 0.16, green: 0.36, blue: 0.67)
+        case .engineering:
+            return colorScheme == .dark ? Color(red: 0.47, green: 0.84, blue: 0.69) : Color(red: 0.11, green: 0.42, blue: 0.31)
+        case .life:
+            return colorScheme == .dark ? Color(red: 0.94, green: 0.64, blue: 0.77) : Color(red: 0.55, green: 0.25, blue: 0.38)
+        }
     }
 
     private func providerColor(_ thread: DeckThread) -> Color {

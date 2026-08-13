@@ -82,10 +82,25 @@ test("provider badges resume the exact owning thread and counts stay beside labe
   expect(countBox!.x - (titleBox!.x + titleBox!.width)).toBeLessThan(12);
 });
 
+test("assigns bounded context labels without changing NOW or provider resume", async ({ page }) => {
+  const row = page.locator('.thread-row[data-thread-id^="claude:"]');
+  const provider = row.locator('.source-badge[data-source-id="claude"]');
+  const contextSelect = row.getByRole("combobox", { name: /Context for Review the multi-agent adapter contract/ });
+  const href = await provider.getAttribute("href");
+  await expect(row.locator(".context-badge")).toHaveText("Engineering");
+  await expect(contextSelect).toHaveValue("engineering");
+  expect((await contextSelect.boundingBox())?.width).toBeGreaterThanOrEqual(118);
+  await contextSelect.selectOption("design");
+  await expect(row.locator(".context-badge")).toHaveText("Design");
+  await expect(provider).toHaveAttribute("href", href!);
+  await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
+  await expect(page.locator(".now-card .context-badge")).toHaveText("Design");
+});
+
 test("drags recent threads into priority lanes while retaining keyboard actions", async ({ page }) => {
   const secondFocus = page.locator('.thread-row[data-thread-id^="claude:"]');
   const firstFocus = page.locator("#focus-list .thread-row").first();
-  await secondFocus.dragTo(firstFocus);
+  await secondFocus.locator(".thread-main").dragTo(firstFocus.locator(".thread-main"));
   await expect(page.locator("#focus-list .thread-row").first()).toContainText("Review the multi-agent adapter contract");
 
   const recent = page.locator('.available-row[data-thread-id="codex:available-1"]');

@@ -78,6 +78,27 @@ describe("Gajendra domain", () => {
     expect(result.entries).toEqual([]);
   });
 
+  it("assigns only bounded Gaja contexts and preserves them across priority changes", () => {
+    let store = applyMutation(structuredClone(EMPTY_STORE), { type: "set-level", threadId: "codex:a", level: "focus" }, now);
+    store = applyMutation(store, { type: "set-context", threadId: "codex:a", context: "engineering" }, now);
+    store = applyMutation(store, { type: "set-current", threadId: "codex:a" }, now);
+    store = applyMutation(store, { type: "set-level", threadId: "codex:a", level: "important" }, now);
+    expect(store.entries[0]).toMatchObject({ threadId: "codex:a", level: "important", context: "engineering" });
+
+    const unchanged = applyMutation(store, { type: "set-context", threadId: "codex:recent", context: "life" }, now);
+    expect(unchanged.entries).toHaveLength(1);
+
+    const normalized = normalizeStore({
+      ...store,
+      entries: [{ ...store.entries[0], context: "strategy", title: "must not persist", prompt: "private" }],
+    });
+    expect(normalized.entries[0]).toEqual({
+      threadId: "codex:a",
+      level: "important",
+      addedAt: now.toISOString(),
+    });
+  });
+
   it("uses canonical source-qualified thread IDs", () => {
     expect(canonicalThreadId("cursor", "abc")).toBe("cursor:abc");
   });

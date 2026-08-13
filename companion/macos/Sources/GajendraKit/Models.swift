@@ -5,6 +5,22 @@ public enum PriorityLevel: String, Codable, Sendable {
     case important
 }
 
+public enum ThreadContext: String, Codable, CaseIterable, Identifiable, Sendable {
+    case design
+    case engineering
+    case life
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .design: return "Design"
+        case .engineering: return "Engineering"
+        case .life: return "Life"
+        }
+    }
+}
+
 public struct ResumeCommand: Codable, Equatable, Sendable {
     public let executable: String
     public let arguments: [String]
@@ -33,6 +49,7 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
     public let status: String
     public let level: PriorityLevel?
     public let isCurrent: Bool
+    public let context: ThreadContext?
     public let deepLink: String
     public let resumeCommand: ResumeCommand?
 
@@ -46,6 +63,7 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
         status: String,
         level: PriorityLevel?,
         isCurrent: Bool,
+        context: ThreadContext? = nil,
         deepLink: String,
         resumeCommand: ResumeCommand? = nil
     ) {
@@ -58,6 +76,7 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
         self.status = status
         self.level = level
         self.isCurrent = isCurrent
+        self.context = context
         self.deepLink = deepLink
         self.resumeCommand = resumeCommand
     }
@@ -140,6 +159,7 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
     case setLevel(threadId: String, level: PriorityLevel?)
     case setCurrent(threadId: String)
     case move(threadId: String, direction: MoveDirection)
+    case setContext(threadId: String, context: ThreadContext?)
     case setCollapsed(level: PriorityLevel, collapsed: Bool)
     case setSourceEnabled(sourceId: String, enabled: Bool)
 
@@ -149,7 +169,7 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, threadId, level, direction, collapsed, sourceId, enabled
+        case type, threadId, level, direction, context, collapsed, sourceId, enabled
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -166,6 +186,10 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
             try container.encode("move", forKey: .type)
             try container.encode(threadId, forKey: .threadId)
             try container.encode(direction, forKey: .direction)
+        case let .setContext(threadId, context):
+            try container.encode("set-context", forKey: .type)
+            try container.encode(threadId, forKey: .threadId)
+            try container.encode(context, forKey: .context)
         case let .setCollapsed(level, collapsed):
             try container.encode("set-collapsed", forKey: .type)
             try container.encode(level, forKey: .level)

@@ -28,6 +28,7 @@ Gaja is a quiet focus beacon: persistent enough to become a habit, restrained en
 | NOW emphasis | Gold tint plus `NOW` text | Gold tint plus `NOW` text | Never color-only |
 | Primary action | System accent | System accent | Standard bordered-prominent control |
 | Source health | System green/orange/red plus text/help | Same | Color is supplemental |
+| Context labels | Blue/green/rose tint plus Design/Engineering/Life text | Lighter semantic tints plus text | Bounded, user-assigned, never color-only |
 
 ## Selectable themes
 
@@ -54,6 +55,7 @@ Both themes support Auto, Light, and Dark. Auto follows the macOS appearance in 
 - Primary Open thread action is vertically centered at the trailing edge of NOW.
 - Focus and Important counts sit beside their labels, not against the far edge.
 - Provider badges are text-backed and use supplemental source accents; activating a badge resumes that exact thread in its owning provider.
+- Prioritized threads may show one compact Design, Engineering, or Life context badge. The organizer assigns it from the existing row menu on macOS or a native select in the MCP App; the hover card is display-only.
 - Recent and prioritized rows are draggable between Focus and Important. Visible move and tier controls remain the keyboard-accessible equivalent.
 - Menus and disclosure indicators have separate hit targets and never overlap.
 - Press and hold the floating lotus for 550 ms to enter edit mode. The lotus jiggles, can be dragged within the visible display, or hidden; the app menu restores it.

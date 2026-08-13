@@ -460,6 +460,9 @@ public struct GajendraHoverCardView: View {
                             Text(current.project)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                            if let context = current.context {
+                                contextBadge(context)
+                            }
                             Button { model.open(current) } label: { sourceBadge(current) }
                                 .buttonStyle(.plain)
                                 .help("Open in \(current.sourceName)")
@@ -525,6 +528,9 @@ public struct GajendraHoverCardView: View {
                         Text(thread.title)
                             .font(.caption2)
                             .lineLimit(1)
+                        if let context = thread.context {
+                            contextBadge(context, compact: true)
+                        }
                         Text(thread.sourceName)
                             .font(.system(size: 8, weight: .semibold))
                             .foregroundStyle(providerColor(thread))
@@ -576,6 +582,30 @@ public struct GajendraHoverCardView: View {
             .background(providerColor(thread).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
             .overlay(Capsule().stroke(providerColor(thread).opacity(0.34), lineWidth: 0.75))
             .accessibilityLabel("Open in \(thread.sourceName)")
+    }
+
+    private func contextBadge(_ context: ThreadContext, compact: Bool = false) -> some View {
+        Text(context.title)
+            .font(.system(size: compact ? 8 : 9, weight: .semibold))
+            .lineLimit(1)
+            .fixedSize()
+            .foregroundStyle(contextColor(context))
+            .padding(.horizontal, compact ? 4 : 6)
+            .padding(.vertical, compact ? 1 : 2)
+            .background(contextColor(context).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
+            .overlay(Capsule().stroke(contextColor(context).opacity(0.34), lineWidth: 0.75))
+            .accessibilityLabel("Context: \(context.title)")
+    }
+
+    private func contextColor(_ context: ThreadContext) -> Color {
+        switch context {
+        case .design:
+            return colorScheme == .dark ? Color(red: 0.57, green: 0.73, blue: 1) : Color(red: 0.16, green: 0.36, blue: 0.67)
+        case .engineering:
+            return colorScheme == .dark ? Color(red: 0.47, green: 0.84, blue: 0.69) : Color(red: 0.11, green: 0.42, blue: 0.31)
+        case .life:
+            return colorScheme == .dark ? Color(red: 0.94, green: 0.64, blue: 0.77) : Color(red: 0.55, green: 0.25, blue: 0.38)
+        }
     }
 
     private func providerColor(_ thread: DeckThread) -> Color {

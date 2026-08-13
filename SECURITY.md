@@ -8,7 +8,7 @@ Security fixes are provided for the latest published `0.3.x` source release. Old
 
 Gaja is local-first and declares `openWorldHint: false`. Its own services make no third-party network request.
 
-The v2 state file contains only canonical thread IDs, Focus/Important order, one NOW ID, collapse preferences, and source enablement. Live titles and project basenames are displayed but never persisted. The state directory is owner-only (`0700`), the file is owner-only (`0600`), and writes use an atomic temporary-file rename.
+The v2 state file contains only canonical thread IDs, Focus/Important order, one NOW ID, an optional `design`/`engineering`/`life` context enum, collapse preferences, and source enablement. Context is assigned by the user inside Gaja; providers cannot inject it. Live titles, project basenames, and free-text labels are never persisted. The state directory is owner-only (`0700`), the file is owner-only (`0600`), and writes use an atomic temporary-file rename.
 
 Gaja does not persist prompts, previews, transcript bodies, source files, tokens, credentials, or arbitrary provider responses. Compatible Aadi and Priority Deck metadata is copied only when no v2 state exists; legacy files remain intact.
 

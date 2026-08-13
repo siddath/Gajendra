@@ -31720,7 +31720,7 @@ function canonicalThreadId(sourceId, threadId) {
 function normalizeStore(value) {
   if (!value || typeof value !== "object") return structuredClone(EMPTY_STORE);
   const candidate = value;
-  const entries = Array.isArray(candidate.entries) ? candidate.entries.filter(isStoredEntry).map((entry) => ({ ...entry, threadId: normalizeLegacyThreadId(entry.threadId) })).filter(uniqueByThreadId()) : [];
+  const entries = Array.isArray(candidate.entries) ? candidate.entries.filter(isStoredEntry).map(normalizeStoredEntry).filter(uniqueByThreadId()) : [];
   const candidateCurrent = typeof candidate.currentFocusThreadId === "string" ? normalizeLegacyThreadId(candidate.currentFocusThreadId) : null;
   const current = candidateCurrent && entries.some(
     (entry) => entry.threadId === candidateCurrent && entry.level === "focus"
@@ -31747,10 +31747,19 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     return next;
   }
   const index = next.entries.findIndex((entry2) => entry2.threadId === mutation.threadId);
+  if (mutation.type === "set-context") {
+    if (index < 0) return next;
+    const entry2 = next.entries[index];
+    if (!entry2) return next;
+    if (mutation.context) entry2.context = mutation.context;
+    else delete entry2.context;
+    return next;
+  }
   if (mutation.type === "set-level") {
+    const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
     if (mutation.level) {
-      next.entries.push({ threadId: mutation.threadId, level: mutation.level, addedAt: now.toISOString() });
+      next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
     if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
     if (mutation.level !== "focus" && next.currentFocusThreadId === mutation.threadId) {
@@ -31759,8 +31768,9 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     return next;
   }
   if (mutation.type === "set-current") {
+    const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
-    next.entries.unshift({ threadId: mutation.threadId, level: "focus", addedAt: now.toISOString() });
+    next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
     next.currentFocusThreadId = mutation.threadId;
     return next;
   }
@@ -31784,11 +31794,16 @@ function buildSnapshot(store, threads, sources, error51 = null) {
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry) => {
     const thread = threadsById.get(entry.threadId);
-    return thread ? { ...thread, level: entry.level, isCurrent: normalized.currentFocusThreadId === entry.threadId } : null;
+    return thread ? {
+      ...thread,
+      level: entry.level,
+      isCurrent: normalized.currentFocusThreadId === entry.threadId,
+      context: entry.context ?? null
+    } : null;
   };
   const focus = normalized.entries.filter((entry) => entry.level === "focus").map(resolve).filter(isPresent);
   const important = normalized.entries.filter((entry) => entry.level === "important").map(resolve).filter(isPresent);
-  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...thread, level: null, isCurrent: false }));
+  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...thread, level: null, isCurrent: false, context: null }));
   return {
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
     current: focus.find((thread) => thread.isCurrent) ?? null,
@@ -31806,6 +31821,20 @@ function buildSnapshot(store, threads, sources, error51 = null) {
 }
 function normalizeLegacyThreadId(threadId) {
   return threadId.includes(":") ? threadId : canonicalThreadId("codex", threadId);
+}
+function normalizeStoredEntry(entry) {
+  return storedEntry(
+    normalizeLegacyThreadId(entry.threadId),
+    entry.level,
+    entry.addedAt,
+    normalizeThreadContext(entry.context)
+  );
+}
+function storedEntry(threadId, level, addedAt, context) {
+  return context ? { threadId, level, addedAt, context } : { threadId, level, addedAt };
+}
+function normalizeThreadContext(value) {
+  return value === "design" || value === "engineering" || value === "life" ? value : void 0;
 }
 function normalizeSourcePreferences(value) {
   const preferences = { ...DEFAULT_SOURCE_PREFERENCES };
@@ -32515,6 +32544,7 @@ var deckMutationSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({ type: external_exports.literal("set-level"), threadId: external_exports.string().min(1), level: external_exports.enum(["focus", "important"]).nullable() }),
   external_exports.object({ type: external_exports.literal("set-current"), threadId: external_exports.string().min(1) }),
   external_exports.object({ type: external_exports.literal("move"), threadId: external_exports.string().min(1), direction: external_exports.enum(["up", "down"]) }),
+  external_exports.object({ type: external_exports.literal("set-context"), threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable() }),
   external_exports.object({ type: external_exports.literal("set-collapsed"), level: external_exports.enum(["focus", "important"]), collapsed: external_exports.boolean() }),
   external_exports.object({ type: external_exports.literal("set-source-enabled"), sourceId: external_exports.string().min(1), enabled: external_exports.boolean() })
 ]);
@@ -32556,6 +32586,13 @@ function createGajendraServer(service = new GajendraService()) {
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     _meta: { ui: { visibility: ["app"] } }
   }, async ({ threadId, direction }) => toolResult(await service.mutate({ type: "move", threadId, direction })));
+  K3(server, "gajendra_set_context", {
+    title: "Set thread context",
+    description: "Assign or clear one bounded Gaja context label on a prioritized thread.",
+    inputSchema: { threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable() },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } }
+  }, async ({ threadId, context }) => toolResult(await service.mutate({ type: "set-context", threadId, context })));
   K3(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
     description: "Persist whether a Gaja priority section is collapsed.",

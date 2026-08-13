@@ -5,7 +5,7 @@ Gaja follows Apple platform conventions while being candid about where its reque
 | Principle | Implementation |
 | --- | --- |
 | Deference | The persistent surface is one icon; detail appears only on hover/press. |
-| Clarity | One non-color-only NOW label, source badge, standard button labels, and system typography. |
+| Clarity | One non-color-only NOW label, text-backed source/context badges, standard button labels, and system typography. |
 | Consistency | Standard SwiftUI controls, menu commands, `⌘R`, `⇧⌘O`, `⌘Q`, Dock reopen, and resizable organizer. |
 | Materials | Liquid Glass only on macOS 26 navigation/overlay surfaces; semantic material fallback on older macOS. |
 | Adaptivity | Semantic foreground styles, system light/dark appearance, and a template-safe menu-bar mark. |

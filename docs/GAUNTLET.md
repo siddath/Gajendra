@@ -12,14 +12,14 @@ The runner is fail-fast. Any failed hard gate stops the run and writes the parti
 
 1. Repository script syntax.
 2. TypeScript static checking.
-3. Domain, store, source-adapter, and MCP tests.
+3. Domain, bounded-context, store-privacy, source-adapter, and MCP tests.
 4. Deterministic web/server build.
 5. Plugin manifest, license, lotus, and artifact validation.
 6. Live MCP/real Codex app-server snapshot.
 7. Swift model, queue, placement, hover, and refresh self-test.
 8. Signed native app build.
 9. Native bundle/service/state/privacy validation.
-10. Browser user journeys, accessibility, light/dark, reduced motion, forced colors, compact layout, and no-overlap controls.
+10. Browser user journeys, context assignment, accessibility, light/dark, reduced motion, forced colors, compact layout, and no-overlap controls.
 11. Five repeated unit suites.
 12. Five repeated browser journeys.
 13. Final post-UI artifact presence/manifest validation.

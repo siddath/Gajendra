@@ -89,13 +89,13 @@ body {
   background: var(--canvas);
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 button, a { -webkit-tap-highlight-color: transparent; }
 
 a { color: inherit; }
 
-button:focus-visible, a:focus-visible, input:focus-visible {
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
   outline: 3px solid var(--focus-ring);
   outline-offset: 3px;
 }
@@ -287,6 +287,40 @@ h1 { margin: 0; max-width: 680px; font-size: clamp(28px, 5vw, 42px); line-height
 .thread-row a.source-badge, .available-row a.source-badge, .now-card a.source-badge { font-size: 10px; font-weight: 680; text-decoration: none; }
 .thread-row a.source-badge:hover, .available-row a.source-badge:hover, .now-card a.source-badge:hover { text-decoration: none; filter: brightness(1.12); }
 
+.context-badge {
+  display: inline-flex;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.context-badge[data-context="design"] { background: rgb(45 100 185 / 10%); color: #285caa; }
+.context-badge[data-context="engineering"] { background: rgb(31 112 82 / 10%); color: #1d6b50; }
+.context-badge[data-context="life"] { background: rgb(156 68 105 / 10%); color: #8d3f61; }
+:root[data-theme="dark"] .context-badge[data-context="design"] { color: #91b9ff; }
+:root[data-theme="dark"] .context-badge[data-context="engineering"] { color: #78d7af; }
+:root[data-theme="dark"] .context-badge[data-context="life"] { color: #f0a3c4; }
+
+.context-control select {
+  min-height: 32px;
+  min-width: 118px;
+  max-width: 132px;
+  padding: 5px 24px 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.context-control select:hover { border-color: var(--accent); color: var(--text); }
+
 .section-toggle {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -462,7 +496,7 @@ input[type="search"] { width: 100%; min-height: 42px; margin-bottom: 16px; paddi
 @media (forced-colors: active) {
   .now-card, .thread-row.is-current { border: 3px solid Highlight; }
   .brand-mark, .now-pill { border: 1px solid ButtonText; }
-  .sources-strip, .source-chip, .source-badge { border: 1px solid ButtonText; }
+  .sources-strip, .source-chip, .source-badge, .context-badge, .context-control select { border: 1px solid ButtonText; }
   .lotus-petal { fill: none; stroke: CanvasText; }
   .status-dot { forced-color-adjust: none; background: Highlight; }
 }

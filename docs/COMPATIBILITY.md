@@ -14,6 +14,7 @@
 | MCP App | Standard resource/tool metadata | MCP integration and live probe | Meaningful text tool result |
 | Global Codex destination | Experimental `openai/ui` hint | Metadata test only | Native utility and inline MCP App |
 | State migration | Copy-only Aadi/Priority Deck normalization | Unit migration tests | Legacy files remain recoverable |
+| Context labels | Optional Gaja-owned Design/Engineering/Life enum on prioritized entries | Domain/store/native/browser tests | Missing or unknown values render as no context |
 
 ## Version support
 
