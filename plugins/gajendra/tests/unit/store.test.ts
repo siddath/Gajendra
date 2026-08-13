@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EMPTY_STORE } from "../../src/shared/contracts.js";
+import { EMPTY_STORE, type PriorityStore } from "../../src/shared/contracts.js";
 import { GajendraStoreRepository, resolveDataDirectory, resolveLegacyStateFiles } from "../../src/server/store.js";
 
 const temporaryDirectories: string[] = [];
@@ -25,15 +25,39 @@ describe("GajendraStoreRepository", () => {
     const state = {
       ...structuredClone(EMPTY_STORE),
       currentFocusThreadId: "claude:thread-a",
-      entries: [{ threadId: "claude:thread-a", level: "focus" as const, addedAt: "2026-08-12T12:00:00.000Z" }],
+      entries: [{ threadId: "claude:thread-a", level: "focus" as const, addedAt: "2026-08-12T12:00:00.000Z", context: "design" as const }],
       sourcePreferences: { ...EMPTY_STORE.sourcePreferences, claude: true },
     };
     await repository.write(state);
     const contents = await readFile(repository.filePath, "utf8");
     expect(contents).toContain('"threadId": "claude:thread-a"');
+    expect(contents).toContain('"context": "design"');
     expect(contents).not.toMatch(/preview|transcript|prompt/iu);
     expect((await stat(repository.filePath)).mode & 0o777).toBe(0o600);
     await expect(repository.read()).resolves.toEqual(state);
+  });
+
+  it("strips injected provider prose and unknown entry fields before writing", async () => {
+    const directory = await createTemporaryDirectory();
+    const repository = new GajendraStoreRepository(directory);
+    const unsafeState = {
+      ...structuredClone(EMPTY_STORE),
+      entries: [{
+        threadId: "codex:thread-a",
+        level: "focus",
+        addedAt: "2026-08-12T12:00:00.000Z",
+        context: "life",
+        title: "private title",
+        project: "private project",
+        prompt: "private prompt",
+        unknown: "discard me",
+      }],
+      currentFocusThreadId: "codex:thread-a",
+    } as unknown as PriorityStore;
+    await repository.write(unsafeState);
+    const contents = await readFile(repository.filePath, "utf8");
+    expect(contents).toContain('"context": "life"');
+    expect(contents).not.toMatch(/private|title|project|prompt|unknown/iu);
   });
 
   it("prefers explicit and plugin-owned data directories", () => {

@@ -18,6 +18,7 @@ const deckMutationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set-level"), threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable() }),
   z.object({ type: z.literal("set-current"), threadId: z.string().min(1) }),
   z.object({ type: z.literal("move"), threadId: z.string().min(1), direction: z.enum(["up", "down"]) }),
+  z.object({ type: z.literal("set-context"), threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable() }),
   z.object({ type: z.literal("set-collapsed"), level: z.enum(["focus", "important"]), collapsed: z.boolean() }),
   z.object({ type: z.literal("set-source-enabled"), sourceId: z.string().min(1), enabled: z.boolean() }),
 ]);
@@ -67,6 +68,15 @@ export function createGajendraServer(service: DeckService = new GajendraService(
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ threadId, direction }: { threadId: string; direction: "up" | "down" }) =>
     toolResult(await service.mutate({ type: "move", threadId, direction })));
+
+  registerAppTool(server, "gajendra_set_context", {
+    title: "Set thread context",
+    description: "Assign or clear one bounded Gaja context label on a prioritized thread.",
+    inputSchema: { threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable() },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } },
+  }, async ({ threadId, context }: { threadId: string; context: "design" | "engineering" | "life" | null }) =>
+    toolResult(await service.mutate({ type: "set-context", threadId, context })));
 
   registerAppTool(server, "gajendra_set_collapsed", {
     title: "Set section visibility",

@@ -2,7 +2,7 @@
 
 ## Product contract
 
-Gaja lets one person choose one current thread across configured AI agents, see the short queue behind it, and resume work in the source product. AI agents own sessions; Gaja owns only priority metadata. Gajendra remains the repository and compatibility identity.
+Gaja lets one person choose one current thread across configured AI agents, see the short queue behind it, and resume work in the source product. AI agents own sessions; Gaja owns only priority metadata plus an optional bounded Design/Engineering/Life context. Gajendra remains the repository and compatibility identity.
 
 ```mermaid
 flowchart LR
@@ -28,6 +28,7 @@ Every thread ID is namespaced as `source-id:provider-thread-id`. Gaja stores onl
 - A thread appears at most once across Focus and Important.
 - Moving NOW out of Focus selects the next Focus entry when available.
 - Five Focus threads is guidance, not a hard limit.
+- A prioritized entry may have one user-assigned `design`, `engineering`, or `life` context. Providers cannot supply it, unknown values normalize to absent, and removing the entry removes its context.
 - Disabling a source hides live threads without deleting stored priority metadata; re-enabling restores resolvable entries.
 
 ## Source registry
@@ -40,7 +41,7 @@ Built-in source preferences default to Codex on, Cursor on, and Claude off. Conf
 
 The canonical macOS file is `~/Library/Application Support/Gajendra/gajendra.v2.json`. `GAJENDRA_DATA_DIR`, host `PLUGIN_DATA`, and XDG configuration are supported for tests and non-macOS hosts.
 
-Writes create a `0600` temporary file inside a `0700` directory, then atomically rename it. If v2 state is absent, compatible Aadi and Priority Deck state is normalized to `codex:` IDs and copied. Legacy files are never moved or deleted.
+Writes create a `0600` temporary file inside a `0700` directory, then atomically rename it. The optional bounded context enum is additive within v2 and needs no content migration. If v2 state is absent, compatible Aadi and Priority Deck state is normalized to `codex:` IDs and copied. Legacy files are never moved or deleted.
 
 Visual preferences are separate from priority state. The native companion stores only validated theme, appearance, pill visibility, and pill position values in `UserDefaults`. The MCP App stores only the validated theme and appearance enum values in guarded browser-local storage; a host that denies storage falls back safely without affecting queue state. Neither path stores thread metadata or content.
 

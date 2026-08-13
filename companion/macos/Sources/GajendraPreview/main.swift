@@ -6,12 +6,12 @@ import SwiftUI
 enum GajendraPreview {
     @MainActor
     static func main() throws {
-        let now = thread("focus-1", "Finish the Gaja hover-pill release", "gajendra", level: .focus, current: true)
+        let now = thread("focus-1", "Finish the Gaja hover-pill release", "gajendra", level: .focus, current: true, context: .design)
         let snapshot = DeckSnapshot(
             generatedAt: "2026-08-12T00:00:00Z",
             current: now,
-            focus: [now, thread("focus-2", "Review launch evidence", "tooling", level: .focus)],
-            important: [thread("important-1", "Prepare the next design pass", "design-system", level: .important)],
+            focus: [now, thread("focus-2", "Review launch evidence", "tooling", level: .focus, context: .engineering)],
+            important: [thread("important-1", "Prepare the next design pass", "design-system", level: .important, context: .life)],
             available: [thread("recent-1", "Reconcile the weekly plan", "planning")],
             collapsed: CollapsedSections(focus: false, important: true),
             focusGuide: 5,
@@ -135,7 +135,8 @@ enum GajendraPreview {
         _ title: String,
         _ project: String,
         level: PriorityLevel? = nil,
-        current: Bool = false
+        current: Bool = false,
+        context: ThreadContext? = nil
     ) -> DeckThread {
         DeckThread(
             id: "codex:\(id)",
@@ -147,6 +148,7 @@ enum GajendraPreview {
             status: "idle",
             level: level,
             isCurrent: current,
+            context: context,
             deepLink: "codex://threads/\(id)",
             resumeCommand: nil
         )

@@ -1,6 +1,6 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 
-import type { DeckSnapshot, DeckThread, PriorityLevel } from "../shared/contracts.js";
+import type { DeckSnapshot, DeckThread, PriorityLevel, ThreadContext } from "../shared/contracts.js";
 import { fixtureSnapshot } from "./fixtures.js";
 import { createDeckMotion, type DeckLayoutState, type RenderReason } from "./motion.js";
 import "./styles.css";
@@ -126,7 +126,7 @@ function currentPanel(current: DeckThread | null): string {
   return `<section class="now-card" aria-labelledby="now-heading">
     <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p><span><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">Task status: ${escapeHtml(current.status)}</span></span></div>
     <div class="now-content">
-      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${sourceBadge(current)} ${escapeHtml(current.project)}</p></div>
+      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)} ${sourceBadge(current)}</p></div>
       <a class="primary-action" href="${escapeAttribute(current.deepLink)}" data-open-thread="${escapeAttribute(current.deepLink)}" aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
     </div>
   </section>`;
@@ -156,9 +156,10 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
         ${thread.isCurrent ? '<span class="now-pill">NOW</span>' : ""}
         <a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a>
       </div>
-      <p class="thread-meta">${sourceBadge(thread)} ${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)}</p>
+      <p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${contextBadge(thread)} ${sourceBadge(thread)}</p>
     </div>
     <div class="row-actions" aria-label="Actions for ${escapeAttribute(thread.title)}">
+      ${contextSelector(thread)}
       ${thread.level === "focus" && !thread.isCurrent ? actionButton("Make Now", "current", thread.id) : ""}
       ${moveButtons(thread.id, index, count)}
       ${thread.level === "focus" ? actionButton("Important", "level-important", thread.id) : actionButton("Focus", "level-focus", thread.id)}
@@ -180,7 +181,7 @@ function availableSection(threads: DeckThread[]): string {
 
 function availableRow(thread: DeckThread): string {
   return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="thread-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName}`.toLowerCase())}">
-    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${sourceBadge(thread)} ${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)}</p></div>
+    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)}</p></div>
     <div class="available-actions">${actionButton("Important", "level-important", thread.id)}${actionButton("Focus ✦✦", "level-focus", thread.id, true)}</div>
   </li>`;
 }
@@ -210,6 +211,25 @@ function sourcesPanel(sources: DeckSnapshot["sources"]): string {
 
 function sourceBadge(thread: DeckThread): string {
   return `<a class="source-badge" href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-source-id="${escapeAttribute(thread.sourceId)}" aria-label="Open ${escapeAttribute(thread.title)} in ${escapeAttribute(thread.sourceName)}">${escapeHtml(thread.sourceName)}</a>`;
+}
+
+function contextBadge(thread: DeckThread): string {
+  if (!thread.context) return "";
+  return `<span class="context-badge" data-context="${thread.context}">${contextTitle(thread.context)}</span>`;
+}
+
+function contextSelector(thread: DeckThread): string {
+  return `<label class="context-control">
+    <span class="visually-hidden">Context for ${escapeHtml(thread.title)}</span>
+    <select data-context-thread-id="${escapeAttribute(thread.id)}" aria-label="Context for ${escapeAttribute(thread.title)}">
+      <option value="" ${thread.context ? "" : "selected"}>Context</option>
+      ${(["design", "engineering", "life"] as const).map((context) => `<option value="${context}" ${thread.context === context ? "selected" : ""}>${contextTitle(context)}</option>`).join("")}
+    </select>
+  </label>`;
+}
+
+function contextTitle(context: ThreadContext): string {
+  return context[0]?.toUpperCase() + context.slice(1);
 }
 
 function visualPreferenceControls(): string {
@@ -242,6 +262,10 @@ function bindInteractions(): void {
     });
   });
 
+  root.querySelectorAll<HTMLSelectElement>("select[data-context-thread-id]").forEach((select) => {
+    select.addEventListener("change", () => void handleContextChange(select));
+  });
+
   root.querySelectorAll<HTMLAnchorElement>("a[data-open-thread]").forEach((anchor) => {
     anchor.addEventListener("click", async (event) => {
       event.preventDefault();
@@ -261,6 +285,14 @@ function bindInteractions(): void {
     const current = snapshot?.current;
     if (current) void openThreadLink(current.deepLink);
   });
+}
+
+async function handleContextChange(select: HTMLSelectElement): Promise<void> {
+  const threadId = select.dataset.contextThreadId;
+  if (!threadId) return;
+  const value = select.value;
+  const context = value === "design" || value === "engineering" || value === "life" ? value : null;
+  await mutate("gajendra_set_context", { threadId, context });
 }
 
 function bindDragAndDrop(): void {
@@ -421,6 +453,11 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
   const target = all.find((thread) => thread.id === id);
   if (tool === "gajendra_set_collapsed") return;
   if (!target) return;
+  if (tool === "gajendra_set_context") {
+    const value = args.context;
+    target.context = value === "design" || value === "engineering" || value === "life" ? value : null;
+    return;
+  }
   if (tool === "gajendra_move") {
     const list = target.level === "focus" ? snapshot.focus : snapshot.important;
     const from = list.findIndex((thread) => thread.id === id);
@@ -441,6 +478,7 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
   } else if (tool === "gajendra_set_level") {
     target.isCurrent = false;
     target.level = (args.level as PriorityLevel | null) ?? null;
+    if (!target.level) target.context = null;
     (target.level === "focus" ? snapshot.focus : target.level === "important" ? snapshot.important : snapshot.available).push(target);
     if (snapshot.current?.id === id) {
       const next = snapshot.focus[0] ?? null;

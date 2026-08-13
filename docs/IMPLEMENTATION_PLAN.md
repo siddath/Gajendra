@@ -15,7 +15,7 @@ The project decides whether one local focus layer across AI-agent sessions chang
 
 | Phase | Outcome | State |
 | --- | --- | --- |
-| Contract | One global NOW, metadata-only state, source-owned sessions | Complete |
+| Contract | One global NOW, metadata-only state including bounded context, source-owned sessions | Complete |
 | Registry | Codex, Claude, Cursor, and configured catalog adapters | Complete locally |
 | Native UX | Bottom-right hover utility and resizable organizer | Complete locally |
 | Apple alignment | Liquid Glass gate, material fallback, standard controls, accessibility | Complete locally |

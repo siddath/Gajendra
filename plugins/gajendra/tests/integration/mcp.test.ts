@@ -21,7 +21,7 @@ describe("Gaja MCP contract", () => {
     expect(open?._meta?.ui).toEqual({ resourceUri: RESOURCE_URI, visibility: ["app"] });
     expect(open?._meta?.["openai/ui"]).toEqual({ entrypoints: [{ type: "global" }] });
     expect(tools.tools.filter((tool) => tool._meta?.["openai/ui"])).toHaveLength(1);
-    expect(tools.tools).toHaveLength(6);
+    expect(tools.tools).toHaveLength(7);
 
     const resource = await client.readResource({ uri: RESOURCE_URI });
     expect(resource.contents[0]?.mimeType).toBe("text/html;profile=mcp-app");
@@ -49,6 +49,17 @@ describe("Gaja MCP contract", () => {
       arguments: { threadId: "claude:focus-2" },
     });
     expect(mutations).toEqual([{ type: "set-current", threadId: "claude:focus-2" }]);
+
+    await client.callTool({
+      name: "gajendra_set_context",
+      arguments: { threadId: "claude:focus-2", context: "design" },
+    });
+    expect(mutations.at(-1)).toEqual({ type: "set-context", threadId: "claude:focus-2", context: "design" });
+    const invalid = await client.callTool({
+      name: "gajendra_set_context",
+      arguments: { threadId: "claude:focus-2", context: "strategy" },
+    });
+    expect(invalid.isError).toBe(true);
   });
 
   it("exposes the same service through the companion JSON command", async () => {
@@ -71,6 +82,8 @@ describe("Gaja MCP contract", () => {
     ).resolves.toMatchObject({ source: "fixture" });
     expect(mutations).toEqual([{ type: "set-level", threadId: "recent-1", level: "important" }]);
     await expect(runCompanionCommand("mutate", JSON.stringify({ type: "set-current", threadId: "" }), service))
+      .rejects.toThrow();
+    await expect(runCompanionCommand("mutate", JSON.stringify({ type: "set-context", threadId: "recent-1", context: "strategy" }), service))
       .rejects.toThrow();
   });
 });

@@ -74,6 +74,10 @@ for (const required of ["GajendraPillEditState", "LongPressGesture(minimumDurati
 for (const required of [".draggable(threadId)", ".dropDestination(for: String.self)", "moveDroppedThread"]) {
   if (!content.includes(required)) throw new Error(`Gajendra organizer drag contract is missing: ${required}`);
 }
+for (const required of ["ThreadContext.allCases", ".setContext(threadId:", "contextBadge("]) {
+  if (!content.includes(required)) throw new Error(`Gajendra context-label contract is missing: ${required}`);
+}
+if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
 for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark"]) {
   if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
 }
@@ -122,9 +126,20 @@ try {
     JSON.stringify({ type: "set-collapsed", level: "focus", collapsed: true }),
   );
   if (!mutationSnapshot.collapsed.focus) throw new Error("The companion mutation did not persist collapse state.");
+  runService(
+    ["--mutate-json"],
+    { ...serviceEnvironment, GAJENDRA_DATA_DIR: dataDirectory },
+    JSON.stringify({ type: "set-level", threadId: "codex:context-probe", level: "focus" }),
+  );
+  runService(
+    ["--mutate-json"],
+    { ...serviceEnvironment, GAJENDRA_DATA_DIR: dataDirectory },
+    JSON.stringify({ type: "set-context", threadId: "codex:context-probe", context: "design" }),
+  );
   const statePath = path.join(dataDirectory, "gajendra.v2.json");
   const stateContents = await readFile(statePath, "utf8");
   if (/title|preview|transcript|prompt/iu.test(stateContents)) throw new Error("Gajendra persisted live thread content.");
+  if (!stateContents.includes('"context": "design"')) throw new Error("Gajendra did not persist the bounded thread context.");
   if (((await stat(dataDirectory)).mode & 0o777) !== 0o700) throw new Error("The Gajendra data directory is not private.");
   if (((await stat(statePath)).mode & 0o777) !== 0o600) throw new Error("The Gajendra state file is not private.");
   void legacyDirectory;
@@ -163,6 +178,7 @@ console.log(JSON.stringify({
   appearanceModes: ["automatic", "light", "dark"],
   longPressPillEditMode: true,
   organizerDragAndDrop: true,
+  boundedThreadContexts: ["design", "engineering", "life"],
 }));
 
 function run(command, args) {

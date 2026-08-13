@@ -26,6 +26,7 @@ AI tools own their sessions; Gaja owns only the decision about what matters next
 
 - Exactly one global NOW, and it must be in Focus.
 - One resume action back to Codex, Claude Code, Cursor, or a configured agent.
+- Optional Design, Engineering, or Life context on prioritized threads, visible at a glance and editable without copying provider content.
 - Source health and opt-in controls in the organizer.
 - Owner-only, metadata-only local persistence.
 - Native light/dark appearance, Reduce Motion support, keyboard commands, and VoiceOver labels.
@@ -86,7 +87,7 @@ The canonical macOS state is:
 ~/Library/Application Support/Gajendra/gajendra.v2.json
 ```
 
-It stores canonical source/thread IDs, tier/order, the NOW ID, collapse preferences, and source enablement. The directory is `0700`, the file is `0600`, and writes are atomic. Compatible Aadi and Priority Deck state is copied only when no v2 state exists; legacy files are retained for recovery.
+It stores canonical source/thread IDs, tier/order, the NOW ID, an optional bounded Design/Engineering/Life context enum, collapse preferences, and source enablement. It never stores free-text labels or provider content. The directory is `0700`, the file is `0600`, and writes are atomic. Compatible Aadi and Priority Deck state is copied only when no v2 state exists; legacy files are retained for recovery.
 
 ## Development and validation
 
