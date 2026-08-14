@@ -281,9 +281,11 @@ h1 { margin: 0; max-width: 680px; font-size: clamp(28px, 5vw, 42px); line-height
 .source-badge[data-source-id="codex"] { border-color: rgb(39 123 164 / 42%); background: rgb(39 123 164 / 10%); color: #17618b; }
 .source-badge[data-source-id="claude"] { border-color: rgb(191 91 35 / 43%); background: rgb(191 91 35 / 11%); color: #9a451e; }
 .source-badge[data-source-id="cursor"] { border-color: rgb(110 82 170 / 38%); background: rgb(110 82 170 / 10%); color: #59408d; }
+.source-badge[data-source-id="grok"] { border-color: rgb(44 119 99 / 42%); background: rgb(44 119 99 / 10%); color: #236b58; }
 :root[data-theme="dark"] .source-badge[data-source-id="codex"] { color: #8fd1f2; }
 :root[data-theme="dark"] .source-badge[data-source-id="claude"] { color: #ffad74; }
 :root[data-theme="dark"] .source-badge[data-source-id="cursor"] { color: #c4b1f3; }
+:root[data-theme="dark"] .source-badge[data-source-id="grok"] { color: #78d7ba; }
 .thread-row a.source-badge, .available-row a.source-badge, .now-card a.source-badge { font-size: 10px; font-weight: 680; text-decoration: none; }
 .thread-row a.source-badge:hover, .available-row a.source-badge:hover, .now-card a.source-badge:hover { text-decoration: none; filter: brightness(1.12); }
 

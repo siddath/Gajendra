@@ -18,6 +18,7 @@ import { CodexAppServerClient } from "./codex-app-server.js";
 
 const MAX_THREADS_PER_SOURCE = 200;
 const MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
+const MAX_GROK_METADATA_BYTES = 128 * 1024;
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 const MAX_CURSOR_OUTPUT_BYTES = 2 * 1024 * 1024;
 
@@ -51,6 +52,7 @@ export class ThreadSourceRegistry {
       new CodexThreadSource(this.codex),
       new ClaudeThreadSource(this.env),
       new CursorThreadSource(this.env),
+      new GrokThreadSource(this.env),
       ...configured.adapters,
     ];
     const outcomes = await Promise.all(adapters.map(async (adapter) => {
@@ -150,6 +152,28 @@ class CursorThreadSource implements SourceAdapter {
   }
 }
 
+class GrokThreadSource implements SourceAdapter {
+  readonly id = "grok";
+  readonly name = "Grok Build";
+  readonly kind = "builtin" as const;
+  readonly enabledByDefault = false;
+
+  constructor(private readonly env: NodeJS.ProcessEnv) {}
+
+  async listThreads(): Promise<AgentThread[]> {
+    const executable = await resolveExecutable(
+      this.env.GAJENDRA_GROK_BIN,
+      [path.join(os.homedir(), ".local", "bin", "grok"), "/opt/homebrew/bin/grok", "/usr/local/bin/grok"],
+    );
+    if (!executable) throw new SourceUnavailableError("not-installed", "Grok Build CLI was not found.");
+    const configDirectory = path.resolve(this.env.GAJENDRA_GROK_CONFIG_DIR ?? path.join(os.homedir(), ".grok"));
+    const summaryFiles = await recentGrokSummaryFiles(path.join(configDirectory, "sessions"));
+    const threads = (await Promise.all(summaryFiles.map((file) => readGrokThreadMetadata(file, executable))))
+      .filter(isPresent);
+    return threads.sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+}
+
 class CatalogThreadSource implements SourceAdapter {
   readonly kind = "configured" as const;
   readonly enabledByDefault: boolean;
@@ -239,6 +263,41 @@ async function recentClaudeSessionFiles(projectsDirectory: string): Promise<stri
   return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((file) => file.path);
 }
 
+async function recentGrokSummaryFiles(sessionsDirectory: string): Promise<string[]> {
+  let workspaces;
+  try {
+    workspaces = await readdir(sessionsDirectory, { withFileTypes: true });
+  } catch (error) {
+    if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
+    throw error;
+  }
+  const workspaceDirectories = await Promise.all(workspaces
+    .filter((entry) => entry.isDirectory())
+    .slice(0, MAX_THREADS_PER_SOURCE)
+    .map(async (entry) => {
+      const directory = path.join(sessionsDirectory, entry.name);
+      const directoryStat = await stat(directory);
+      return { directory, modifiedAt: directoryStat.mtimeMs };
+    }));
+  const summaries: Array<{ path: string; modifiedAt: number }> = [];
+  for (const workspace of workspaceDirectories.sort((left, right) => right.modifiedAt - left.modifiedAt)) {
+    for (const entry of await readdir(workspace.directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const summaryPath = path.join(workspace.directory, entry.name, "summary.json");
+      try {
+        const summaryStat = await stat(summaryPath);
+        if (summaryStat.isFile()) summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
+      } catch (error) {
+        if (!isMissing(error)) throw error;
+      }
+    }
+  }
+  return summaries
+    .sort((left, right) => right.modifiedAt - left.modifiedAt)
+    .slice(0, MAX_THREADS_PER_SOURCE)
+    .map((summary) => summary.path);
+}
+
 export async function readClaudeThreadMetadata(filePath: string, executable: string): Promise<AgentThread | null> {
   const fileStat = await stat(filePath);
   const file = await open(filePath, "r");
@@ -281,6 +340,39 @@ export async function readClaudeThreadMetadata(filePath: string, executable: str
   } finally {
     await file.close();
   }
+}
+
+export async function readGrokThreadMetadata(filePath: string, executable: string): Promise<AgentThread | null> {
+  const fileStat = await stat(filePath);
+  if (fileStat.size > MAX_GROK_METADATA_BYTES) return null;
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const info = value.info && typeof value.info === "object" ? value.info as Record<string, unknown> : {};
+  const sessionId = typeof info.id === "string"
+    ? info.id
+    : typeof value.session_id === "string"
+      ? value.session_id
+      : path.basename(path.dirname(filePath));
+  if (!sessionId) return null;
+  const cwd = typeof info.cwd === "string" ? info.cwd : typeof value.cwd === "string" ? value.cwd : "";
+  const generatedTitle = typeof value.generated_title === "string" ? value.generated_title : "";
+  const sessionSummary = typeof value.session_summary === "string" ? value.session_summary : "";
+  const id = canonicalThreadId("grok", sessionId);
+  return {
+    id,
+    sourceId: "grok",
+    sourceName: "Grok Build",
+    title: cleanTitle(generatedTitle || sessionSummary) || `Grok session ${sessionId.slice(0, 8)}`,
+    project: cleanProject(cwd),
+    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || fileStat.mtimeMs / 1000,
+    status: "resumable",
+    deepLink: gajendraThreadLink(id),
+    resumeCommand: { executable, args: ["--resume", sessionId], ...(cwd ? { cwd } : {}) },
+  };
 }
 
 function codexThread(thread: CodexThread): AgentThread {

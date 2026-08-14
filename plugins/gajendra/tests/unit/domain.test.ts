@@ -54,7 +54,7 @@ describe("Gajendra domain", () => {
     expect(result.version).toBe(2);
     expect(result.currentFocusThreadId).toBe("codex:a");
     expect(result.entries).toHaveLength(1);
-    expect(result.sourcePreferences).toMatchObject({ codex: true, claude: false, cursor: true });
+    expect(result.sourcePreferences).toMatchObject({ codex: true, claude: false, cursor: true, grok: false });
   });
 
   it("merges live metadata from multiple sources without persisting it", () => {

@@ -16,12 +16,12 @@ The project decides whether one local focus layer across AI-agent sessions chang
 | Phase | Outcome | State |
 | --- | --- | --- |
 | Contract | One global NOW, metadata-only state including bounded context, source-owned sessions | Complete |
-| Registry | Codex, Claude, Cursor, and configured catalog adapters | Complete locally |
+| Registry | Codex, Claude, Cursor, Grok Build, and configured catalog adapters | Complete locally |
 | Native UX | Bottom-right hover utility and resizable organizer | Complete locally |
 | Apple alignment | Liquid Glass gate, material fallback, standard controls, accessibility | Complete locally |
 | Portable UI | Inline MCP App plus experimental global metadata hint | Complete locally |
 | Gauntlet/install | Fail-fast verification and installed-build proof | Final run pending |
-| Source publication | Public remote, hosted CI, release/tag | Owner action pending |
+| Source publication | Public remote and contribution workflow active; release tag pending | Complete for source |
 | Binary publication | Developer ID, notarization, Gatekeeper proof | Separate future gate |
 
 ## Adoption experiment

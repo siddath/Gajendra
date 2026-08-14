@@ -17,9 +17,10 @@ Gaja does not persist prompts, previews, transcript bodies, source files, tokens
 - **Codex:** invokes `codex app-server --stdio` and uses `thread/list`; it does not inspect Codex SQLite, rollout JSONL, Electron storage, or the signed app bundle.
 - **Claude Code:** disabled by default. When enabled, reads at most the newest 200 documented session JSONL files and at most 512 KiB from each, extracting only `sessionId`, `cwd`, `timestamp`, `aiTitle`, and `slug`. Conversation bodies are neither used nor stored.
 - **Cursor:** invokes the resolved `cursor-agent ls` process with a 10-second timeout and 2 MiB output cap. Resume uses the official session ID argument.
+- **Grok Build:** disabled by default. When enabled, reads at most the newest 200 documented `summary.json` metadata files and at most 128 KiB from each, extracting only the session ID, working directory, generated title, and activity timestamps. It does not read `updates.jsonl`, `chat_history.jsonl`, plans, prompts, responses, tool calls, or file snapshots. Resume uses the official session ID argument.
 - **Configured agents:** reads only catalogs explicitly named in `sources.json`, capped at 2 MiB and 2,000 entries. A configured resume command is user-authored executable authority; review it like a local script.
 
-Executable overrides are explicit: `GAJENDRA_CODEX_BIN`, `GAJENDRA_CLAUDE_BIN`, `GAJENDRA_CURSOR_BIN`, and `GAJENDRA_NODE_BIN`. Legacy Aadi/Priority Deck environment names are accepted only for migration compatibility.
+Executable overrides are explicit: `GAJENDRA_CODEX_BIN`, `GAJENDRA_CLAUDE_BIN`, `GAJENDRA_CURSOR_BIN`, `GAJENDRA_GROK_BIN`, and `GAJENDRA_NODE_BIN`. Legacy Aadi/Priority Deck environment names are accepted only for migration compatibility.
 
 ## Resume boundary
 

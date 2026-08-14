@@ -88,9 +88,10 @@ for (const required of ['Picker("Hover card size"', "$visualSettings.hoverCardSi
   if (!content.includes(required)) throw new Error(`Gajendra organizer visual-settings contract is missing: ${required}`);
 }
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
-for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "hoveredThreadId", "providerBadge(", "openButtonForeground", "Fresh on hover · Local metadata"]) {
+for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on hover · Local metadata"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra redesigned hover card contract is missing: ${required}`);
 }
+if (overlay.includes("Divider().padding(.leading")) throw new Error("Hover-card queue dividers must span the complete clickable row width.");
 for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark", "case compact", "case comfortable", "case expanded", "hoverCardSizeKey", "GajendraHoverCardSizing"]) {
   if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
 }
@@ -121,7 +122,7 @@ if (snapshot.current && currentCount !== 1) throw new Error("The current task is
 if (snapshot.current && !snapshot.current.deepLink && !snapshot.current.resumeCommand) {
   throw new Error("The current thread has no resumable destination.");
 }
-if (!Array.isArray(snapshot.sources) || snapshot.sources.length < 3) throw new Error("The unified source registry is missing.");
+if (!Array.isArray(snapshot.sources) || snapshot.sources.length < 4) throw new Error("The unified source registry is missing.");
 if (snapshot.error) throw new Error(`Gaja could not read configured thread sources: ${snapshot.error}`);
 
 const bundledService = await readFile(service);

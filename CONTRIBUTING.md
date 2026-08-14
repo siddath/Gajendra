@@ -5,7 +5,7 @@ Contributions are welcome. Fork [siddath/Gajendra](https://github.com/siddath/Ga
 1. Preserve the single global NOW invariant and canonical `source:thread` IDs.
 2. Keep provider sessions in their owning apps. Do not add a cloud task store or persist live titles/transcripts by default.
 3. New adapters must be explicit, bounded, independently failing, and documented with an official discovery/resume contract.
-4. Keep Claude metadata discovery opt-in and generic command authority structured and user-configured.
+4. Keep Claude and Grok metadata discovery opt-in and generic command authority structured and user-configured.
 5. Keep the standard MCP App and native utility working without Codex’s experimental global route.
 6. Add observable behavior tests and run `npm run gauntlet` before proposing a release.
 7. Do not commit private conversations, absolute private paths, credentials, proprietary host code, or copied reference artwork.

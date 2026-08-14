@@ -502,32 +502,36 @@ public struct GajendraHoverCardView: View {
     @ViewBuilder
     private var nowSection: some View {
         if let current = model.snapshot?.current {
-            VStack(alignment: .leading, spacing: 7 * contentScale) {
-                HStack(spacing: 6) {
-                    Image(systemName: visualSettings.theme == .focusDeck ? "star.fill" : "scope")
-                    Text("NOW")
-                    Text("Current focus")
-                        .font(scaledFont(10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                }
-                .font(scaledFont(12.5, weight: .bold))
-                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+            HStack(alignment: .center, spacing: 14 * contentScale) {
+                VStack(alignment: .leading, spacing: 7 * contentScale) {
+                    HStack(spacing: 6) {
+                        Image(systemName: visualSettings.theme == .focusDeck ? "star.fill" : "scope")
+                        Text("NOW")
+                        Text("Current focus")
+                            .font(scaledFont(10.5, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(scaledFont(12.5, weight: .bold))
+                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
 
-                Text(current.title)
-                    .font(scaledFont(17, weight: .semibold))
-                    .lineLimit(visualSettings.hoverCardSize == .compact ? 2 : 3)
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(current.title)
+                        .font(scaledFont(17, weight: .semibold))
+                        .lineLimit(visualSettings.hoverCardSize == .compact ? 2 : 3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 7) {
+                        Text(current.project)
+                            .font(scaledFont(11.5, weight: .regular))
+                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
+                        if let context = current.context {
+                            contextBadge(context)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 HStack(alignment: .center, spacing: 7) {
-                    Text(current.project)
-                        .font(scaledFont(11.5, weight: .regular))
-                        .lineLimit(1)
-                        .foregroundStyle(.secondary)
-                    if let context = current.context {
-                        contextBadge(context)
-                    }
-                    Spacer(minLength: 8)
                     Button { model.open(current) } label: { sourceBadge(current) }
                         .buttonStyle(.plain)
                         .help("Open in \(current.sourceName)")
@@ -541,6 +545,7 @@ public struct GajendraHoverCardView: View {
                     .tint(openButtonTint)
                     .fixedSize()
                 }
+                .fixedSize(horizontal: true, vertical: false)
             }
             .padding(.horizontal, 13 * contentScale)
             .padding(.vertical, 11 * contentScale)
@@ -610,8 +615,7 @@ public struct GajendraHoverCardView: View {
                     .padding(.horizontal, 10 * contentScale)
             } else {
                 ForEach(visibleThreads.indices, id: \.self) { index in
-                    if index > 0 { Divider().padding(.leading, 10 * contentScale) }
-                    queueRow(visibleThreads[index])
+                    queueRow(visibleThreads[index], showsTopDivider: index > 0)
                 }
             }
         }
@@ -623,7 +627,7 @@ public struct GajendraHoverCardView: View {
         )
     }
 
-    private func queueRow(_ thread: DeckThread) -> some View {
+    private func queueRow(_ thread: DeckThread, showsTopDivider: Bool) -> some View {
         Button { model.open(thread) } label: {
             VStack(alignment: .leading, spacing: 2 * contentScale) {
                 HStack(alignment: .firstTextBaseline, spacing: 7) {
@@ -648,13 +652,20 @@ public struct GajendraHoverCardView: View {
             .padding(.horizontal, 10 * contentScale)
             .padding(.vertical, 6 * contentScale)
             .frame(maxWidth: .infinity, minHeight: 39 * contentScale, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(hoveredThreadId == thread.id ? rowHoverColor : Color.clear)
-            )
+            .overlay(alignment: .top) {
+                if showsTopDivider {
+                    Divider()
+                }
+            }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            GajendraThreadRowButtonStyle(
+                isHovered: hoveredThreadId == thread.id,
+                hoverColor: rowHoverColor,
+                pressedColor: rowPressedColor
+            )
+        )
         .onHover { hovered in
             hoveredThreadId = hovered ? thread.id : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
         }
@@ -771,6 +782,7 @@ public struct GajendraHoverCardView: View {
         case "codex": return colorScheme == .dark ? Color(red: 0.49, green: 0.78, blue: 0.96) : Color(red: 0.03, green: 0.36, blue: 0.6)
         case "claude": return colorScheme == .dark ? Color(red: 1, green: 0.63, blue: 0.34) : Color(red: 0.68, green: 0.27, blue: 0.06)
         case "cursor": return colorScheme == .dark ? Color(red: 0.76, green: 0.7, blue: 1) : Color(red: 0.35, green: 0.25, blue: 0.62)
+        case "grok": return colorScheme == .dark ? Color(red: 0.47, green: 0.84, blue: 0.73) : Color(red: 0.14, green: 0.42, blue: 0.35)
         default: return .secondary
         }
     }
@@ -798,6 +810,12 @@ public struct GajendraHoverCardView: View {
             : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.15 : 0.09)
     }
 
+    private var rowPressedColor: Color {
+        visualSettings.theme == .focusDeck
+            ? Color.gajendraAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.16)
+            : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.24 : 0.16)
+    }
+
     @ViewBuilder
     private var refreshControl: some View {
         if isPreview {
@@ -821,6 +839,26 @@ public struct GajendraHoverCardView: View {
             .help(model.isLoading ? "Refreshing" : "Refresh")
             .accessibilityLabel(model.isLoading ? "Refreshing Gaja" : "Refresh Gaja")
         }
+    }
+}
+
+private struct GajendraThreadRowButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let isHovered: Bool
+    let hoverColor: Color
+    let pressedColor: Color
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(configuration.isPressed ? pressedColor : (isHovered ? hoverColor : Color.clear))
+            )
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+            .animation(
+                reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.82),
+                value: configuration.isPressed
+            )
     }
 }
 

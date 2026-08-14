@@ -1,12 +1,13 @@
 # Thread source configuration
 
-Gaja 0.3.1 includes three built-in adapters and a conservative JSON-catalog adapter for other AI agents. Gajendra names remain in configuration paths and environment variables for compatibility.
+Current Gaja source includes four built-in adapters and a conservative JSON-catalog adapter for other AI agents. Gajendra names remain in configuration paths and environment variables for compatibility.
 
 ## Built-in sources
 
 - Codex is enabled by default and uses the local app-server.
 - Cursor is enabled by default; an absent `cursor-agent` is reported as `not-installed`.
 - Claude Code is disabled by default because enabling it reads local session metadata. Enable or disable any source from the organizer’s source chips.
+- Grok Build is disabled by default because enabling it reads only the documented local `summary.json` metadata under `~/.grok/sessions`; it never reads Grok prompts, responses, tool calls, or file snapshots. An absent `grok` CLI is reported as `not-installed`.
 
 Executable overrides are optional:
 
@@ -14,7 +15,10 @@ Executable overrides are optional:
 export GAJENDRA_CODEX_BIN="/absolute/path/to/codex"
 export GAJENDRA_CLAUDE_BIN="/absolute/path/to/claude"
 export GAJENDRA_CURSOR_BIN="/absolute/path/to/cursor-agent"
+export GAJENDRA_GROK_BIN="/absolute/path/to/grok"
 ```
+
+Grok discovery and resume follow xAI’s official [session storage](https://docs.x.ai/build/features/sessions) and [CLI resume](https://docs.x.ai/build/cli/reference) contracts. `GAJENDRA_GROK_CONFIG_DIR` may point at an isolated Grok configuration directory for testing.
 
 ## Configure another agent
 
