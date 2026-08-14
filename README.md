@@ -10,7 +10,7 @@
   <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black.svg" />
 </p>
 
-**Gaja, Elephant Focus for AI Power Users** is an open-source, local-first macOS focus utility for AI-agent threads. It gives Codex, Claude Code, Cursor, and explicitly configured agents one shared priority layer: one **NOW**, an ordered Focus queue, and an Important tier.
+**Gaja, Elephant Focus for AI Power Users** is an open-source, local-first macOS focus utility for AI-agent threads. It gives Codex, Claude Code, Cursor, Grok Build, and explicitly configured agents one shared priority layer: one **NOW**, an ordered Focus queue, and an Important tier.
 
 The repository and compatibility identity is **Gajendra** (`gajendra` in packages, plugin IDs, URLs, bundle identifiers, and state paths). The user-facing product is **Gaja**. Keeping that boundary avoids breaking existing installations and priority state.
 
@@ -25,7 +25,7 @@ The daily surface is an icon-only outlined lotus at the bottom right. Hover or p
 AI tools own their sessions; Gaja owns only the decision about what matters next. It does not replace the source apps, copy conversations into a new task system, or modify their private databases.
 
 - Exactly one global NOW, and it must be in Focus.
-- One resume action back to Codex, Claude Code, Cursor, or a configured agent.
+- One resume action back to Codex, Claude Code, Cursor, Grok Build, or a configured agent.
 - Optional Design, Engineering, or Life context on prioritized threads, visible at a glance and editable without copying provider content.
 - Source health and opt-in controls in the organizer.
 - Owner-only, metadata-only local persistence.
@@ -38,6 +38,7 @@ AI tools own their sessions; Gaja owns only the decision about what matters next
 | Codex | Local `codex app-server` | Native `codex://threads/...` link | On | Live local integration |
 | Claude Code | Documented local session JSONL metadata | `claude --resume <session-id>` in Terminal | Off, explicit opt-in | Parser tests and local adapter validation |
 | Cursor | Official `cursor-agent ls` | `cursor-agent --resume=<chat-id>` | On | Parser/fixture tested; live CLI proof requires Cursor Agent installed |
+| Grok Build | Documented local `summary.json` metadata | `grok --resume <session-id>` in Terminal | Off, explicit opt-in | Parser/fixture tested; live CLI proof requires Grok Build installed |
 | Other agents | Size-bounded JSON catalogs | Declared deep link or explicit resume command | Per configuration | Schema and fixture tested |
 
 Gaja never persists titles, prompts, transcript bodies, previews, source files, tokens, or credentials. Claude Code scanning is disabled until the user enables it.
@@ -56,7 +57,7 @@ The implementation follows Apple’s guidance on [Liquid Glass](https://develope
 
 ## Install from source
 
-Prerequisites: macOS 13 or later, Node.js 20 or later, and Codex CLI. Claude Code and Cursor Agent are optional source integrations.
+Prerequisites: macOS 13 or later, Node.js 20 or later, and Codex CLI. Claude Code, Cursor Agent, and Grok Build are optional source integrations.
 
 ```bash
 git clone https://github.com/siddath/Gajendra.git gajendra

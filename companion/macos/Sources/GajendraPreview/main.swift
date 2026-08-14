@@ -22,7 +22,7 @@ enum GajendraPreview {
             important: [
                 thread("important-1", "Prepare the next design pass", "design-system", level: .important, context: .design),
                 thread("important-2", "Reconcile the weekly operating plan", "planning", level: .important, context: .life, sourceId: "claude", sourceName: "Claude"),
-                thread("important-3", "Review source health failure states", "gajendra", level: .important, context: .engineering),
+                thread("important-3", "Review source health failure states", "gajendra", level: .important, context: .engineering, sourceId: "grok", sourceName: "Grok Build"),
                 thread("important-4", "Check the plugin host reload evidence", "harness", level: .important, sourceId: "cursor", sourceName: "Cursor"),
                 thread("important-5", "Confirm dark appearance contrast", "design-system", level: .important, context: .design),
                 thread("important-6", "Archive the release receipts", "operations", level: .important),
@@ -37,6 +37,7 @@ enum GajendraPreview {
                 ThreadSourceStatus(id: "codex", name: "Codex", kind: "codex-app-server", state: "ready", enabled: true, threadCount: 3),
                 ThreadSourceStatus(id: "claude", name: "Claude", kind: "claude-jsonl", state: "ready", enabled: true, threadCount: 1),
                 ThreadSourceStatus(id: "cursor", name: "Cursor", kind: "cursor-cli", state: "not-installed", enabled: true, threadCount: 0),
+                ThreadSourceStatus(id: "grok", name: "Grok Build", kind: "grok-summary", state: "disabled", enabled: false, threadCount: 0),
             ],
             error: nil
         )

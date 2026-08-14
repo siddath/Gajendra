@@ -91,6 +91,7 @@ export const DEFAULT_SOURCE_PREFERENCES: Record<string, boolean> = {
   codex: true,
   claude: false,
   cursor: true,
+  grok: false,
 };
 
 export const EMPTY_STORE: PriorityStore = {

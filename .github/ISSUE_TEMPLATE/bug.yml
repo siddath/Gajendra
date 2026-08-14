@@ -14,7 +14,7 @@ body:
         - macOS bottom-right control or hover card
         - macOS organizer or menu bar
         - MCP App
-        - Codex, Claude, Cursor, or configured source
+        - Codex, Claude, Cursor, Grok Build, or configured source
         - plugin service or persistence
         - build or installation
     validations:

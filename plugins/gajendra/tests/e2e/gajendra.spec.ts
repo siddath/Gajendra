@@ -63,9 +63,11 @@ test("provider badges resume the exact owning thread and counts stay beside labe
   const codex = page.locator('.source-badge[data-source-id="codex"]').first();
   const claude = page.locator('.source-badge[data-source-id="claude"]').first();
   const cursor = page.locator('.source-badge[data-source-id="cursor"]').first();
+  const grok = page.locator('.source-badge[data-source-id="grok"]').first();
   await expect(codex).toHaveAttribute("href", /^codex:\/\/threads\//u);
   await expect(claude).toHaveAttribute("href", /^gajendra:\/\/thread\/claude/u);
   await expect(cursor).toHaveAttribute("href", /^gajendra:\/\/thread\/cursor/u);
+  await expect(grok).toHaveAttribute("href", /^gajendra:\/\/thread\/grok/u);
   await codex.click();
   await expect(page.locator("#app")).toHaveAttribute("data-last-opened-thread", /^codex:\/\/threads\//u);
 

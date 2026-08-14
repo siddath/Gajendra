@@ -16,6 +16,7 @@ flowchart LR
     Registry --> Codex["Codex app-server"]
     Registry --> Claude["Claude metadata adapter"]
     Registry --> Cursor["Cursor Agent CLI"]
+    Registry --> Grok["Grok Build metadata adapter"]
     Registry --> Catalogs["Configured JSON catalogs"]
     Organizer -->|"Open thread"| Owner["Owning AI agent"]
 ```
@@ -35,7 +36,7 @@ Every thread ID is namespaced as `source-id:provider-thread-id`. Gaja stores onl
 
 Sources execute concurrently and return a bounded list of normalized `AgentThread` values plus health status. One failing optional source does not block a ready source. A snapshot reports an aggregate error only when every enabled source is unavailable.
 
-Built-in source preferences default to Codex on, Cursor on, and Claude off. Configured catalogs choose their own initial state. See [Thread sources](THREAD_SOURCES.md).
+Built-in source preferences default to Codex and Cursor on, with Claude and Grok Build off because both read documented local session metadata. Configured catalogs choose their own initial state. See [Thread sources](THREAD_SOURCES.md).
 
 ## Persistence and migration
 

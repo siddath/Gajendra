@@ -31703,7 +31703,8 @@ var FOCUS_GUIDE = 5;
 var DEFAULT_SOURCE_PREFERENCES = {
   codex: true,
   claude: false,
-  cursor: true
+  cursor: true,
+  grok: false
 };
 var EMPTY_STORE = {
   version: STORE_VERSION,
@@ -32078,6 +32079,7 @@ function resolveRpcTimeout(env = process.env) {
 // src/server/thread-sources.ts
 var MAX_THREADS_PER_SOURCE = 200;
 var MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
+var MAX_GROK_METADATA_BYTES = 128 * 1024;
 var MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 var MAX_CURSOR_OUTPUT_BYTES = 2 * 1024 * 1024;
 var ThreadSourceRegistry = class {
@@ -32092,6 +32094,7 @@ var ThreadSourceRegistry = class {
       new CodexThreadSource(this.codex),
       new ClaudeThreadSource(this.env),
       new CursorThreadSource(this.env),
+      new GrokThreadSource(this.env),
       ...configured.adapters
     ];
     const outcomes = await Promise.all(adapters.map(async (adapter) => {
@@ -32182,6 +32185,26 @@ var CursorThreadSource = class {
     return parseCursorSessionList(await collectProcessOutput(executable, ["ls"], this.env), executable);
   }
 };
+var GrokThreadSource = class {
+  constructor(env) {
+    this.env = env;
+  }
+  id = "grok";
+  name = "Grok Build";
+  kind = "builtin";
+  enabledByDefault = false;
+  async listThreads() {
+    const executable = await resolveExecutable(
+      this.env.GAJENDRA_GROK_BIN,
+      [path2.join(os2.homedir(), ".local", "bin", "grok"), "/opt/homebrew/bin/grok", "/usr/local/bin/grok"]
+    );
+    if (!executable) throw new SourceUnavailableError("not-installed", "Grok Build CLI was not found.");
+    const configDirectory = path2.resolve(this.env.GAJENDRA_GROK_CONFIG_DIR ?? path2.join(os2.homedir(), ".grok"));
+    const summaryFiles = await recentGrokSummaryFiles(path2.join(configDirectory, "sessions"));
+    const threads = (await Promise.all(summaryFiles.map((file2) => readGrokThreadMetadata(file2, executable)))).filter(isPresent2);
+    return threads.sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+};
 var CatalogThreadSource = class {
   constructor(id, name, catalogPath, enabled) {
     this.id = id;
@@ -32263,6 +32286,34 @@ async function recentClaudeSessionFiles(projectsDirectory) {
   }
   return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((file2) => file2.path);
 }
+async function recentGrokSummaryFiles(sessionsDirectory) {
+  let workspaces;
+  try {
+    workspaces = await readdir(sessionsDirectory, { withFileTypes: true });
+  } catch (error51) {
+    if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
+    throw error51;
+  }
+  const workspaceDirectories = await Promise.all(workspaces.filter((entry) => entry.isDirectory()).slice(0, MAX_THREADS_PER_SOURCE).map(async (entry) => {
+    const directory = path2.join(sessionsDirectory, entry.name);
+    const directoryStat = await stat(directory);
+    return { directory, modifiedAt: directoryStat.mtimeMs };
+  }));
+  const summaries = [];
+  for (const workspace of workspaceDirectories.sort((left, right) => right.modifiedAt - left.modifiedAt)) {
+    for (const entry of await readdir(workspace.directory, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const summaryPath = path2.join(workspace.directory, entry.name, "summary.json");
+      try {
+        const summaryStat = await stat(summaryPath);
+        if (summaryStat.isFile()) summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
+      } catch (error51) {
+        if (!isMissing2(error51)) throw error51;
+      }
+    }
+  }
+  return summaries.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((summary) => summary.path);
+}
 async function readClaudeThreadMetadata(filePath, executable) {
   const fileStat = await stat(filePath);
   const file2 = await open(filePath, "r");
@@ -32305,6 +32356,34 @@ async function readClaudeThreadMetadata(filePath, executable) {
   } finally {
     await file2.close();
   }
+}
+async function readGrokThreadMetadata(filePath, executable) {
+  const fileStat = await stat(filePath);
+  if (fileStat.size > MAX_GROK_METADATA_BYTES) return null;
+  let value;
+  try {
+    value = JSON.parse(await readFile2(filePath, "utf8"));
+  } catch {
+    return null;
+  }
+  const info = value.info && typeof value.info === "object" ? value.info : {};
+  const sessionId = typeof info.id === "string" ? info.id : typeof value.session_id === "string" ? value.session_id : path2.basename(path2.dirname(filePath));
+  if (!sessionId) return null;
+  const cwd = typeof info.cwd === "string" ? info.cwd : typeof value.cwd === "string" ? value.cwd : "";
+  const generatedTitle = typeof value.generated_title === "string" ? value.generated_title : "";
+  const sessionSummary = typeof value.session_summary === "string" ? value.session_summary : "";
+  const id = canonicalThreadId("grok", sessionId);
+  return {
+    id,
+    sourceId: "grok",
+    sourceName: "Grok Build",
+    title: cleanTitle(generatedTitle || sessionSummary) || `Grok session ${sessionId.slice(0, 8)}`,
+    project: cleanProject(cwd),
+    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || fileStat.mtimeMs / 1e3,
+    status: "resumable",
+    deepLink: gajendraThreadLink(id),
+    resumeCommand: { executable, args: ["--resume", sessionId], ...cwd ? { cwd } : {} }
+  };
 }
 function codexThread(thread) {
   const id = canonicalThreadId("codex", thread.id);

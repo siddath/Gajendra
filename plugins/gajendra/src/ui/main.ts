@@ -96,7 +96,7 @@ function render(reason: RenderReason = "external", layoutState: DeckLayoutState 
           <span class="refresh-icon" aria-hidden="true">↻</span><span data-refresh-label>Refresh</span>
         </button>
       </div>
-      <p class="lede">One source of truth across Codex, Claude, Cursor, and the agents you connect.</p>
+      <p class="lede">One source of truth across Codex, Claude, Cursor, Grok Build, and the agents you connect.</p>
       ${visualPreferenceControls()}
       <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gaja is up to date</span>
     </header>
