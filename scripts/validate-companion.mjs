@@ -14,6 +14,9 @@ const menuBarSource = path.resolve("companion/macos/Sources/GajendraApp/main.swi
 const contentSource = path.resolve("companion/macos/Sources/GajendraKit/DeckContentView.swift");
 const overlaySource = path.resolve("companion/macos/Sources/GajendraKit/DeckWidgetView.swift");
 const visualSettingsSource = path.resolve("companion/macos/Sources/GajendraKit/GajendraVisualSettings.swift");
+const modelsSource = path.resolve("companion/macos/Sources/GajendraKit/Models.swift");
+const codexSource = path.resolve("plugins/gajendra/src/server/codex-app-server.ts");
+const threadSourcesSource = path.resolve("plugins/gajendra/src/server/thread-sources.ts");
 
 await Promise.all([
   access(executable, constants.X_OK),
@@ -25,6 +28,9 @@ await Promise.all([
   access(contentSource, constants.R_OK),
   access(overlaySource, constants.R_OK),
   access(visualSettingsSource, constants.R_OK),
+  access(modelsSource, constants.R_OK),
+  access(codexSource, constants.R_OK),
+  access(threadSourcesSource, constants.R_OK),
 ]);
 
 run("codesign", ["--verify", "--deep", "--strict", app]);
@@ -37,11 +43,14 @@ if (bundleDisplayName !== "Gaja") throw new Error("The visible bundle name must 
 const bundleVersion = run("plutil", ["-extract", "CFBundleShortVersionString", "raw", info]).stdout.trim();
 if (bundleVersion !== "0.3.1") throw new Error("The Gaja bundle version must be 0.3.1.");
 
-const [menuBar, content, overlay, visualSettings] = await Promise.all([
+const [menuBar, content, overlay, visualSettings, models, codex, threadSources] = await Promise.all([
   readFile(menuBarSource, "utf8"),
   readFile(contentSource, "utf8"),
   readFile(overlaySource, "utf8"),
   readFile(visualSettingsSource, "utf8"),
+  readFile(modelsSource, "utf8"),
+  readFile(codexSource, "utf8"),
+  readFile(threadSourcesSource, "utf8"),
 ]);
 for (const required of [
   "showPill(on: preferredScreen())",
@@ -53,12 +62,19 @@ for (const required of [
   ".canJoinAllApplications",
   "NSWorkspace.didActivateApplicationNotification",
   "NSApplication.didChangeScreenParametersNotification",
-  "DispatchQueue.main.asyncAfter(deadline: .now() + 0.22",
   "SMAppService.mainApp.register()",
   "Launch Gaja at Login",
-  "let enteredPill = hoverState.setPillHovered(hovered)",
-  "if enteredPill && !pillEditController.isEditing { model.refresh() }",
-  "if !wasVisible && !hoverState.pillHovered { model.refresh() }",
+  "cardPresentation.toggle()",
+  "installCardDismissalMonitors()",
+  "removeCardDismissalMonitors()",
+  "eventTargetsPresentedSurface(event)",
+  "event.window === cardWindow || event.window === pillWindow",
+  "dismissCardIfOutside()",
+  "event.keyCode == 53",
+  "configurePillPlacement()",
+  "Lotus Position",
+  "Uninstall Gaja…",
+  "FileManager.default.trashItem",
   "panel.orderFrontRegardless()",
   "NSAnimationContext.runAnimationGroup",
   "accessibilityDisplayShouldReduceMotion",
@@ -69,13 +85,18 @@ for (const required of [
   "pollForOutsidePillEditClick()",
   "NSEvent.mouseLocation",
   "GajendraOverlayPlacement.draggedOrigin",
+  "GajendraOverlayPanel",
+  "GajendraFirstMouseHostingView",
+  "override func acceptsFirstMouse",
+  "override var canBecomeKey: Bool { acceptsKeyboardInput }",
+  'makeOverlayPanel(title: "Gaja Details", size: cardSize, acceptsKeyboardInput: true)',
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
 }
-for (const required of ["bottomTrailingOrigin", "cardOrigin", "pillHovered || cardHovered", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".thinMaterial"]) {
-  if (!overlay.includes(required)) throw new Error(`Gajendra hover contract is missing: ${required}`);
+for (const required of ["bottomTrailingOrigin", "origin(", "nearestAnchor", "cardMaximumSize", "cardOrigin", "isMeaningfulDrag", "GajendraCardPresentationState", "isPresented.toggle()", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".thinMaterial"]) {
+  if (!overlay.includes(required)) throw new Error(`Gajendra floating-card contract is missing: ${required}`);
 }
-for (const required of ["GajendraPillEditController", "dismissIfOutside", "LongPressGesture(minimumDuration: 0.55)", "editController.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin", "pointerStart", "draggedOrigin"]) {
+for (const required of ["GajendraPillEditController", "dismissIfOutside", "TapGesture(count: 2)", "editController.toggle()", "onActivate()", ".contextMenu", "Uninstall Gaja…", "GajendraJigglingView", "editController.acceptsDrag", "DragGesture(minimumDistance: 1)", "onDragChanged", "onHide", "clampedOrigin", "pointerStart", "draggedOrigin"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra pill edit contract is missing: ${required}`);
 }
 for (const required of [".draggable(threadId)", ".dropDestination(for: String.self)", "moveDroppedThread"]) {
@@ -84,32 +105,74 @@ for (const required of [".draggable(threadId)", ".dropDestination(for: String.se
 for (const required of ["ThreadContext.allCases", ".setContext(threadId:", "contextBadge("]) {
   if (!content.includes(required)) throw new Error(`Gajendra context-label contract is missing: ${required}`);
 }
-for (const required of ['Picker("Hover card size"', "$visualSettings.hoverCardSize"]) {
+for (const required of ['Picker("Hover card size"', "$visualSettings.hoverCardSize", 'Picker("Lotus position"', "$visualSettings.pillAnchor"]) {
   if (!content.includes(required)) throw new Error(`Gajendra organizer visual-settings contract is missing: ${required}`);
 }
+for (const source of [overlay, content]) {
+  for (const required of ["settingsIcon", 'Image(systemName: "gearshape")', 'accessibilityLabel("Open Gaja settings")', "ZStack(alignment: .center)", ".multilineTextAlignment(.center)", 'Text("All priority lanes")', "isRunningHeaderHovered"]) {
+    if (!source.includes(required)) throw new Error(`Gajendra consolidated settings or Running disclosure contract is missing: ${required}`);
+  }
+  if (source.includes("toggleLightDark")) throw new Error("Opening native header settings must not also toggle appearance.");
+}
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
-for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on hover · Local metadata"]) {
+for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "Show \\(remaining) more in Organizer", "executionSignal(", "runningSummary(", "runningDisclosureHeader(", "isRunningExpanded.toggle()", "ScrollView(.vertical, showsIndicators: true)", "persistentSearchFooter(total:", "gajendra-card-scroll-top", "quickSearch(total:", "GajendraSearchTextField(", "field.selectText(nil)", "searchResults(", "searchActions(", "snapshot.allThreads.count", "snapshot.searchThreads(searchQuery)", "isNowHovered", "isSearchHovered", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on open · Local metadata"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra redesigned hover card contract is missing: ${required}`);
 }
+for (const required of ["runningSection(", "runningSectionHeader(", "organizerSearchFooter(snapshot:", "gajendra-organizer-search-results", "executionSignal(", "snapshot.runningThreads", "snapshot.searchThreads(search)"]) {
+  if (!content.includes(required)) throw new Error(`Gajendra organizer activity contract is missing: ${required}`);
+}
+for (const required of ["isRunningStatus", '"inprogress"', '"running"', "allThreads", "runningThreads", "searchThreads"]) {
+  if (!models.includes(required)) throw new Error(`Gajendra running-status contract is missing: ${required}`);
+}
+if (models.includes('"resumable"')) throw new Error("Resumable metadata must not be inferred as a running status.");
+for (const required of ["enrichCodexRuntimeStatuses", "heldCodexThreadIds", "rolloutTailShowsActiveTurn", "MAX_ROLLOUT_TAIL_BYTES", 'event.payload?.type === "task_complete"', "isCodexRolloutPath"]) {
+  if (!codex.includes(required)) throw new Error(`Gajendra Codex runtime-status contract is missing: ${required}`);
+}
+for (const required of ["selectSourceThreads", "MAX_BACKGROUND_THREADS_PER_SOURCE", "isRunningThreadStatus(thread.status)"]) {
+  if (!threadSources.includes(required)) throw new Error(`Gajendra active-thread retention contract is missing: ${required}`);
+}
 if (overlay.includes("Divider().padding(.leading")) throw new Error("Hover-card queue dividers must span the complete clickable row width.");
-for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark", "case compact", "case comfortable", "case expanded", "hoverCardSizeKey", "GajendraHoverCardSizing"]) {
+for (const required of ['case nativePopover = "native-popover"', 'case focusDeck = "focus-deck"', "case automatic", "case light", "case dark", "case compact", "case comfortable", "case expanded", 'case topLeading = "top-left"', 'case topTrailing = "top-right"', "case center", 'case bottomLeading = "bottom-left"', 'case bottomCenter = "bottom-center"', 'case bottomTrailing = "bottom-right"', "hoverCardSizeKey", "pillAnchorKey", "GajendraHoverCardSizing"]) {
   if (!visualSettings.includes(required)) throw new Error(`Gajendra visual preference contract is missing: ${required}`);
 }
 if (visualSettings.includes("command-capsule")) throw new Error("Command Capsule must not be a production theme.");
-for (const required of ["visualSettings: visualSettings", "configureAppearance()", "resizeCard(for:", "GajendraHoverCardSizing.size(", "gajendra.pill.hidden", "Hide Gaja Lotus", "Show Gaja Lotus"]) {
+for (const required of ["visualSettings: visualSettings", "configureAppearance()", "resizeCard(for:", "GajendraHoverCardSizing.size(", "gajendra.pill.hidden", "gajendra.pill.screen-number", "Hide Gaja Lotus", "Show Gaja Lotus"]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra shared visual or pill recovery contract is missing: ${required}`);
 }
 const markBody = overlay.slice(overlay.indexOf("public struct GajendraMark"), overlay.indexOf("public struct GajendraGlassSurface"));
-if (markBody.includes(".fill(")) throw new Error("The native lotus petals must remain outline-only.");
-if (!markBody.includes(".stroke(")) throw new Error("The native lotus is missing its outline stroke.");
-for (const required of ["size * 0.042", "point(64, 24)", "point(31, 49)", "point(97, 49)", "point(11, 72)", "point(117, 72)", "point(24, 102)", "point(38, 113)"]) {
-  if (!markBody.includes(required)) throw new Error(`The native lotus is missing canonical vector geometry: ${required}`);
+if ((markBody.match(/\.fill\(/gu) ?? []).length !== 1 || !markBody.includes("GajendraElephantLotusPupilShape")) {
+  throw new Error("The native mark may fill only its attentive eye pupil; every contour must remain outline-only.");
+}
+if ((markBody.match(/\.stroke\(/gu) ?? []).length !== 3) throw new Error("The native mark is missing its authored contour, detail, or petal stroke.");
+for (const required of ["GajendraElephantLotusMarkShape", "GajendraElephantLotusDetailShape", "GajendraElephantLotusPetalShape", "GajendraElephantLotusPupilShape", "size * 0.0278", "size * 0.0137", "size * 0.02", "point(37, 42)", "point(20, 54)", "point(40, 42)", "point(98, 62)", "point(47, 64)", "point(55, 57)", "point(56, 59)", "point(58, 75)", "point(67, 79)", "point(92, 43)", "point(89, 41)", "point(94, 41)", "point(89, 42)", "point(95, 43)", "point(88, 32)", "point(94, 44)", "point(99, 60.5)", "63.1 / 128"]) {
+  if (!markBody.includes(required)) throw new Error(`The native mark is missing canonical elephant-and-lotus geometry: ${required}`);
+}
+const hoverHeader = overlay.slice(overlay.indexOf("private var header"), overlay.indexOf("private var visualSettingsMenu"));
+const organizerIndex = hoverHeader.indexOf("Button(action: onOpenOrganizer)");
+const refreshIndex = hoverHeader.indexOf("refreshControl");
+const settingsIndex = hoverHeader.indexOf("visualSettingsMenu");
+if (!(organizerIndex >= 0 && organizerIndex < refreshIndex && refreshIndex < settingsIndex)) {
+  throw new Error("The native header actions must remain ordered Organizer, Refresh, Settings at the trailing edge.");
 }
 const pillBody = overlay.slice(overlay.indexOf("public struct GajendraPillView"), overlay.indexOf("public struct GajendraHoverCardView"));
 if (pillBody.includes('Text("Gaja")')) throw new Error("The persistent Gaja control must remain icon-only.");
 if (!menuBar.includes("NSStatusBar.system.statusItem")) throw new Error("Gajendra must retain its menu-bar fallback.");
 if (!menuBar.includes("applicationShouldHandleReopen")) throw new Error("Gajendra must reopen its organizer from the Dock.");
 if (!content.includes(".menuIndicator(.hidden)")) throw new Error("Gajendra row menus must hide the automatic indicator.");
+for (const contract of [
+  { source: overlay, start: "private var nowSection" },
+  { source: content, start: "private func nowCard" },
+]) {
+  const nowStart = contract.source.indexOf(contract.start);
+  const nowEnd = contract.source.indexOf("private func executionSignal", nowStart);
+  const nowBody = contract.source.slice(nowStart, nowEnd);
+  const openIndex = nowBody.indexOf("model.open(current)");
+  const activityIndex = nowBody.indexOf("executionSignal(current)");
+  const providerIndex = nowBody.indexOf("sourceBadge(current)");
+  if (!(openIndex >= 0 && openIndex < activityIndex && activityIndex < providerIndex)) {
+    throw new Error("Gaja NOW actions must remain ordered Open, activity, provider.");
+  }
+}
 
 const serviceEnvironment = {
   ...process.env,
@@ -164,19 +227,41 @@ try {
 console.log(JSON.stringify({
   status: "passed",
   appBundle: "valid-ad-hoc-signature",
-  persistentBottomRightIcon: true,
-  hoverDetailsCard: true,
-  hoverExitGracePeriod: true,
+  persistentSnapAnchoredIcon: true,
+  snapAnchors: ["top-left", "top-right", "center", "bottom-left", "bottom-center", "bottom-right"],
+  cardActivation: "primary-click-toggle",
+  hoverActivationDisabled: true,
+  headerBrandMarkPlacement: "left",
+  headerTitleAlignment: "center",
+  trailingSettingsMenu: true,
+  logoAppearanceToggle: false,
+  rightHeaderActions: ["organizer", "refresh", "settings"],
+  microDragThresholdPoints: 6,
+  floatingDetailsCard: true,
+  outsideClickAndEscapeDismissal: true,
   overlayCrossAppAndSpaces: true,
   screenChangeRepositioning: true,
   nonactivatingPanels: true,
   dockRecoverable: true,
   menuBarFallback: true,
-  refreshOnReveal: true,
+  refreshOnOpen: true,
+  confirmedSelfUninstall: true,
   outsideClickEndsPillEdit: true,
   globalPointerDragCoordinates: true,
   adaptiveHoverCardSizing: true,
+  scrollableWidgetBody: true,
+  expandableRunningSection: true,
+  persistentSearchFooter: true,
   visibleQueueLimitPerTier: 5,
+  overflowShortcutPlacement: "queue-bottom",
+  derivedRunningLane: true,
+  runningIncludesPrioritizedThreads: true,
+  runningStatusRequiresExplicitProviderState: true,
+  codexDesktopRuntimeStatusEnrichment: "lock-and-lifecycle-metadata-only",
+  inCardGlobalThreadSearch: true,
+  keyboardCapableSearchPanel: true,
+  searchSelectsExistingTextOnFocus: true,
+  nowActionOrder: ["open", "activity", "provider"],
   hoverCardSizes: ["compact", "comfortable", "expanded"],
   distinctNativeAndFocusDeckSurfaces: true,
   reversibleLaunchAtLogin: true,
@@ -196,7 +281,8 @@ console.log(JSON.stringify({
   privateTaskContentRecorded: false,
   productionThemeCount: 2,
   appearanceModes: ["automatic", "light", "dark"],
-  longPressPillEditMode: true,
+  doubleClickPillEditMode: true,
+  iconOnlyEditJiggle: true,
   organizerDragAndDrop: true,
   boundedThreadContexts: ["design", "engineering", "life"],
 }));

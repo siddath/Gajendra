@@ -1,6 +1,15 @@
 import { App } from "@modelcontextprotocol/ext-apps";
 
-import type { DeckSnapshot, DeckThread, PriorityLevel, ThreadContext } from "../shared/contracts.js";
+import {
+  allDeckThreads,
+  isRunningThreadStatus,
+  normalizeDeckSelection,
+  runningDeckThreads,
+  type DeckSnapshot,
+  type DeckThread,
+  type PriorityLevel,
+  type ThreadContext,
+} from "../shared/contracts.js";
 import { fixtureSnapshot } from "./fixtures.js";
 import { createDeckMotion, type DeckLayoutState, type RenderReason } from "./motion.js";
 import "./styles.css";
@@ -25,6 +34,7 @@ let hostAppearance: ResolvedAppearance | null = null;
 let snapshot: DeckSnapshot | null = null;
 let app: App | null = null;
 let busy = false;
+let runningExpanded = true;
 const fixtureNow = new Date("2026-08-11T15:00:00.000Z").valueOf();
 
 applyVisualPreferences();
@@ -39,7 +49,7 @@ void start();
 
 async function start(): Promise<void> {
   if (shouldUseFixture()) {
-    snapshot = structuredClone(fixtureSnapshot);
+    snapshot = normalizeDeckSelection(structuredClone(fixtureSnapshot));
     render("initial");
     return;
   }
@@ -76,40 +86,45 @@ function shouldUseFixture(): boolean {
 
 function acceptSnapshot(value: unknown, reason: RenderReason, layoutState: DeckLayoutState | null = motion.captureLayout()): void {
   if (!value || typeof value !== "object" || !("focus" in value)) return;
-  snapshot = value as DeckSnapshot;
+  snapshot = normalizeDeckSelection(value as DeckSnapshot);
   render(reason, layoutState);
 }
 
 function render(reason: RenderReason = "external", layoutState: DeckLayoutState | null = null): void {
   if (!snapshot) return renderLoading();
+  const running = runningDeckThreads(snapshot);
+  const recent = snapshot.available.filter((thread) => !isRunningThreadStatus(thread.status));
   root.innerHTML = `
-    <header class="deck-header">
-      <div class="deck-header-top">
-        <div class="brand-lockup">
-          ${brandMark()}
-          <div>
-            <p class="eyebrow">Gaja</p>
-            <h1>What deserves your attention now?</h1>
+    <div class="deck-scroll-surface" aria-label="Scrollable Gaja task overview">
+      <header class="deck-header">
+        <div class="deck-header-top">
+          <div class="brand-lockup">
+            ${brandMark()}
+            <div class="brand-copy">
+              <p class="eyebrow">Gaja</p>
+              <h1>What deserves your attention now?</h1>
+              <p class="lede">One source of truth across Codex, Claude, Cursor, Grok Build, and the agents you connect.</p>
+            </div>
           </div>
+          <button class="refresh-action" type="button" data-action="refresh" aria-label="Refresh Gaja">
+            <span class="refresh-icon" aria-hidden="true">↻</span><span data-refresh-label>Refresh</span>
+          </button>
         </div>
-        <button class="refresh-action" type="button" data-action="refresh" aria-label="Refresh Gaja">
-          <span class="refresh-icon" aria-hidden="true">↻</span><span data-refresh-label>Refresh</span>
-        </button>
-      </div>
-      <p class="lede">One source of truth across Codex, Claude, Cursor, Grok Build, and the agents you connect.</p>
-      ${visualPreferenceControls()}
-      <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gaja is up to date</span>
-    </header>
-    ${snapshot.error ? errorPanel(snapshot.error) : ""}
-    ${sourcesPanel(snapshot.sources)}
-    ${currentPanel(snapshot.current)}
-    ${section("focus", "Double-star focus", "The short queue you have deliberately chosen.", snapshot.focus)}
-    ${section("important", "Important", "Worth returning to after the focus queue.", snapshot.important)}
-    ${availableSection(snapshot.available)}
-    <footer class="deck-footer">
-      <span>${snapshot.focus.length} focus · ${snapshot.important.length} important</span>
-      <span>Metadata only · ${snapshot.sources.filter((source) => source.state === "ready").length} sources ready</span>
-    </footer>
+        <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gaja is up to date</span>
+      </header>
+      ${snapshot.error ? errorPanel(snapshot.error) : ""}
+      ${sourcesPanel(snapshot.sources)}
+      ${currentPanel(snapshot.current)}
+      ${section("focus", "Double-star focus", "The short queue you have deliberately chosen.", snapshot.focus)}
+      ${section("important", "Important", "Worth returning to after the focus queue.", snapshot.important)}
+      ${runningSection(running)}
+      ${availableSection(snapshot, recent)}
+      <footer class="deck-footer">
+        <span>${snapshot.focus.length} focus · ${snapshot.important.length} important</span>
+        <span>Metadata only · ${snapshot.sources.filter((source) => source.state === "ready").length} sources ready</span>
+      </footer>
+    </div>
+    ${threadSearchFooter(snapshot, recent.length)}
   `;
   bindInteractions();
   motion.setBusy(busy);
@@ -124,12 +139,24 @@ function currentPanel(current: DeckThread | null): string {
     </section>`;
   }
   return `<section class="now-card" aria-labelledby="now-heading">
-    <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p><span><span class="status-dot" aria-hidden="true"></span><span class="visually-hidden">Task status: ${escapeHtml(current.status)}</span></span></div>
+    <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p></div>
     <div class="now-content">
-      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)} ${sourceBadge(current)}</p></div>
-      <a class="primary-action" href="${escapeAttribute(current.deepLink)}" data-open-thread="${escapeAttribute(current.deepLink)}" aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
+      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
+      <div class="now-actions" aria-label="Current task actions">
+        <a class="primary-action" href="${escapeAttribute(current.deepLink)}" data-open-thread="${escapeAttribute(current.deepLink)}" aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
+        ${activitySignal(current)}
+        ${sourceBadge(current)}
+      </div>
     </div>
   </section>`;
+}
+
+function activitySignal(thread: DeckThread): string {
+  const running = isRunningThreadStatus(thread.status);
+  return `<div class="activity-signal" data-running="${String(running)}" aria-label="${running ? "Running now" : "Ready to resume"}. ${relativeDate(thread.updatedAt)}">
+    <span class="activity-symbol" aria-hidden="true">${running ? "●" : "◷"}</span>
+    <span><strong>${running ? "Running now" : "Ready to resume"}</strong><small>${relativeDate(thread.updatedAt)}</small></span>
+  </div>`;
 }
 
 function section(level: PriorityLevel, title: string, description: string, threads: DeckThread[]): string {
@@ -168,22 +195,65 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
   </li>`;
 }
 
-function availableSection(threads: DeckThread[]): string {
-  return `<section class="available-section" aria-labelledby="available-heading">
-    <div class="available-heading"><div><p class="eyebrow">All recent threads</p><h2 id="available-heading">Add to your focus system</h2></div><span>${threads.length}</span></div>
-    <label class="search-label" for="task-search">Filter recent threads</label>
-    <input id="task-search" type="search" placeholder="Search by thread, project, or source" autocomplete="off" />
-    <ul class="available-list" id="available-list">
-      ${threads.map(availableRow).join("") || '<li class="empty-row">Every recent task is already organized.</li>'}
+function runningSection(threads: DeckThread[]): string {
+  return `<section class="running-section deck-section" aria-labelledby="running-heading">
+    <button class="running-heading running-toggle" type="button" data-running-toggle aria-expanded="${String(runningExpanded)}" aria-controls="running-list" ${threads.length ? "" : "disabled"}>
+      <span><span class="running-title"><span class="running-symbol" aria-hidden="true">◉</span><span id="running-heading">Running</span><span class="section-count">${threads.length}</span></span>
+      <span class="running-description">Active provider work across every priority lane.</span></span>
+      <span class="running-scope"><span>All priority lanes</span>${threads.length ? '<span class="running-chevron chevron" aria-hidden="true">⌄</span>' : ""}</span>
+    </button>
+    <ul class="running-list thread-list" id="running-list" ${runningExpanded ? "" : "hidden"}>
+      ${threads.length ? threads.map(runningRow).join("") : '<li class="empty-row">No provider reports active work.</li>'}
     </ul>
   </section>`;
 }
 
-function availableRow(thread: DeckThread): string {
-  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="thread-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName}`.toLowerCase())}">
-    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)}</p></div>
-    <div class="available-actions">${actionButton("Important", "level-important", thread.id)}${actionButton("Focus ✦✦", "level-focus", thread.id, true)}</div>
+function runningRow(thread: DeckThread): string {
+  return `<li class="available-row running-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="running-${escapeAttribute(thread.id)}">
+    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
+}
+
+function availableSection(deck: DeckSnapshot, recent: DeckThread[]): string {
+  const recentIds = new Set(recent.map((thread) => thread.id));
+  const threads = allDeckThreads(deck);
+  return `<section class="available-section" aria-labelledby="available-heading">
+    <div class="available-heading"><div><p class="eyebrow">Thread organizer</p><h2 id="available-heading">Find and organize any thread</h2></div><span data-search-count>${recent.length}</span></div>
+    <ul class="available-list" id="available-list">
+      ${threads.map((thread) => availableRow(thread, recentIds.has(thread.id))).join("") || '<li class="empty-row">No threads are available.</li>'}
+    </ul>
+  </section>`;
+}
+
+function threadSearchFooter(deck: DeckSnapshot, visibleCount: number): string {
+  const total = allDeckThreads(deck).length;
+  return `<section class="thread-search-footer" role="search" aria-label="All-thread search">
+    <label class="visually-hidden" for="task-search">Search all ${total} threads</label>
+    <input id="task-search" type="search" placeholder="Search all ${total} threads" autocomplete="off" aria-describedby="thread-search-status" />
+    <span class="thread-search-status" id="thread-search-status" data-search-status aria-live="polite">${visibleCount} recent</span>
+  </section>`;
+}
+
+function availableRow(thread: DeckThread, isRecent: boolean): string {
+  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName} ${thread.sourceId} ${thread.id} ${thread.status}`.toLowerCase())}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
+    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div class="available-actions">${threadActions(thread)}</div>
+  </li>`;
+}
+
+function placementBadge(thread: DeckThread): string {
+  const placement = thread.isCurrent ? "NOW" : thread.level === "focus" ? "Focus" : thread.level === "important" ? "Important" : "";
+  return placement ? `<span class="placement-badge">${placement}</span>` : "";
+}
+
+function threadActions(thread: DeckThread): string {
+  return [
+    thread.isCurrent ? "" : actionButton("Make Now", "current", thread.id),
+    thread.level === "important" ? "" : actionButton("Important", "level-important", thread.id),
+    thread.level === "focus" ? "" : actionButton("Focus ✦✦", "level-focus", thread.id, true),
+    thread.level ? actionButton("Remove", "level-none", thread.id) : "",
+  ].join("");
 }
 
 function actionButton(label: string, action: string, threadId: string, emphasized = false): string {
@@ -247,6 +317,14 @@ function visualPreferenceControls(): string {
 }
 
 function bindInteractions(): void {
+  const visualSettings = root.querySelector<HTMLDetailsElement>(".visual-settings");
+  const visualSettingsButton = visualSettings?.querySelector<HTMLElement>("summary.brand-mark");
+  const syncVisualSettingsDisclosure = (): void => {
+    visualSettingsButton?.setAttribute("aria-expanded", String(visualSettings?.open ?? false));
+  };
+  visualSettings?.addEventListener("toggle", syncVisualSettingsDisclosure);
+  syncVisualSettingsDisclosure();
+
   root.querySelectorAll<HTMLButtonElement>("button[data-collapse]").forEach((button) => {
     button.addEventListener("click", () => void handleCollapse(button));
   });
@@ -255,11 +333,39 @@ function bindInteractions(): void {
     button.addEventListener("click", () => void handleAction(button));
   });
 
-  root.querySelector<HTMLInputElement>("#task-search")?.addEventListener("input", (event) => {
-    const query = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase();
-    root.querySelectorAll<HTMLElement>(".available-row").forEach((row) => {
-      motion.filterRow(row, !query || Boolean(row.dataset.searchValue?.includes(query)));
+  root.querySelector<HTMLButtonElement>("button[data-running-toggle]")?.addEventListener("click", (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    runningExpanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(runningExpanded));
+    const list = root.querySelector<HTMLElement>("#running-list");
+    if (list) list.hidden = !runningExpanded;
+  });
+
+  const search = root.querySelector<HTMLInputElement>("#task-search");
+  search?.addEventListener("focus", () => {
+    search.select();
+  });
+  root.querySelector<HTMLElement>(".thread-search-footer")?.addEventListener("click", () => {
+    search?.focus();
+  });
+  search?.addEventListener("input", (event) => {
+    const terms = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+    let visibleCount = 0;
+    root.querySelectorAll<HTMLElement>("#available-list .available-row").forEach((row) => {
+      const visible = terms.length
+        ? terms.every((term) => row.dataset.searchValue?.includes(term))
+        : row.dataset.isRecent === "true";
+      if (visible) visibleCount += 1;
+      motion.filterRow(row, visible);
     });
+    root.querySelectorAll<HTMLElement>("[data-search-count]").forEach((count) => {
+      count.textContent = String(visibleCount);
+    });
+    const status = root.querySelector<HTMLElement>("[data-search-status]");
+    if (status) status.textContent = terms.length
+      ? `${visibleCount} ${visibleCount === 1 ? "match" : "matches"}`
+      : `${visibleCount} recent`;
+    if (terms.length) root.querySelector<HTMLElement>(".available-section")?.scrollIntoView({ block: "start" });
   });
 
   root.querySelectorAll<HTMLSelectElement>("select[data-context-thread-id]").forEach((select) => {
@@ -624,15 +730,37 @@ function escapeAttribute(value: string): string {
 }
 
 function brandMark(): string {
-  return `<span class="brand-mark" aria-hidden="true"><svg class="lotus-mark" viewBox="0 0 128 128" focusable="false">
-    <g class="lotus-petal">
-      <path d="M64 101C48 83 49 47 64 24C79 47 80 83 64 101Z"/>
-      <path d="M61 101C42 91 29 70 31 49C49 56 61 73 64 96"/>
-      <path d="M67 101C86 91 99 70 97 49C79 56 67 73 64 96"/>
-      <path d="M59 105C38 105 18 92 11 72C31 70 50 82 63 103"/>
-      <path d="M69 105C90 105 110 92 117 72C97 70 78 82 65 103"/>
-      <path d="M24 102C42 116 86 116 104 102"/>
-      <path d="M38 113C51 121 77 121 90 113"/>
+  return `<details class="visual-settings">
+    <summary class="brand-mark" role="button" aria-label="Open Gaja settings" aria-expanded="false" aria-controls="gaja-visual-settings" aria-haspopup="true" title="Gaja settings"><svg class="gaja-mark" viewBox="0 0 128 128" focusable="false" aria-hidden="true">
+    <g class="gaja-mark-main">
+      <path d="M37 42C29 40 23 45 18 54C18 63 23 70 30 75C34 79 35 86 39 89C44 92 49 86 48 78C47 69 47 60 45 52C43 46 40 43 37 42Z"/>
+      <path d="M20 54C25 55 29 49 34 46C39 44 43 47 45 51C40 53 36 58 33 64"/>
+      <path d="M40 42C49 36 59 35 67 40C74 45 74 51 79 55C85 60 83 69 84 78C84 85 86 90 90 91C95 93 99 89 99 84C100 78 97 71 95 67C93 63 93 59 98 57C100 56 102 57 102 59"/>
+      <path d="M98 62C100 62 102 63 103 65C108 73 109 85 104 94C98 103 84 104 74 97C68 93 65 87 62 82"/>
+      <path d="M47 64C45 72 46 78 52 80C56 81 59 80 62 83"/>
     </g>
-  </svg></span>`;
+    <g class="gaja-mark-detail">
+      <path d="M55 57C58 54 63 54 66 57"/>
+      <path d="M56 59C59 56 63 56 66 59C64 62 59 63 56 59Z"/>
+      <path d="M58 75C60 75 60 79 62 80C64 78 67 77 69 79"/>
+      <path d="M67 79C69 81 72 83 75 84C72 81 70 79 68 77"/>
+    </g>
+    <circle class="gaja-mark-pupil" cx="63.1" cy="59" r="0.85"/>
+    <g class="gaja-mark-petal">
+      <path d="M92 43C86 38 86 30 92 23C99 30 101 38 94 43C93 44 92 44 92 43Z"/>
+      <path d="M89 41C83 36 82 28 84 22C90 26 93 33 92 41"/>
+      <path d="M94 41C99 33 104 29 108 27C108 34 104 40 96 43"/>
+      <path d="M89 42C83 45 77 41 75 35C82 34 87 36 92 41"/>
+      <path d="M95 43C102 41 108 37 111 34C108 42 102 46 95 45"/>
+      <path d="M88 32C88 27 91 22 94 19C98 23 100 28 100 32"/>
+      <path d="M94 44C100 44 104 47 105 50C99 51 94 48 91 44"/>
+      <path d="M92 43C88 49 89 56 99 60.5"/>
+    </g>
+    </svg><span class="settings-badge" aria-hidden="true">⚙︎</span></summary>
+    <div class="visual-settings-popover" id="gaja-visual-settings">
+      <p class="settings-title">Appearance settings</p>
+      ${visualPreferenceControls()}
+      <p class="settings-note">Card size and lotus position are available in the native Gaja app.</p>
+    </div>
+  </details>`;
 }

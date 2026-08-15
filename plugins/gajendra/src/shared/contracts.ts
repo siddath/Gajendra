@@ -5,6 +5,49 @@ export type PriorityLevel = "focus" | "important";
 export type ThreadContext = "design" | "engineering" | "life";
 export type SourceState = "ready" | "disabled" | "not-installed" | "not-configured" | "error";
 
+const RUNNING_STATUS_KEYS = new Set([
+  "active",
+  "busy",
+  "inprogress",
+  "processing",
+  "running",
+  "streaming",
+  "working",
+]);
+
+export function isRunningThreadStatus(status: string): boolean {
+  return RUNNING_STATUS_KEYS.has(status.toLowerCase().replace(/[^a-z]/gu, ""));
+}
+
+export function allDeckThreads(snapshot: DeckSnapshot): DeckThread[] {
+  const unique = new Map<string, DeckThread>();
+  for (const thread of [snapshot.current, ...snapshot.focus, ...snapshot.important, ...snapshot.available]) {
+    if (thread && !unique.has(thread.id)) unique.set(thread.id, thread);
+  }
+  return [...unique.values()];
+}
+
+export function runningDeckThreads(snapshot: DeckSnapshot): DeckThread[] {
+  return allDeckThreads(snapshot)
+    .filter((thread) => isRunningThreadStatus(thread.status))
+    .sort((left, right) => right.updatedAt - left.updatedAt);
+}
+
+export function normalizeDeckSelection(snapshot: DeckSnapshot): DeckSnapshot {
+  const currentId = snapshot.current?.id ?? null;
+  const markCurrent = (thread: DeckThread): DeckThread => ({
+    ...thread,
+    isCurrent: currentId !== null && thread.id === currentId,
+  });
+  return {
+    ...snapshot,
+    current: snapshot.current ? { ...snapshot.current, isCurrent: true } : null,
+    focus: snapshot.focus.map(markCurrent),
+    important: snapshot.important.map((thread) => ({ ...thread, isCurrent: false })),
+    available: snapshot.available.map((thread) => ({ ...thread, isCurrent: false })),
+  };
+}
+
 export type StoredEntry = {
   threadId: string;
   level: PriorityLevel;
@@ -77,6 +120,7 @@ export type CodexThread = {
   updatedAt?: number;
   recencyAt?: number | null;
   status?: { type?: string } | string;
+  path?: string | null;
 };
 
 export type DeckMutation =

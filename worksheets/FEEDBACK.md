@@ -1,0 +1,37 @@
+# Session feedback
+
+## Retro — Review-gated elephant-and-lotus widget identity — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: The first vector pass made the legacy lotus too large and let it collide with the forehead, so the flower dominated and the trunk-to-flower contact was ambiguous; the cause was judging the 128-unit composition before checking the actual 18/24/34-point render hierarchy.
+TECHNIQUES: Asset-first integration gate; preserve legacy geometry with one explicit uniform transform; review large and optical-size renders before touching UI code; use a center-layer header so asymmetric trailing actions cannot move the title; verify installed alignment through Accessibility coordinates rather than source inference.
+SKILL-GAPS: The geometry validator proves path parity but not optical legibility; consider a bounded raster-size review check only if this mark is revised repeatedly enough to justify maintenance.
+IDEAS-PARKED: A full current-build gauntlet and hosted CI remain PR/release work, and Codex should be relaunched later to consume the refreshed MCP App cache.
+
+## Retro — Official reference-informed Gaja icon — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: Candidates 1 and 2 let the lotus collide with the forehead and made the tusk read as a mouth; candidate 3 separated the silhouette but hid the stem, so the trunk appeared to grow into the flower. The cause was treating anatomical and floral contours as one compact motif before enforcing separate negative-space zones.
+TECHNIQUES: Decompose the supplied references by responsibility; keep exploration in a reversible candidate asset; reject at the 34-point widget render before propagation; approve only after 512/128/64/34/24/18-pixel review; lock the thirteen canonical paths across SVG, SwiftUI, web, menu-bar, and app-icon surfaces; verify the installed launcher with hover/click behavior and Accessibility geometry.
+SKILL-GAPS: Static path parity still cannot prove subjective recognition, and macOS screen-capture permission blocked an installed-window raster receipt; retain the rendered preview matrix plus live window/position evidence unless repeated revisions justify a dedicated optical-regression harness.
+IDEAS-PARKED: The full release gauntlet, hosted CI, commit/push, and Codex host reload remain separate owner-gated actions; the refreshed native app and local plugin cache are complete without claiming a public release.
+
+## Retro — Review-only Gaja icon alternatives — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: The first vector renders made the almond eye collapse into a heavy symbol and let the short tusk read as a hook; the cause was refining path geometry at 512 pixels before compositing on the real light surface and checking optical sizes.
+TECHNIQUES: Treat the generation prompt as an acceptance contract; isolate every candidate outside the canonical asset; compare anatomy on a light review plate; downsample to 64/34/24/18 pixels before recommending; separate the generated concept from production-vector claims.
+SKILL-GAPS: Higgsfield produced the strongest anatomy but only as a fine-lined raster, while the SVG detectors cannot judge whether an ear, eye, tusk, or flower reads correctly; retain human visual approval as the integration gate.
+IDEAS-PARKED: Vector-redraw the selected Higgsfield concept or propagate the selected native SVG only after Sid chooses; widget, menu bar, app icon, install, commit, and release verification remain intentionally untouched.
+
+## Retro — Attentive-integrity Gaja vector redraw — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: The first manual render used `currentColor`, which the macOS SVG rasterizer resolved as black, and joined ear, forehead, and fold at one optical knot; the cause was trusting semantic SVG structure before checking the actual renderer and 512-pixel silhouette.
+TECHNIQUES: Translate product values into anatomy rather than ornament; keep a review-only SVG outside the canonical asset; separate the listening ear fold from the head contour; terminate the stem inside the trunk curl; validate light/dark plus 64/34/24/18-pixel renders before integration.
+SKILL-GAPS: XML validation and the design detector cannot judge zoological recognition or whether focus, sincerity, and integrity read from an icon; retain Sid's visual approval as the binding gate.
+IDEAS-PARKED: If approved, propagate the eighteen-path-and-one-pupil geometry across SVG, SwiftUI, web, menu-bar, and app-icon surfaces, update exact-geometry validators, then rebuild and verify the installed app; no production surface changed in this pass.
+
+## Retro — Single reference-guided Higgsfield Gaja revision — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: The prompt asked for both near-exact preservation and substantial micro-anatomy changes, so the reference-guided model preserved the long tusk and knot-like trunk grip more strongly than requested; the cause was tension between identity retention and local geometric correction in a single raster edit.
+TECHNIQUES: Enforce a one-job generation cap; use the completed prior job as direct reference media; preflight the two-credit cost; preserve the raw output and make only a separate review crop; inspect 64/34/24/18-pixel renders before recommending integration.
+SKILL-GAPS: A generated raster can establish the visual master but cannot guarantee exact tusk length, trunk-stem topology, adaptive color, or small-size stroke behavior; those remain controlled-vector implementation work.
+IDEAS-PARKED: Wait for Sid's explicit confirmation, then faithfully vectorize the approved visual while shortening the tusk, resolving the grip, and strengthening optical strokes; only afterward propagate, test, install, open the PR, and merge under the user's conditional authorization.
+
+## Retro — Approved Gaja visual-master integration and release — 2026-08-15 — Codex / GPT-5
+MISTAKES→CAUSE: I initially treated the broad dirty checkout as unrelated work, but project STATUS and the earlier session receipts showed it was the current verified widget candidate; the configured plugin marketplace later confirmed that checkout remained the canonical local root. The cause was privileging remote-main cleanliness over the project's explicit local candidate truth before reconciling both.
+TECHNIQUES: Snapshot the complete candidate into an isolated branch while leaving the source checkout recoverable; redraw the approved raster as seventeen deterministic contours plus one pupil; use separate structural, detail, and petal optical weights; make the stem terminate between two separated trunk lobes; inspect one bounded light/dark/native/focus-deck pass; require the full 18-gate gauntlet; retain a rollback app; and prove installed hover, click, close, centered title, and trailing action geometry through Accessibility coordinates.
+SKILL-GAPS: Exact geometry checks prove cross-surface parity but cannot prove elephant recognition or emotional tone, and the local installer intentionally cannot refresh a marketplace from a different worktree. Human visual approval remains the perceptual gate, and canonical-root refresh remains an explicit post-merge step.
+IDEAS-PARKED: Developer ID signing, notarization, a downloadable binary, a new version tag, and a forced Codex restart remain outside this source-merge contract.

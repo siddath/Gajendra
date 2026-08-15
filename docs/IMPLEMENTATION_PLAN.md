@@ -17,7 +17,7 @@ The project decides whether one local focus layer across AI-agent sessions chang
 | --- | --- | --- |
 | Contract | One global NOW, metadata-only state including bounded context, source-owned sessions | Complete |
 | Registry | Codex, Claude, Cursor, Grok Build, and configured catalog adapters | Complete locally |
-| Native UX | Bottom-right hover utility and resizable organizer | Complete locally |
+| Native UX | Click-presented snap-anchored utility and resizable organizer | Complete locally |
 | Apple alignment | Liquid Glass gate, material fallback, standard controls, accessibility | Complete locally |
 | Portable UI | Inline MCP App plus experimental global metadata hint | Complete locally |
 | Gauntlet/install | Fail-fast verification and installed-build proof | Final run pending |
@@ -32,7 +32,7 @@ Success requires:
 2. one NOW change that alters the next resumed session;
 3. at least two source apps used without duplicating priorities elsewhere.
 
-Kill the trial if the utility becomes visual noise, hover reveals accidentally, source metadata is materially stale, resume repeatedly fails, or queue upkeep duplicates work.
+Kill the trial if the utility becomes visual noise, opens without deliberate activation, source metadata is materially stale, resume repeatedly fails, or queue upkeep duplicates work.
 
 ## Deferred WidgetKit surface
 

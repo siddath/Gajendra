@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { EMPTY_STORE, type AgentThread, type PriorityStore, type ThreadSourceStatus } from "../../src/shared/contracts.js";
+import {
+  allDeckThreads,
+  EMPTY_STORE,
+  isRunningThreadStatus,
+  normalizeDeckSelection,
+  runningDeckThreads,
+  type AgentThread,
+  type PriorityStore,
+  type ThreadSourceStatus,
+} from "../../src/shared/contracts.js";
 import { applyMutation, buildSnapshot, canonicalThreadId, normalizeStore } from "../../src/server/domain.js";
 import { resolveRpcTimeout } from "../../src/server/codex-app-server.js";
 
@@ -103,6 +112,54 @@ describe("Gajendra domain", () => {
     expect(canonicalThreadId("cursor", "abc")).toBe("cursor:abc");
   });
 
+  it("recognizes only explicit provider running states", () => {
+    expect(["active", "running", "inProgress", "in-progress", "WORKING", "streaming"].every(isRunningThreadStatus)).toBe(true);
+    expect(["idle", "notLoaded", "resumable", "completed", "unknown"].some(isRunningThreadStatus)).toBe(false);
+  });
+
+  it("derives Running across NOW, Focus, Important, and unprioritized threads without duplicates", () => {
+    const initial = state([
+      { threadId: "codex:now", level: "focus", addedAt: now.toISOString() },
+      { threadId: "claude:focus", level: "focus", addedAt: now.toISOString() },
+      { threadId: "cursor:important", level: "important", addedAt: now.toISOString() },
+    ], "codex:now");
+    const threads: AgentThread[] = [
+      agentThread("codex:now", "active", 400),
+      agentThread("claude:focus", "running", 300),
+      agentThread("cursor:important", "in-progress", 200),
+      agentThread("codex:available", "working", 100),
+      agentThread("codex:idle", "idle", 500),
+    ];
+    const snapshot = buildSnapshot(initial, threads, sources);
+
+    expect(allDeckThreads(snapshot).map((thread) => thread.id)).toHaveLength(5);
+    expect(runningDeckThreads(snapshot).map((thread) => thread.id)).toEqual([
+      "codex:now",
+      "claude:focus",
+      "cursor:important",
+      "codex:available",
+    ]);
+  });
+
+  it("normalizes malformed snapshots to one current task", () => {
+    const initial = state([
+      { threadId: "codex:a", level: "focus", addedAt: now.toISOString() },
+      { threadId: "codex:b", level: "focus", addedAt: now.toISOString() },
+      { threadId: "cursor:c", level: "important", addedAt: now.toISOString() },
+    ], "codex:a");
+    const malformed = buildSnapshot(initial, [
+      agentThread("codex:a", "active", 300),
+      agentThread("codex:b", "idle", 200),
+      agentThread("cursor:c", "idle", 100),
+    ], sources);
+    malformed.focus[1]!.isCurrent = true;
+    malformed.important[0]!.isCurrent = true;
+
+    const normalized = normalizeDeckSelection(malformed);
+    expect([...normalized.focus, ...normalized.important, ...normalized.available].filter((thread) => thread.isCurrent).map((thread) => thread.id)).toEqual(["codex:a"]);
+    expect(normalized.current?.id).toBe("codex:a");
+  });
+
   it("uses a bounded, configurable app-server request timeout with legacy compatibility", () => {
     expect(resolveRpcTimeout({})).toBe(15_000);
     expect(resolveRpcTimeout({ GAJENDRA_RPC_TIMEOUT_MS: "25000" })).toBe(25_000);
@@ -112,4 +169,18 @@ describe("Gajendra domain", () => {
 
 function state(entries: PriorityStore["entries"], currentFocusThreadId: string | null): PriorityStore {
   return { ...structuredClone(EMPTY_STORE), entries, currentFocusThreadId };
+}
+
+function agentThread(id: string, status: string, updatedAt: number): AgentThread {
+  const [sourceId = "codex"] = id.split(":");
+  return {
+    id,
+    sourceId,
+    sourceName: sourceId,
+    title: id,
+    project: "fixture",
+    updatedAt,
+    status,
+    deepLink: `${sourceId}://threads/${id}`,
+  };
 }

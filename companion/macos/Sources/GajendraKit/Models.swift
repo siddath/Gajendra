@@ -80,6 +80,53 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
         self.deepLink = deepLink
         self.resumeCommand = resumeCommand
     }
+
+    public var isRunning: Bool {
+        Self.isRunningStatus(status)
+    }
+
+    public var placementLabel: String? {
+        if isCurrent { return "NOW" }
+        switch level {
+        case .focus: return "Focus"
+        case .important: return "Important"
+        case nil: return nil
+        }
+    }
+
+    public func matchesSearch(_ query: String) -> Bool {
+        let terms = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard !terms.isEmpty else { return true }
+        let searchableMetadata = [title, project, sourceName, sourceId, id, status]
+            .joined(separator: " ")
+            .lowercased()
+        return terms.allSatisfy(searchableMetadata.contains)
+    }
+
+    fileprivate func settingCurrent(_ value: Bool) -> DeckThread {
+        DeckThread(
+            id: id,
+            sourceId: sourceId,
+            sourceName: sourceName,
+            title: title,
+            project: project,
+            updatedAt: updatedAt,
+            status: status,
+            level: level,
+            isCurrent: value,
+            context: context,
+            deepLink: deepLink,
+            resumeCommand: resumeCommand
+        )
+    }
+
+    public static func isRunningStatus(_ status: String) -> Bool {
+        let key = status.lowercased().unicodeScalars
+            .filter { CharacterSet.letters.contains($0) }
+            .map(String.init)
+            .joined()
+        return ["active", "busy", "inprogress", "processing", "running", "streaming", "working"].contains(key)
+    }
 }
 
 public struct ThreadSourceStatus: Codable, Identifiable, Equatable, Sendable {
@@ -141,10 +188,11 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
         error: String?
     ) {
         self.generatedAt = generatedAt
-        self.current = current
-        self.focus = focus
-        self.important = important
-        self.available = available
+        let currentId = current?.id
+        self.current = current?.settingCurrent(true)
+        self.focus = focus.map { $0.settingCurrent($0.id == currentId) }
+        self.important = important.map { $0.settingCurrent(false) }
+        self.available = available.map { $0.settingCurrent(false) }
         self.collapsed = collapsed
         self.focusGuide = focusGuide
         self.focusOverGuide = focusOverGuide
@@ -152,6 +200,46 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
         self.source = source
         self.sources = sources
         self.error = error
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case generatedAt, current, focus, important, available, collapsed, focusGuide, focusOverGuide
+        case staleEntryCount, source, sources, error
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            generatedAt: try container.decode(String.self, forKey: .generatedAt),
+            current: try container.decodeIfPresent(DeckThread.self, forKey: .current),
+            focus: try container.decode([DeckThread].self, forKey: .focus),
+            important: try container.decode([DeckThread].self, forKey: .important),
+            available: try container.decode([DeckThread].self, forKey: .available),
+            collapsed: try container.decode(CollapsedSections.self, forKey: .collapsed),
+            focusGuide: try container.decode(Int.self, forKey: .focusGuide),
+            focusOverGuide: try container.decode(Bool.self, forKey: .focusOverGuide),
+            staleEntryCount: try container.decode(Int.self, forKey: .staleEntryCount),
+            source: try container.decode(String.self, forKey: .source),
+            sources: try container.decode([ThreadSourceStatus].self, forKey: .sources),
+            error: try container.decodeIfPresent(String.self, forKey: .error)
+        )
+    }
+
+    public var allThreads: [DeckThread] {
+        var seen = Set<String>()
+        return ([current].compactMap { $0 } + focus + important + available).filter { thread in
+            seen.insert(thread.id).inserted
+        }
+    }
+
+    public var runningThreads: [DeckThread] {
+        allThreads.filter(\.isRunning).sorted { left, right in
+            left.updatedAt > right.updatedAt
+        }
+    }
+
+    public func searchThreads(_ query: String) -> [DeckThread] {
+        allThreads.filter { $0.matchesSearch(query) }
     }
 }
 

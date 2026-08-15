@@ -97,14 +97,20 @@ export function createDeckMotion(root: HTMLElement) {
       row.hidden = !visible;
       return;
     }
-    markAnimating(0.22);
     if (visible) {
-      if (!row.hidden) return;
+      const wasHidden = row.hidden;
       row.hidden = false;
+      gsap.set(row, { clearProps: "transform,opacity,visibility" });
+      if (!wasHidden) return;
+      markAnimating(0.22);
       gsap.fromTo(row, { autoAlpha: 0, y: -5 }, { autoAlpha: 1, y: 0, duration: 0.2, ease: "power3.out", clearProps: "transform,opacity,visibility" });
       return;
     }
-    if (row.hidden) return;
+    if (row.hidden) {
+      gsap.set(row, { clearProps: "transform,opacity,visibility" });
+      return;
+    }
+    markAnimating(0.22);
     gsap.to(row, {
       autoAlpha: 0,
       y: -5,

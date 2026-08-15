@@ -6,14 +6,14 @@ import SwiftUI
 enum GajendraPreview {
     @MainActor
     static func main() throws {
-        let now = thread("focus-1", "Finish the adaptive Gaja hover-card release", "gajendra", level: .focus, current: true, context: .design)
+        let now = thread("focus-1", "Finish the adaptive Gaja hover-card release", "gajendra", level: .focus, current: true, context: .design, status: "active", updatedAt: 1_786_473_650)
         let cardSnapshot = DeckSnapshot(
             generatedAt: "2026-08-12T00:00:00Z",
             current: now,
             focus: [
                 now,
                 thread("focus-2", "Review launch evidence", "tooling", level: .focus, context: .engineering),
-                thread("focus-3", "Tighten the organizer interaction model", "gajendra", level: .focus, sourceId: "claude", sourceName: "Claude"),
+                thread("focus-3", "Tighten the organizer interaction model", "gajendra", level: .focus, sourceId: "claude", sourceName: "Claude", status: "working", updatedAt: 1_786_473_600),
                 thread("focus-4", "Verify the exact thread resume paths", "agents", level: .focus, sourceId: "cursor", sourceName: "Cursor"),
                 thread("focus-5", "Write the macOS design case study", "design-system", level: .focus, context: .design),
                 thread("focus-6", "Audit reduced transparency behavior", "accessibility", level: .focus, context: .engineering),
@@ -21,13 +21,17 @@ enum GajendraPreview {
             ],
             important: [
                 thread("important-1", "Prepare the next design pass", "design-system", level: .important, context: .design),
-                thread("important-2", "Reconcile the weekly operating plan", "planning", level: .important, context: .life, sourceId: "claude", sourceName: "Claude"),
+                thread("important-2", "Reconcile the weekly operating plan", "planning", level: .important, context: .life, sourceId: "claude", sourceName: "Claude", status: "streaming", updatedAt: 1_786_473_550),
                 thread("important-3", "Review source health failure states", "gajendra", level: .important, context: .engineering, sourceId: "grok", sourceName: "Grok Build"),
                 thread("important-4", "Check the plugin host reload evidence", "harness", level: .important, sourceId: "cursor", sourceName: "Cursor"),
                 thread("important-5", "Confirm dark appearance contrast", "design-system", level: .important, context: .design),
                 thread("important-6", "Archive the release receipts", "operations", level: .important),
             ],
-            available: [thread("recent-1", "Reconcile the weekly plan", "planning")],
+            available: [
+                thread("running-1", "Validate the provider activity contract", "agents", sourceId: "cursor", sourceName: "Cursor", status: "in-progress", updatedAt: 1_786_473_500),
+                thread("running-2", "Watch the release verification", "gajendra", sourceId: "grok", sourceName: "Grok Build", status: "running", updatedAt: 1_786_473_450),
+                thread("recent-1", "Reconcile the weekly plan", "planning"),
+            ],
             collapsed: CollapsedSections(focus: false, important: true),
             focusGuide: 5,
             focusOverGuide: false,
@@ -72,6 +76,7 @@ enum GajendraPreview {
         let focusDarkPillDestination = arguments.dropFirst(11).first ?? "gajendra-focus-deck-pill-dark.png"
         let compactCardDestination = arguments.dropFirst(12).first ?? "gajendra-hover-card-compact.png"
         let expandedCardDestination = arguments.dropFirst(13).first ?? "gajendra-hover-card-expanded.png"
+        let searchCardDestination = arguments.dropFirst(14).first ?? "gajendra-hover-card-search.png"
 
         try renderSuite(
             organizerModel: organizerModel,
@@ -123,6 +128,14 @@ enum GajendraPreview {
             size: .expanded,
             destination: expandedCardDestination
         )
+        try renderCard(
+            model: cardModel,
+            theme: .nativePopover,
+            appearance: .light,
+            size: .comfortable,
+            destination: searchCardDestination,
+            searchQuery: "Gaja"
+        )
     }
 
     @MainActor
@@ -131,7 +144,8 @@ enum GajendraPreview {
         theme: GajendraVisualTheme,
         appearance: ColorScheme,
         size: GajendraHoverCardSize,
-        destination: String
+        destination: String,
+        searchQuery: String = ""
     ) throws {
         let settings = GajendraVisualSettings(
             theme: theme,
@@ -143,7 +157,12 @@ enum GajendraPreview {
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
         try render(
-            GajendraHoverCardView(model: model, visualSettings: settings, isPreview: true),
+            GajendraHoverCardView(
+                model: model,
+                visualSettings: settings,
+                isPreview: true,
+                previewSearchQuery: searchQuery
+            ),
             width: cardSize.width,
             height: cardSize.height,
             destination: destination,
@@ -189,9 +208,7 @@ enum GajendraPreview {
             GajendraPillView(
                 model: cardModel,
                 visualSettings: setting,
-                editController: GajendraPillEditController(),
-                onHoverChanged: { _ in },
-                onActivate: {}
+                editController: GajendraPillEditController()
             ),
             width: 60,
             height: 60,
@@ -228,7 +245,9 @@ enum GajendraPreview {
         current: Bool = false,
         context: ThreadContext? = nil,
         sourceId: String = "codex",
-        sourceName: String = "Codex"
+        sourceName: String = "Codex",
+        status: String = "idle",
+        updatedAt: Double = 1_786_473_400
     ) -> DeckThread {
         DeckThread(
             id: "\(sourceId):\(id)",
@@ -236,8 +255,8 @@ enum GajendraPreview {
             sourceName: sourceName,
             title: title,
             project: project,
-            updatedAt: 1_786_473_600,
-            status: "idle",
+            updatedAt: updatedAt,
+            status: status,
             level: level,
             isCurrent: current,
             context: context,

@@ -13,7 +13,7 @@ The preflight checks Codex app identity, plugin enablement, cache/source hashes,
 ## Native utility proof
 
 1. Launch the installed `Gajendra.app`.
-2. Confirm only the outlined lotus persists at the bottom right.
+2. Confirm only the outlined elephant-trunk-and-lotus mark persists at the bottom right.
 3. Hover the lotus; the card appears without opening the full organizer.
 4. Move across the gap; the card stays visible long enough to enter it.
 5. Leave both; the card collapses.

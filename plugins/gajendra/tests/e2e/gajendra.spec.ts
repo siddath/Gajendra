@@ -20,7 +20,14 @@ test("makes one current thread unmistakable and returns to its native provider d
   const open = now.getByRole("link", { name: /Open thread/ });
   await expect(open).toHaveAttribute("href", /^codex:\/\/threads\//u);
   await expect(open).toHaveAttribute("aria-current", "true");
+  await expect(now.locator(".activity-signal")).toContainText("Running now");
+  await expect(now.locator(".activity-signal")).toContainText("Updated today");
   await expect(page.locator(".thread-row.is-current .now-pill")).toHaveText("NOW");
+  expect(await now.locator(".now-actions > *").evaluateAll((elements) => elements.map((element) => element.className))).toEqual([
+    "primary-action",
+    "activity-signal",
+    "source-badge",
+  ]);
 
   const contentBox = await now.locator(".now-content").boundingBox();
   const titleBox = await now.getByRole("heading", { name: "Ship the Gaja source release" }).boundingBox();
@@ -30,9 +37,22 @@ test("makes one current thread unmistakable and returns to its native provider d
   expect(openBox).not.toBeNull();
   expect(openBox!.x).toBeGreaterThan(titleBox!.x + titleBox!.width);
   expect(Math.abs(openBox!.y + openBox!.height / 2 - (contentBox!.y + contentBox!.height / 2))).toBeLessThan(3);
+
+  const beforeHover = await now.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundColor,
+    border: getComputedStyle(element).borderColor,
+  }));
+  await now.hover();
+  const afterHover = await now.evaluate((element) => ({
+    background: getComputedStyle(element).backgroundColor,
+    border: getComputedStyle(element).borderColor,
+  }));
+  expect(afterHover).not.toEqual(beforeHover);
 });
 
 test("switches and persists exactly Native Popover and Focus Deck across light, dark, and auto", async ({ page }) => {
+  const settings = page.getByRole("button", { name: "Open Gaja settings" });
+  await settings.click();
   const native = page.getByRole("button", { name: "Native", exact: true });
   const focusDeck = page.getByRole("button", { name: "Focus Deck", exact: true });
   await expect(native).toHaveAttribute("aria-pressed", "true");
@@ -41,6 +61,7 @@ test("switches and persists exactly Native Popover and Focus Deck across light, 
   await expect(page.locator("html")).toHaveAttribute("data-gaja-theme", "focus-deck");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.reload();
+  await settings.click();
   await expect(focusDeck).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Dark", exact: true })).toHaveAttribute("aria-pressed", "true");
 
@@ -55,6 +76,7 @@ test("switches and persists exactly Native Popover and Focus Deck across light, 
     localStorage.setItem("gajendra.ui.appearance.v1", "sepia");
   });
   await page.reload();
+  await settings.click();
   await expect(page.locator("html")).toHaveAttribute("data-gaja-theme", "native");
   await expect(page.getByRole("button", { name: "Auto", exact: true })).toHaveAttribute("aria-pressed", "true");
 });
@@ -99,20 +121,38 @@ test("assigns bounded context labels without changing NOW or provider resume", a
   await expect(page.locator(".now-card .context-badge")).toHaveText("Design");
 });
 
-test("drags recent threads into priority lanes while retaining keyboard actions", async ({ page }) => {
+test("includes prioritized and unprioritized active work while retaining priority actions", async ({ page }) => {
+  const running = page.locator(".running-section");
+  const runningToggle = running.locator("[data-running-toggle]");
+  await expect(runningToggle).toHaveAttribute("aria-expanded", "true");
+  await expect(running.locator(".running-scope")).toContainText("All priority lanes");
+  await expect(running.locator(".running-scope")).toHaveCSS("border-top-style", "solid");
+  await expect(running.locator(".running-row")).toHaveCount(4);
+  await expect(running).toContainText("Ship the Gaja source release");
+  await expect(running.locator('.running-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"] .placement-badge')).toHaveText("NOW");
+  await expect(running).toContainText("Investigate the CI performance regression");
+  await expect(page.locator('#available-list .available-row[data-thread-id="windsurf:available-2"]')).toBeHidden();
+
+  await runningToggle.click();
+  await expect(runningToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#running-list")).toBeHidden();
+  await expect(page.locator(".thread-search-footer")).toBeVisible();
+
   const secondFocus = page.locator('.thread-row[data-thread-id^="claude:"]');
   const firstFocus = page.locator("#focus-list .thread-row").first();
   await secondFocus.locator(".thread-main").dragTo(firstFocus.locator(".thread-main"));
   await expect(page.locator("#focus-list .thread-row").first()).toContainText("Review the multi-agent adapter contract");
 
   const recent = page.locator('.available-row[data-thread-id="codex:available-1"]');
-  await recent.dragTo(page.locator('.deck-section[data-drop-level="important"]'));
+  await recent.getByRole("button", { name: "Important" }).click();
   await expect(page.locator("#important-list")).toContainText("Plan this week across projects");
   await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
   await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
 
-  const keyboardRecent = page.locator('.available-row[data-thread-id="windsurf:available-2"]');
-  const keyboardFocus = keyboardRecent.getByRole("button", { name: "Focus ✦✦" });
+  await runningToggle.click();
+  await expect(page.locator("#running-list")).toBeVisible();
+  const keyboardRunning = page.locator('.running-row[data-thread-id="windsurf:available-2"]');
+  const keyboardFocus = keyboardRunning.getByRole("button", { name: "Focus ✦✦" });
   await keyboardFocus.focus();
   await keyboardFocus.press("Enter");
   await expect(page.locator("#focus-list")).toContainText("Investigate the CI performance regression");
@@ -127,7 +167,21 @@ test("collapses sections and promotes a recent task without losing the single NO
 
   await page.locator(".available-row", { hasText: "Plan this week across projects" }).getByRole("button", { name: "Focus ✦✦" }).click();
   await expect(page.locator("#focus-list")).toContainText("Plan this week across projects");
-  await expect(page.getByText("NOW", { exact: true })).toHaveCount(2);
+  await expect(page.locator(".now-card .now-label strong")).toHaveText("NOW");
+  await expect(page.locator("#focus-list .thread-row.is-current .now-pill")).toHaveCount(1);
+});
+
+test("moves the same task between Focus and Important while preserving one NOW", async ({ page }) => {
+  const threadId = "claude:11111111-1111-4111-8111-111111111111";
+  const focusRow = page.locator(`#focus-list .thread-row[data-thread-id="${threadId}"]`);
+  await focusRow.getByRole("button", { name: "Important" }).click();
+  const importantRow = page.locator(`#important-list .thread-row[data-thread-id="${threadId}"]`);
+  await expect(importantRow).toContainText("Review the multi-agent adapter contract");
+
+  await importantRow.getByRole("button", { name: "Focus" }).click();
+  await expect(page.locator(`#focus-list .thread-row[data-thread-id="${threadId}"]`)).toContainText("Review the multi-agent adapter contract");
+  await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
+  await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
 });
 
 test("animates row ordering and refreshes without replacing the visible deck", async ({ page }) => {
@@ -154,14 +208,50 @@ test("removes motion when the system requests reduced motion", async ({ page }) 
   await expect(page.locator("#app")).toHaveAttribute("data-motion-state", "idle");
 });
 
-test("filters recent threads and remains operable by keyboard", async ({ page }) => {
-  const search = page.getByRole("searchbox", { name: "Filter recent threads" });
-  await search.focus();
-  await page.keyboard.type("build-tools");
-  await expect(page.locator(".available-row", { hasText: "build-tools" })).toBeVisible();
-  await expect(page.locator(".available-row", { hasText: "workspace" })).toBeHidden();
+test("searches every thread and exposes organizer actions by keyboard", async ({ page }) => {
+  const searchFooter = page.locator(".thread-search-footer");
+  const search = page.getByRole("searchbox", { name: "Search all 8 threads" });
+  await expect(searchFooter).toBeVisible();
+  await expect(search).toHaveAttribute("placeholder", "Search all 8 threads");
+  const initialBorder = await searchFooter.evaluate((element) => getComputedStyle(element).borderColor);
+  await searchFooter.hover();
+  const hoverBorder = await searchFooter.evaluate((element) => getComputedStyle(element).borderColor);
+  expect(hoverBorder).not.toBe(initialBorder);
+  const footerBeforeScroll = await searchFooter.boundingBox();
+  await page.locator(".deck-scroll-surface").evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  const footerAfterScroll = await searchFooter.boundingBox();
+  expect(footerBeforeScroll).not.toBeNull();
+  expect(footerAfterScroll).not.toBeNull();
+  expect(Math.abs(footerBeforeScroll!.y - footerAfterScroll!.y)).toBeLessThan(2);
+  await searchFooter.click({ position: { x: 6, y: 6 } });
+  await expect(search).toBeFocused();
+  await page.keyboard.type("gaja codex active");
+  await expect(page.locator("[data-search-status]")).toHaveText("1 match");
+  await search.blur();
+  await searchFooter.click({ position: { x: 6, y: 6 } });
+  await expect(search).toBeFocused();
+  await expect.poll(() => search.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    return [input.selectionStart, input.selectionEnd];
+  })).toEqual([0, 17]);
+  const prioritizedMatch = page.locator('#available-list .available-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"]');
+  await expect(prioritizedMatch).toBeVisible();
+  await expect(prioritizedMatch.locator(".placement-badge")).toHaveText("NOW");
+  await expect(prioritizedMatch.getByRole("button", { name: "Important" })).toBeVisible();
+  await expect(page.locator('#available-list .available-row[data-thread-id="codex:available-1"]')).toBeHidden();
   await page.keyboard.press("Shift+Tab");
   await expect(page.locator(":focus")).toBeVisible();
+});
+
+test("keeps one selected NOW task after sequential Codex-style selections", async ({ page }) => {
+  await page.locator('.thread-row[data-thread-id^="claude:"]').getByRole("button", { name: "Make Now" }).click();
+  await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
+  await expect(page.locator("#focus-list .thread-row.is-current")).toContainText("Review the multi-agent adapter contract");
+
+  await page.locator('.thread-row[data-thread-id^="codex:"]').getByRole("button", { name: "Make Now" }).click();
+  await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
+  await expect(page.locator("#focus-list .thread-row.is-current")).toContainText("Ship the Gaja source release");
+  await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
 });
 
 test("passes automated accessibility checks in expanded and collapsed states", async ({ page }) => {
@@ -174,6 +264,7 @@ test("passes automated accessibility checks in expanded and collapsed states", a
   const collapsed = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(collapsed.violations.filter((violation) => ["critical", "serious"].includes(violation.impact ?? ""))).toEqual([]);
 
+  await page.getByRole("button", { name: "Open Gaja settings" }).click();
   for (const [theme, appearance] of [["Native", "Light"], ["Native", "Dark"], ["Focus Deck", "Light"], ["Focus Deck", "Dark"]] as const) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("button", { name: appearance, exact: true }).click();
@@ -191,6 +282,7 @@ test("reflows without horizontal overflow and records light, dark, and forced-co
   await expect(page.locator(".thread-heading-line > a").first()).toHaveCSS("color", "rgb(245, 245, 247)");
   await page.screenshot({ path: path.join(evidenceDirectory, "gajendra-dark-reduced-motion.png"), fullPage: true });
 
+  await page.getByRole("button", { name: "Open Gaja settings" }).click();
   await page.getByRole("button", { name: "Focus Deck", exact: true }).click();
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page.screenshot({ path: path.join(evidenceDirectory, "gajendra-focus-deck-dark.png"), fullPage: true });

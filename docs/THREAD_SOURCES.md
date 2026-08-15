@@ -2,6 +2,10 @@
 
 Current Gaja source includes four built-in adapters and a conservative JSON-catalog adapter for other AI agents. Gajendra names remain in configuration paths and environment variables for compatibility.
 
+The Running view is deliberately conservative and inclusive. A thread enters it only when its source emits an explicit active/running-equivalent status, and it remains visible there even when it is also NOW, Focus, or Important. The current Claude Code and Grok Build metadata adapters emit `resumable`, so Gaja does not claim those sessions are running. Cursor JSON and configured catalogs can participate when they supply an explicit status.
+
+Codex app-server reports desktop-owned threads as `notLoaded` to a separate client. On macOS, Gaja therefore performs a best-effort metadata-only enrichment: it finds held files in `~/.codex/thread-writer-locks`, validates the matching rollout path remains under `~/.codex/sessions`, reads at most the final 256 KiB, and treats a lifecycle tail after the last `task_complete` marker as active. It never emits or persists rollout content. If the lock, path, lifecycle marker, or `/usr/sbin/lsof` probe is unavailable, Gaja keeps the app-server status rather than guessing from recency.
+
 ## Built-in sources
 
 - Codex is enabled by default and uses the local app-server.
@@ -68,4 +72,4 @@ Every catalog thread must declare at least one resumable destination. Instead of
 
 Use `resumeCommand` as that field name inside the thread object. There is no shell-string or `eval` field. Review catalog commands before enabling the source: the user who configures them is granting execution authority to that executable and argument list.
 
-Set `GAJENDRA_SOURCES_CONFIG` to test a different configuration file. Catalogs are capped at 2 MiB and 2,000 threads; at most 200 normalized threads per source enter a snapshot.
+Set `GAJENDRA_SOURCES_CONFIG` to test a different configuration file. Catalogs are capped at 2 MiB and 2,000 threads. A snapshot retains the 200 most recent non-running threads per source plus every thread with an explicit running status.

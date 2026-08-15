@@ -4,7 +4,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { parseCursorSessionList, readClaudeThreadMetadata, readGrokThreadMetadata, ThreadSourceRegistry } from "../../src/server/thread-sources.js";
+import { parseCursorSessionList, readClaudeThreadMetadata, readGrokThreadMetadata, selectSourceThreads, ThreadSourceRegistry } from "../../src/server/thread-sources.js";
+import type { AgentThread } from "../../src/shared/contracts.js";
 import type { CodexAppServerClient } from "../../src/server/codex-app-server.js";
 
 const temporaryDirectories: string[] = [];
@@ -14,6 +15,23 @@ afterEach(async () => {
 });
 
 describe("thread source adapters", () => {
+  it("retains every active thread beyond the ordinary 200-thread history window", () => {
+    const threads: AgentThread[] = Array.from({ length: 202 }, (_, index) => ({
+      id: `fixture:${index}`,
+      sourceId: "fixture",
+      sourceName: "Fixture",
+      title: `Thread ${index}`,
+      project: "fixture",
+      updatedAt: 202 - index,
+      status: index === 201 ? "active" : "idle",
+      deepLink: `fixture://threads/${index}`,
+    }));
+
+    const selected = selectSourceThreads(threads);
+    expect(selected).toHaveLength(201);
+    expect(selected).toContainEqual(expect.objectContaining({ id: "fixture:201", status: "active" }));
+  });
+
   it("normalizes Cursor's supported session list into resumable threads", () => {
     const [thread] = parseCursorSessionList("123e4567-e89b-12d3-a456-426614174000  Refactor authentication", "/usr/local/bin/cursor-agent");
     expect(thread).toMatchObject({

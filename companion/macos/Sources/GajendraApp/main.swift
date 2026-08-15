@@ -4,6 +4,32 @@ import Combine
 import ServiceManagement
 import SwiftUI
 
+private final class GajendraOverlayPanel: NSPanel {
+    private let acceptsKeyboardInput: Bool
+
+    init(contentRect: NSRect, acceptsKeyboardInput: Bool) {
+        self.acceptsKeyboardInput = acceptsKeyboardInput
+        super.init(
+            contentRect: contentRect,
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("GajendraOverlayPanel does not support NSCoder initialization")
+    }
+
+    override var canBecomeKey: Bool { acceptsKeyboardInput }
+    override var canBecomeMain: Bool { false }
+}
+
+private final class GajendraFirstMouseHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
 @main
 enum GajendraMenuBarMain {
     @MainActor
@@ -51,30 +77,37 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var workspaceActivationObserver: NSObjectProtocol?
     private var screenParametersObserver: NSObjectProtocol?
-    private var hoverState = GajendraHoverState()
-    private var hideCardWorkItem: DispatchWorkItem?
+    private var cardPresentation = GajendraCardPresentationState()
     private var cardAnimationGeneration = 0
     private var launchAtLoginItem: NSMenuItem?
     private var pillVisibilityItem: NSMenuItem?
+    private var pillAnchorItems: [GajendraPillAnchor: NSMenuItem] = [:]
     private var appearanceCancellable: AnyCancellable?
     private var hoverCardSizeCancellable: AnyCancellable?
+    private var pillAnchorCancellable: AnyCancellable?
     private var pillEditCancellable: AnyCancellable?
+    private var localCardDismissMonitor: Any?
+    private var globalCardDismissMonitor: Any?
     private var localEditDismissMonitor: Any?
     private var globalEditDismissMonitor: Any?
     private var editDismissPollTimer: Timer?
     private var editDismissMouseWasDown = false
     private var pillDragStart: CGPoint?
     private var pillDragPointerStart: CGPoint?
+    private var pillDragDidMove = false
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
     private let pillHiddenKey = "gajendra.pill.hidden"
     private let pillHasCustomOriginKey = "gajendra.pill.has-custom-origin"
     private let pillOriginXKey = "gajendra.pill.origin.x"
     private let pillOriginYKey = "gajendra.pill.origin.y"
+    private let pillScreenNumberKey = "gajendra.pill.screen-number"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        migrateLegacyPillPosition()
         configureApplicationMenu()
         configureAppearance()
+        configurePillPlacement()
         configurePillInteraction()
         configureStatusItem()
         configurePopover()
@@ -87,7 +120,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        hideCardWorkItem?.cancel()
+        removeCardDismissalMonitors()
         removePillEditDismissalMonitors()
         let center = NSWorkspace.shared.notificationCenter
         if let workspaceActivationObserver { center.removeObserver(workspaceActivationObserver) }
@@ -120,10 +153,14 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc
-    private func movePillHere(_ sender: Any?) {
-        UserDefaults.standard.set(false, forKey: pillHasCustomOriginKey)
+    private func selectPillAnchor(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let anchor = GajendraPillAnchor(rawValue: rawValue) else { return }
         UserDefaults.standard.set(false, forKey: pillHiddenKey)
-        showPill(on: preferredScreen())
+        let screen = pillWindow?.screen ?? preferredScreen()
+        storePillScreen(screen)
+        visualSettings.pillAnchor = anchor
+        showPill(on: screen)
         updatePillVisibilityMenuState()
     }
 
@@ -169,6 +206,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func showOrganizer() {
+        dismissPresentedCard(animated: false)
         let window = organizerWindow ?? makeOrganizerWindow()
         organizerWindow = window
         window.makeKeyAndOrderFront(nil)
@@ -178,11 +216,12 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private func showPill(on screen: NSScreen) {
         let panel = pillWindow ?? makePillPanel()
         pillWindow = panel
-        let origin = storedPillOrigin() ?? GajendraOverlayPlacement.bottomTrailingOrigin(
+        let targetScreen = storedPillScreen() ?? screen
+        let origin = GajendraOverlayPlacement.origin(
+            for: visualSettings.pillAnchor,
             windowSize: panel.frame.size,
-            visibleFrame: screen.visibleFrame
+            visibleFrame: targetScreen.visibleFrame
         )
-        let targetScreen = screenContaining(origin) ?? screen
         panel.setFrameOrigin(GajendraOverlayPlacement.clampedOrigin(
             windowSize: panel.frame.size,
             proposedOrigin: origin,
@@ -199,7 +238,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     private func hidePill() {
         pillEditController.exit()
-        hideCardImmediately()
+        dismissPresentedCard(animated: false)
         pillWindow?.orderOut(nil)
         UserDefaults.standard.set(true, forKey: pillHiddenKey)
         updatePillVisibilityMenuState()
@@ -216,6 +255,14 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             )
         }
         guard let start = pillDragStart, let pointerStart = pillDragPointerStart else { return }
+        guard pillDragDidMove || GajendraOverlayPlacement.isMeaningfulDrag(translation) else {
+            if ended { resetPillDrag() }
+            return
+        }
+        if !pillDragDidMove {
+            pillDragDidMove = true
+            dismissPresentedCard(animated: false)
+        }
         let proposed = GajendraOverlayPlacement.draggedOrigin(
             startOrigin: start,
             pointerStart: pointerStart,
@@ -231,19 +278,56 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.setFrameOrigin(origin)
         if ended {
-            let defaults = UserDefaults.standard
-            defaults.set(true, forKey: pillHasCustomOriginKey)
-            defaults.set(origin.x, forKey: pillOriginXKey)
-            defaults.set(origin.y, forKey: pillOriginYKey)
-            pillDragStart = nil
-            pillDragPointerStart = nil
+            let anchor = GajendraOverlayPlacement.nearestAnchor(
+                to: origin,
+                windowSize: panel.frame.size,
+                visibleFrame: targetScreen.visibleFrame
+            )
+            storePillScreen(targetScreen)
+            UserDefaults.standard.set(false, forKey: pillHasCustomOriginKey)
+            visualSettings.pillAnchor = anchor
+            panel.setFrameOrigin(GajendraOverlayPlacement.origin(
+                for: anchor,
+                windowSize: panel.frame.size,
+                visibleFrame: targetScreen.visibleFrame
+            ))
+            resetPillDrag()
         }
     }
 
-    private func storedPillOrigin() -> CGPoint? {
+    private func resetPillDrag() {
+        pillDragStart = nil
+        pillDragPointerStart = nil
+        pillDragDidMove = false
+    }
+
+    private func storePillScreen(_ screen: NSScreen) {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else { return }
+        UserDefaults.standard.set(number.intValue, forKey: pillScreenNumberKey)
+    }
+
+    private func storedPillScreen() -> NSScreen? {
+        guard let stored = UserDefaults.standard.object(forKey: pillScreenNumberKey) as? NSNumber else { return nil }
+        return NSScreen.screens.first { screen in
+            (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.intValue == stored.intValue
+        }
+    }
+
+    private func migrateLegacyPillPosition() {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: pillHasCustomOriginKey) else { return nil }
-        return CGPoint(x: defaults.double(forKey: pillOriginXKey), y: defaults.double(forKey: pillOriginYKey))
+        guard defaults.bool(forKey: pillHasCustomOriginKey) else { return }
+        let origin = CGPoint(
+            x: defaults.double(forKey: pillOriginXKey),
+            y: defaults.double(forKey: pillOriginYKey)
+        )
+        let screen = screenContaining(origin) ?? preferredScreen()
+        visualSettings.pillAnchor = GajendraOverlayPlacement.nearestAnchor(
+            to: origin,
+            windowSize: pillSize,
+            visibleFrame: screen.visibleFrame
+        )
+        storePillScreen(screen)
+        defaults.set(false, forKey: pillHasCustomOriginKey)
     }
 
     private func screenContaining(_ origin: CGPoint) -> NSScreen? {
@@ -252,49 +336,30 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setPillHovered(_ hovered: Bool) {
-        let enteredPill = hoverState.setPillHovered(hovered)
-        if enteredPill && !pillEditController.isEditing { model.refresh() }
-        updateCardPresentation()
-    }
-
-    private func setCardHovered(_ hovered: Bool) {
-        hoverState.setCardHovered(hovered)
-        updateCardPresentation()
-    }
-
-    private func activatePill() {
+    private func toggleCardFromPill() {
         guard !pillEditController.isEditing else { return }
-        hideCardWorkItem?.cancel()
-        if cardWindow?.isVisible == true {
+        if cardPresentation.toggle() {
+            model.refresh()
+            showCard()
+            installCardDismissalMonitors()
+        } else {
+            removeCardDismissalMonitors()
+            hideCard()
+        }
+    }
+
+    private func dismissPresentedCard(animated: Bool = true) {
+        guard cardPresentation.dismiss() else { return }
+        removeCardDismissalMonitors()
+        if animated {
             hideCard()
         } else {
-            showCard()
-        }
-    }
-
-    private func updateCardPresentation() {
-        hideCardWorkItem?.cancel()
-        if pillEditController.isEditing {
             hideCardImmediately()
-            return
         }
-        if hoverState.wantsCardVisible {
-            showCard()
-            return
-        }
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self, !self.hoverState.wantsCardVisible else { return }
-            self.hideCard()
-        }
-        hideCardWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: workItem)
     }
 
     private func showCard() {
         guard !pillEditController.isEditing else { return }
-        hideCardWorkItem?.cancel()
         let panel = cardWindow ?? makeCardPanel()
         let wasVisible = panel.isVisible
         cardWindow = panel
@@ -313,7 +378,6 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
                 panel.animator().alphaValue = 1
             }
         }
-        if !wasVisible && !hoverState.pillHovered { model.refresh() }
     }
 
     private func hideCard() {
@@ -333,7 +397,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 guard let self, let panel,
                       generation == self.cardAnimationGeneration,
-                      !self.hoverState.wantsCardVisible else { return }
+                      !self.cardPresentation.isPresented else { return }
                 panel.orderOut(nil)
                 panel.alphaValue = 1
             }
@@ -341,10 +405,54 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func hideCardImmediately() {
-        hideCardWorkItem?.cancel()
         cardAnimationGeneration += 1
         cardWindow?.orderOut(nil)
         cardWindow?.alphaValue = 1
+    }
+
+    private func installCardDismissalMonitors() {
+        removeCardDismissalMonitors()
+        let localEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown, .keyDown]
+        localCardDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: localEvents) { [weak self] event in
+            if event.type == .keyDown, event.keyCode == 53 {
+                self?.dismissPresentedCard()
+                return nil
+            }
+            if self?.eventTargetsPresentedSurface(event) != true {
+                self?.dismissPresentedCard()
+            }
+            return event
+        }
+        let pointerEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        globalCardDismissMonitor = NSEvent.addGlobalMonitorForEvents(matching: pointerEvents) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.dismissCardIfOutside()
+            }
+        }
+    }
+
+    private func removeCardDismissalMonitors() {
+        if let localCardDismissMonitor { NSEvent.removeMonitor(localCardDismissMonitor) }
+        if let globalCardDismissMonitor { NSEvent.removeMonitor(globalCardDismissMonitor) }
+        localCardDismissMonitor = nil
+        globalCardDismissMonitor = nil
+    }
+
+    private func eventTargetsPresentedSurface(_ event: NSEvent) -> Bool {
+        if event.window === cardWindow || event.window === pillWindow { return true }
+        return pointTargetsPresentedSurface(NSEvent.mouseLocation)
+    }
+
+    private func pointTargetsPresentedSurface(_ point: CGPoint) -> Bool {
+        pillWindow?.frame.contains(point) == true || cardWindow?.frame.contains(point) == true
+    }
+
+    private func dismissCardIfOutside() {
+        if !pointTargetsPresentedSurface(NSEvent.mouseLocation) { dismissPresentedCard() }
+    }
+
+    private func focusCardSearch() {
+        cardWindow?.makeKey()
     }
 
     private func positionCard() {
@@ -353,27 +461,39 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             GajendraOverlayPlacement.cardOrigin(
                 cardSize: cardWindow.frame.size,
                 pillFrame: pillWindow.frame,
-                visibleFrame: screen.visibleFrame
+                visibleFrame: screen.visibleFrame,
+                anchor: visualSettings.pillAnchor
             )
         )
     }
 
     private func resizeCard(for screen: NSScreen, animated: Bool) {
         guard let panel = cardWindow else { return }
-        let targetSize = GajendraHoverCardSizing.size(
+        let preferredSize = GajendraHoverCardSizing.size(
             for: visualSettings.hoverCardSize,
             visibleFrame: screen.visibleFrame
         )
-        panel.contentMaxSize = NSSize(
-            width: max(320, screen.visibleFrame.width - 24),
-            height: max(360, screen.visibleFrame.height - 24)
+        let maximumSize = GajendraOverlayPlacement.cardMaximumSize(
+            for: visualSettings.pillAnchor,
+            pillSize: pillSize,
+            visibleFrame: screen.visibleFrame
         )
+        let targetSize = NSSize(
+            width: min(preferredSize.width, maximumSize.width),
+            height: min(preferredSize.height, maximumSize.height)
+        )
+        panel.contentMinSize = NSSize(
+            width: min(320, maximumSize.width),
+            height: min(360, maximumSize.height)
+        )
+        panel.contentMaxSize = maximumSize
         guard panel.frame.size != targetSize else { return }
         let targetOrigin = pillWindow.map {
             GajendraOverlayPlacement.cardOrigin(
                 cardSize: targetSize,
                 pillFrame: $0.frame,
-                visibleFrame: screen.visibleFrame
+                visibleFrame: screen.visibleFrame,
+                anchor: visualSettings.pillAnchor
             )
         } ?? panel.frame.origin
         let targetFrame = NSRect(origin: targetOrigin, size: targetSize)
@@ -405,14 +525,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         organizerItem.target = self
         appMenu.addItem(organizerItem)
 
-        let moveItem = NSMenuItem(
-            title: "Move Gaja Lotus Here",
-            action: #selector(movePillHere(_:)),
-            keyEquivalent: "m"
-        )
-        moveItem.keyEquivalentModifierMask = [.command, .shift]
-        moveItem.target = self
-        appMenu.addItem(moveItem)
+        let positionItem = NSMenuItem(title: "Lotus Position", action: nil, keyEquivalent: "")
+        let positionMenu = NSMenu(title: "Lotus Position")
+        for anchor in GajendraPillAnchor.allCases {
+            let item = NSMenuItem(
+                title: anchor.title,
+                action: #selector(selectPillAnchor(_:)),
+                keyEquivalent: ""
+            )
+            item.target = self
+            item.representedObject = anchor.rawValue
+            pillAnchorItems[anchor] = item
+            positionMenu.addItem(item)
+        }
+        positionItem.submenu = positionMenu
+        appMenu.addItem(positionItem)
 
         let visibilityItem = NSMenuItem(
             title: "Hide Gaja Lotus",
@@ -441,6 +568,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         launchAtLoginItem = loginItem
         appMenu.addItem(loginItem)
         appMenu.addItem(.separator())
+        let uninstallItem = NSMenuItem(
+            title: "Uninstall Gaja…",
+            action: #selector(requestUninstallFromMenu(_:)),
+            keyEquivalent: ""
+        )
+        uninstallItem.target = self
+        appMenu.addItem(uninstallItem)
         appMenu.addItem(
             withTitle: "Quit Gaja",
             action: #selector(NSApplication.terminate(_:)),
@@ -449,10 +583,59 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         appMenuItem.submenu = appMenu
         NSApplication.shared.mainMenu = mainMenu
         updatePillVisibilityMenuState()
+        updatePillAnchorMenuState()
     }
 
     private func updatePillVisibilityMenuState() {
         pillVisibilityItem?.title = pillWindow?.isVisible == true ? "Hide Gaja Lotus" : "Show Gaja Lotus"
+    }
+
+    private func updatePillAnchorMenuState() {
+        for (anchor, item) in pillAnchorItems {
+            item.state = anchor == visualSettings.pillAnchor ? .on : .off
+        }
+    }
+
+    @objc
+    private func requestUninstallFromMenu(_ sender: Any?) {
+        requestUninstall()
+    }
+
+    private func requestUninstall() {
+        NSApplication.shared.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Uninstall Gaja?"
+        alert.informativeText = "This moves the Gajendra app to Trash and stops Launch at Login. Your local priority metadata and provider threads are retained."
+        alert.addButton(withTitle: "Move App to Trash")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let appURL = Bundle.main.bundleURL.standardizedFileURL
+        guard Bundle.main.bundleIdentifier == "dev.sid.gajendra", appURL.pathExtension == "app" else {
+            showUninstallError("Gaja must be running from its installed app bundle before it can uninstall itself.")
+            return
+        }
+
+        do {
+            let loginService = SMAppService.mainApp
+            if loginService.status == .enabled || loginService.status == .requiresApproval {
+                try loginService.unregister()
+            }
+            try FileManager.default.trashItem(at: appURL, resultingItemURL: nil)
+            NSApplication.shared.terminate(nil)
+        } catch {
+            showUninstallError(error.localizedDescription)
+        }
+    }
+
+    private func showUninstallError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = "Gaja Could Not Be Uninstalled"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func configureAppearance() {
@@ -468,19 +651,39 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             }
     }
 
+    private func configurePillPlacement() {
+        pillAnchorCancellable = visualSettings.$pillAnchor
+            .removeDuplicates()
+            .sink { [weak self] anchor in
+                guard let self else { return }
+                self.updatePillAnchorMenuState()
+                guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey),
+                      let panel = self.pillWindow else { return }
+                let screen = panel.screen ?? self.preferredScreen()
+                self.dismissPresentedCard(animated: false)
+                panel.setFrameOrigin(GajendraOverlayPlacement.origin(
+                    for: anchor,
+                    windowSize: panel.frame.size,
+                    visibleFrame: screen.visibleFrame
+                ))
+                if self.cardWindow?.isVisible == true {
+                    self.resizeCard(for: screen, animated: false)
+                    self.positionCard()
+                }
+            }
+    }
+
     private func configurePillInteraction() {
         pillEditCancellable = pillEditController.$isEditing
             .removeDuplicates()
             .sink { [weak self] isEditing in
                 guard let self else { return }
-                self.pillDragStart = nil
-                self.pillDragPointerStart = nil
+                self.resetPillDrag()
                 if isEditing {
-                    self.hideCardImmediately()
+                    self.dismissPresentedCard(animated: false)
                     self.installPillEditDismissalMonitors()
                 } else {
                     self.removePillEditDismissalMonitors()
-                    self.updateCardPresentation()
                 }
             }
     }
@@ -589,17 +792,18 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func makePillPanel() -> NSPanel {
-        let panel = makeOverlayPanel(title: "Gaja Focus Pill", size: pillSize)
+        let panel = makeOverlayPanel(title: "Gaja Focus Pill", size: pillSize, acceptsKeyboardInput: false)
         panel.setAccessibilityLabel("Gaja focus pill")
-        panel.contentViewController = NSHostingController(
+        panel.contentView = GajendraFirstMouseHostingView(
             rootView: GajendraPillView(
                 model: model,
                 visualSettings: visualSettings,
                 editController: pillEditController,
-                onHoverChanged: { [weak self] hovered in self?.setPillHovered(hovered) },
-                onActivate: { [weak self] in self?.activatePill() },
+                onActivate: { [weak self] in self?.toggleCardFromPill() },
+                onOpenOrganizer: { [weak self] in self?.showOrganizer() },
                 onDragChanged: { [weak self] translation, ended in self?.handlePillDrag(translation: translation, ended: ended) },
-                onHide: { [weak self] in self?.hidePill() }
+                onHide: { [weak self] in self?.hidePill() },
+                onRequestUninstall: { [weak self] in self?.requestUninstall() }
             )
         )
         panel.setContentSize(pillSize)
@@ -608,35 +812,43 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
 
     private func makeCardPanel() -> NSPanel {
         let screen = pillWindow?.screen ?? preferredScreen()
-        let cardSize = GajendraHoverCardSizing.size(
+        let preferredSize = GajendraHoverCardSizing.size(
             for: visualSettings.hoverCardSize,
             visibleFrame: screen.visibleFrame
         )
-        let panel = makeOverlayPanel(title: "Gaja Details", size: cardSize)
-        panel.contentMinSize = NSSize(width: 320, height: 360)
-        panel.contentMaxSize = NSSize(
-            width: max(320, screen.visibleFrame.width - 24),
-            height: max(360, screen.visibleFrame.height - 24)
+        let maximumSize = GajendraOverlayPlacement.cardMaximumSize(
+            for: visualSettings.pillAnchor,
+            pillSize: pillSize,
+            visibleFrame: screen.visibleFrame
         )
+        let cardSize = NSSize(
+            width: min(preferredSize.width, maximumSize.width),
+            height: min(preferredSize.height, maximumSize.height)
+        )
+        let panel = makeOverlayPanel(title: "Gaja Details", size: cardSize, acceptsKeyboardInput: true)
+        panel.contentMinSize = NSSize(
+            width: min(320, maximumSize.width),
+            height: min(360, maximumSize.height)
+        )
+        panel.contentMaxSize = maximumSize
         panel.setAccessibilityLabel("Gaja priority details")
         panel.contentViewController = NSHostingController(
             rootView: GajendraHoverCardView(
                 model: model,
                 visualSettings: visualSettings,
-                onHoverChanged: { [weak self] hovered in self?.setCardHovered(hovered) },
-                onOpenOrganizer: { [weak self] in self?.showOrganizer() }
+                onOpenOrganizer: { [weak self] in self?.showOrganizer() },
+                onDismiss: { [weak self] in self?.dismissPresentedCard() },
+                onSearchFocusRequested: { [weak self] in self?.focusCardSearch() }
             )
         )
         panel.setContentSize(cardSize)
         return panel
     }
 
-    private func makeOverlayPanel(title: String, size: NSSize) -> NSPanel {
-        let panel = NSPanel(
+    private func makeOverlayPanel(title: String, size: NSSize, acceptsKeyboardInput: Bool) -> NSPanel {
+        let panel = GajendraOverlayPanel(
             contentRect: NSRect(origin: .zero, size: size),
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+            acceptsKeyboardInput: acceptsKeyboardInput
         )
         panel.title = title
         panel.setContentSize(size)
