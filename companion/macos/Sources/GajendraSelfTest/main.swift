@@ -10,6 +10,84 @@ enum GajendraSelfTest {
         try require(snapshot.current?.deepLink == "codex://threads/focus-1", "deep link changed")
         try require(snapshot.current?.context == .design, "thread context did not decode")
         try require(snapshot.sources.count == 2, "thread sources did not decode")
+        try require(DeckThread.isRunningStatus("active"), "active provider status must be treated as running")
+        try require(DeckThread.isRunningStatus("in-progress"), "normalized in-progress status must be treated as running")
+        try require(!DeckThread.isRunningStatus("resumable"), "resumable metadata must not be inferred as running")
+        try require(!DeckThread.isRunningStatus("notLoaded"), "unloaded provider metadata must not be inferred as running")
+        let activeNow = DeckThread(
+            id: "codex:focus-1", sourceId: "codex", sourceName: "Codex", title: "Current", project: "Fixture",
+            updatedAt: 4, status: "active", level: .focus, isCurrent: true, deepLink: "codex://threads/focus-1"
+        )
+        let activeImportant = DeckThread(
+            id: "cursor:important-1", sourceId: "cursor", sourceName: "Cursor", title: "Important active", project: "Fixture",
+            updatedAt: 3, status: "running", level: .important, isCurrent: false, deepLink: "cursor://threads/important-1"
+        )
+        let activeAvailable = DeckThread(
+            id: "claude:available-1", sourceId: "claude", sourceName: "Claude", title: "Available active", project: "Fixture",
+            updatedAt: 2, status: "working", level: nil, isCurrent: false, deepLink: "claude://threads/available-1"
+        )
+        let inclusiveSnapshot = DeckSnapshot(
+            generatedAt: snapshot.generatedAt,
+            current: activeNow,
+            focus: [activeNow],
+            important: [activeImportant],
+            available: [activeAvailable],
+            collapsed: snapshot.collapsed,
+            focusGuide: snapshot.focusGuide,
+            focusOverGuide: false,
+            staleEntryCount: 0,
+            source: snapshot.source,
+            sources: snapshot.sources,
+            error: nil
+        )
+        try require(
+            inclusiveSnapshot.runningThreads.map(\.id) == [activeNow.id, activeImportant.id, activeAvailable.id],
+            "Running must include NOW, Important, and unprioritized active threads"
+        )
+        try require(inclusiveSnapshot.searchThreads("cursor").map(\.id) == [activeImportant.id], "global thread search must match providers")
+        try require(inclusiveSnapshot.searchThreads("active cursor").map(\.id) == [activeImportant.id], "global thread search must match every metadata term")
+        let duplicateFocusCurrent = DeckThread(
+            id: activeImportant.id,
+            sourceId: activeImportant.sourceId,
+            sourceName: activeImportant.sourceName,
+            title: activeImportant.title,
+            project: activeImportant.project,
+            updatedAt: activeImportant.updatedAt,
+            status: activeImportant.status,
+            level: .focus,
+            isCurrent: true,
+            deepLink: activeImportant.deepLink
+        )
+        let duplicateImportantCurrent = DeckThread(
+            id: activeAvailable.id,
+            sourceId: activeAvailable.sourceId,
+            sourceName: activeAvailable.sourceName,
+            title: activeAvailable.title,
+            project: activeAvailable.project,
+            updatedAt: activeAvailable.updatedAt,
+            status: activeAvailable.status,
+            level: .important,
+            isCurrent: true,
+            deepLink: activeAvailable.deepLink
+        )
+        let malformedSelection = DeckSnapshot(
+            generatedAt: snapshot.generatedAt,
+            current: activeNow,
+            focus: [activeNow, duplicateFocusCurrent],
+            important: [duplicateImportantCurrent],
+            available: [],
+            collapsed: snapshot.collapsed,
+            focusGuide: snapshot.focusGuide,
+            focusOverGuide: false,
+            staleEntryCount: 0,
+            source: snapshot.source,
+            sources: snapshot.sources,
+            error: nil
+        )
+        try require(
+            (malformedSelection.focus + malformedSelection.important).filter(\.isCurrent).map(\.id) == [activeNow.id],
+            "snapshot normalization must keep exactly one selected NOW task"
+        )
         try require(
             snapshot.available.first?.resumeCommand
                 == ResumeCommand(executable: "/usr/local/bin/claude", arguments: ["--resume", "claude-1"], cwd: "/tmp/project"),
@@ -35,6 +113,58 @@ enum GajendraSelfTest {
             visibleFrame: visibleFrame
         )
         try require(pillOrigin == CGPoint(x: 1434, y: 43), "pill placement changed")
+        let expectedAnchorOrigins: [GajendraPillAnchor: CGPoint] = [
+            .topLeading: CGPoint(x: 18, y: 897),
+            .topTrailing: CGPoint(x: 1434, y: 897),
+            .center: CGPoint(x: 726, y: 470),
+            .bottomLeading: CGPoint(x: 18, y: 43),
+            .bottomCenter: CGPoint(x: 726, y: 43),
+            .bottomTrailing: CGPoint(x: 1434, y: 43),
+        ]
+        for anchor in GajendraPillAnchor.allCases {
+            let anchorOrigin = GajendraOverlayPlacement.origin(
+                for: anchor,
+                windowSize: CGSize(width: 60, height: 60),
+                visibleFrame: visibleFrame
+            )
+            try require(anchorOrigin == expectedAnchorOrigins[anchor], "\(anchor.title) hotspot placement changed")
+            let maximumCardSize = GajendraOverlayPlacement.cardMaximumSize(
+                for: anchor,
+                pillSize: CGSize(width: 60, height: 60),
+                visibleFrame: visibleFrame
+            )
+            let cardSize = CGSize(
+                width: min(660, maximumCardSize.width),
+                height: min(610, maximumCardSize.height)
+            )
+            let pillFrame = CGRect(origin: anchorOrigin, size: CGSize(width: 60, height: 60))
+            let anchoredCardOrigin = GajendraOverlayPlacement.cardOrigin(
+                cardSize: cardSize,
+                pillFrame: pillFrame,
+                visibleFrame: visibleFrame,
+                anchor: anchor
+            )
+            try require(
+                !CGRect(origin: anchoredCardOrigin, size: cardSize).intersects(pillFrame),
+                "\(anchor.title) card must open inward without covering the launcher"
+            )
+        }
+        try require(
+            GajendraOverlayPlacement.nearestAnchor(
+                to: CGPoint(x: 710, y: 44),
+                windowSize: CGSize(width: 60, height: 60),
+                visibleFrame: visibleFrame
+            ) == .bottomCenter,
+            "manual movement must snap to the nearest hotspot"
+        )
+        try require(
+            !GajendraOverlayPlacement.isMeaningfulDrag(CGSize(width: 2, height: 3)),
+            "micro movement must not reposition the launcher"
+        )
+        try require(
+            GajendraOverlayPlacement.isMeaningfulDrag(CGSize(width: 6, height: 0)),
+            "an intentional drag must reposition the launcher"
+        )
         let cardOrigin = GajendraOverlayPlacement.cardOrigin(
             cardSize: CGSize(width: 428, height: 326),
             pillFrame: CGRect(origin: pillOrigin, size: CGSize(width: 60, height: 60)),
@@ -47,11 +177,19 @@ enum GajendraSelfTest {
             visibleFrame: CGRect(x: 0, y: 25, width: 1512, height: 950)
         )
         try require(clampedCardOrigin.x == 12, "hover card must stay inside the visible screen")
+        let topPillFrame = CGRect(x: 1_434, y: 907, width: 60, height: 60)
+        let belowTopPillOrigin = GajendraOverlayPlacement.cardOrigin(
+            cardSize: CGSize(width: 660, height: 610),
+            pillFrame: topPillFrame,
+            visibleFrame: visibleFrame
+        )
+        let topCardFrame = CGRect(origin: belowTopPillOrigin, size: CGSize(width: 660, height: 610))
+        try require(!topCardFrame.intersects(topPillFrame), "hover card must move below a top-edge launcher instead of covering it")
         let referenceCardSize = GajendraHoverCardSizing.size(
             for: .comfortable,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
-        try require(referenceCardSize == CGSize(width: 660, height: 500), "14-inch reference card size changed")
+        try require(referenceCardSize == CGSize(width: 660, height: 610), "14-inch reference card size changed")
         let compactCardSize = GajendraHoverCardSizing.size(
             for: .compact,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
@@ -69,6 +207,35 @@ enum GajendraSelfTest {
         try require(
             smallDisplayCardSize.width <= 596 && smallDisplayCardSize.height <= 476,
             "card size must clamp to a small display's visible frame"
+        )
+        let smallVisibleFrame = CGRect(x: 0, y: 0, width: 620, height: 500)
+        let smallCenterPillOrigin = GajendraOverlayPlacement.origin(
+            for: .center,
+            windowSize: CGSize(width: 60, height: 60),
+            visibleFrame: smallVisibleFrame
+        )
+        let smallCenterMaximum = GajendraOverlayPlacement.cardMaximumSize(
+            for: .center,
+            pillSize: CGSize(width: 60, height: 60),
+            visibleFrame: smallVisibleFrame
+        )
+        let smallCenterCardSize = CGSize(
+            width: min(smallDisplayCardSize.width, smallCenterMaximum.width),
+            height: min(smallDisplayCardSize.height, smallCenterMaximum.height)
+        )
+        let smallCenterPillFrame = CGRect(
+            origin: smallCenterPillOrigin,
+            size: CGSize(width: 60, height: 60)
+        )
+        let smallCenterCardOrigin = GajendraOverlayPlacement.cardOrigin(
+            cardSize: smallCenterCardSize,
+            pillFrame: smallCenterPillFrame,
+            visibleFrame: smallVisibleFrame,
+            anchor: .center
+        )
+        try require(
+            !CGRect(origin: smallCenterCardOrigin, size: smallCenterCardSize).intersects(smallCenterPillFrame),
+            "center hotspot must keep the card away from the launcher on a small display"
         )
         let movedPillOrigin = GajendraOverlayPlacement.clampedOrigin(
             windowSize: CGSize(width: 60, height: 60),
@@ -93,22 +260,20 @@ enum GajendraSelfTest {
             globallyDraggedOrigin == CGPoint(x: -790, y: 390),
             "pill drag must use stable global pointer coordinates across displays"
         )
-        var hover = GajendraHoverState()
-        try require(!hover.wantsCardVisible, "card must start hidden")
-        try require(hover.setPillHovered(true), "a new pill hover must request fresh data")
-        try require(hover.wantsCardVisible, "pill hover must reveal the card")
-        try require(!hover.setPillHovered(true), "a continuing pill hover must not duplicate refresh intent")
-        hover.setPillHovered(false)
-        hover.setCardHovered(true)
-        try require(hover.wantsCardVisible, "card hover must keep details visible")
-        hover.setCardHovered(false)
-        try require(!hover.wantsCardVisible, "card must hide after both hover targets exit")
-        try require(hover.setPillHovered(true), "a new hover during the hide grace period must request fresh data")
+        var cardPresentation = GajendraCardPresentationState()
+        try require(!cardPresentation.isPresented, "card must start hidden")
+        try require(cardPresentation.toggle(), "the first icon click must present the card")
+        try require(cardPresentation.isPresented, "the card must stay presented without hover state")
+        try require(!cardPresentation.toggle(), "the second icon click must dismiss the card")
+        try require(!cardPresentation.isPresented, "the card must remain hidden after click dismissal")
+        try require(!cardPresentation.dismiss(), "dismissing an already-hidden card must be idempotent")
+        try require(cardPresentation.toggle(), "the card must reopen on a later click")
+        try require(cardPresentation.dismiss(), "outside click or Escape must dismiss a presented card")
         try await MainActor.run {
             let editController = GajendraPillEditController()
-            try require(!editController.acceptsDrag, "pill drag must be locked before the long-press edit transition")
-            try require(!editController.requestHide(), "pill hide must be locked before the long-press edit transition")
-            editController.enter()
+            try require(!editController.acceptsDrag, "pill drag must be locked before the double-click edit transition")
+            try require(!editController.requestHide(), "pill hide must be locked before the double-click edit transition")
+            editController.toggle()
             try require(
                 !editController.dismissIfOutside(
                     point: CGPoint(x: 25, y: 25),
@@ -151,21 +316,25 @@ enum GajendraSelfTest {
             try require(settings.theme == .nativePopover, "Native Popover must be the default theme")
             try require(settings.appearance == .automatic, "Auto must be the default appearance")
             try require(settings.hoverCardSize == .comfortable, "Comfortable must be the default hover-card size")
+            try require(settings.pillAnchor == .bottomTrailing, "Bottom Right must be the default launcher hotspot")
             settings.theme = .focusDeck
             settings.appearance = .dark
             settings.hoverCardSize = .expanded
+            settings.pillAnchor = .bottomCenter
             settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .focusDeck, "theme choice did not survive reinitialization")
             try require(settings.appearance == .dark, "appearance choice did not survive reinitialization")
             try require(settings.hoverCardSize == .expanded, "hover-card size did not survive reinitialization")
-
+            try require(settings.pillAnchor == .bottomCenter, "launcher hotspot did not survive reinitialization")
             defaults.set("command-capsule", forKey: GajendraVisualSettings.themeKey)
             defaults.set("sepia", forKey: GajendraVisualSettings.appearanceKey)
             defaults.set("cinema", forKey: GajendraVisualSettings.hoverCardSizeKey)
+            defaults.set("floating-middle", forKey: GajendraVisualSettings.pillAnchorKey)
             settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .nativePopover, "invalid theme must fall back safely")
             try require(settings.appearance == .automatic, "invalid appearance must fall back safely")
             try require(settings.hoverCardSize == .comfortable, "invalid hover-card size must fall back safely")
+            try require(settings.pillAnchor == .bottomTrailing, "invalid launcher hotspot must fall back safely")
             try require(GajendraAppearance.automatic.appKitName == nil, "Auto must follow the system appearance")
             try require(GajendraAppearance.light.appKitName == .aqua, "Light must map to Aqua")
             try require(GajendraAppearance.dark.appKitName == .darkAqua, "Dark must map to Dark Aqua")

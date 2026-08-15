@@ -285,10 +285,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path4) {
-  if (!path4)
+function getElementAtPath(obj, path5) {
+  if (!path5)
     return obj;
-  return path4.reduce((acc, key) => acc?.[key], obj);
+  return path5.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -616,11 +616,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path4, issues) {
+function prefixIssues(path5, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path4);
+    iss.path.unshift(path5);
     return iss;
   });
 }
@@ -837,16 +837,16 @@ function flattenError(error51, mapper = (issue2) => issue2.message) {
 }
 function formatError(error51, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error52, path4 = []) => {
+  const processError = (error52, path5 = []) => {
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -873,17 +873,17 @@ function formatError(error51, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error51, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error52, path4 = []) => {
+  const processError = (error52, path5 = []) => {
     var _a3, _b;
     for (const issue2 of error52.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path4, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path4, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
       } else {
-        const fullpath = [...path4, ...issue2.path];
+        const fullpath = [...path5, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -915,8 +915,8 @@ function treeifyError(error51, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path4 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path4) {
+  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path5) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -14346,13 +14346,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path4 = ref.slice(1).split("/").filter(Boolean);
-  if (path4.length === 0) {
+  const path5 = ref.slice(1).split("/").filter(Boolean);
+  if (path5.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path4[0] === defsKey) {
-    const key = path4[1];
+  if (path5[0] === defsKey) {
+    const key = path5[1];
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -18322,8 +18322,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path4) {
-      let input = path4;
+    function removeDotSegments(path5) {
+      let input = path5;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -18575,8 +18575,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path4, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path4 && path4 !== "/" ? path4 : void 0;
+        const [path5, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -22010,7 +22010,7 @@ var require_dist = __commonJS({
 
 // src/server/index.ts
 import { readFile as readFile3 } from "node:fs/promises";
-import path3 from "node:path";
+import path4 from "node:path";
 import { fileURLToPath } from "node:url";
 
 // ../../node_modules/zod/v3/helpers/util.js
@@ -22372,8 +22372,8 @@ function getErrorMap() {
 
 // ../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path4, errorMaps, issueData } = params;
-  const fullPath = [...path4, ...issueData.path || []];
+  const { data, path: path5, errorMaps, issueData } = params;
+  const fullPath = [...path5, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -22488,11 +22488,11 @@ var errorUtil;
 
 // ../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path4, key) {
+  constructor(parent, value, path5, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path4;
+    this._path = path5;
     this._key = key;
   }
   get path() {
@@ -26032,11 +26032,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path4) {
-  if (path4.length === 0) {
+function getDotPath(path5) {
+  if (path5.length === 0) {
     return "object root";
   }
-  return path4.reduce((acc, seg, index) => {
+  return path5.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -31700,6 +31700,18 @@ var StdioServerTransport = class {
 // src/shared/contracts.ts
 var STORE_VERSION = 2;
 var FOCUS_GUIDE = 5;
+var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
+  "active",
+  "busy",
+  "inprogress",
+  "processing",
+  "running",
+  "streaming",
+  "working"
+]);
+function isRunningThreadStatus(status) {
+  return RUNNING_STATUS_KEYS.has(status.toLowerCase().replace(/[^a-z]/gu, ""));
+}
 var DEFAULT_SOURCE_PREFERENCES = {
   codex: true,
   claude: false,
@@ -31936,17 +31948,23 @@ function isMissing(error51) {
 
 // src/server/thread-sources.ts
 import { constants } from "node:fs";
-import { access, open, readdir, readFile as readFile2, stat } from "node:fs/promises";
+import { access, open as open2, readdir, readFile as readFile2, stat as stat2 } from "node:fs/promises";
 import { spawn as spawn2 } from "node:child_process";
-import os2 from "node:os";
-import path2 from "node:path";
+import os3 from "node:os";
+import path3 from "node:path";
 
 // src/server/codex-app-server.ts
 import { spawn } from "node:child_process";
+import { open, stat } from "node:fs/promises";
+import os2 from "node:os";
+import path2 from "node:path";
 import { createInterface } from "node:readline";
+var MAX_ROLLOUT_TAIL_BYTES = 256 * 1024;
+var LSOF_TIMEOUT_MS = 2e3;
 var CodexAppServerClient = class {
-  constructor(requestTimeoutMs = resolveRpcTimeout()) {
+  constructor(requestTimeoutMs = resolveRpcTimeout(), env = process.env) {
     this.requestTimeoutMs = requestTimeoutMs;
+    this.env = env;
   }
   process = null;
   nextId = 1;
@@ -31972,7 +31990,7 @@ var CodexAppServerClient = class {
       if (next) seenCursors.add(next);
       cursor = next;
     } while (cursor);
-    return all;
+    return enrichCodexRuntimeStatuses(all, this.env);
   }
   async close() {
     const active = this.process;
@@ -32071,13 +32089,129 @@ var CodexAppServerClient = class {
 `);
   }
 };
+async function enrichCodexRuntimeStatuses(threads, env = process.env) {
+  if (threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
+  const codexHome = path2.resolve(env.CODEX_HOME ?? path2.join(os2.homedir(), ".codex"));
+  const lockDirectory = path2.join(codexHome, "thread-writer-locks");
+  let heldThreadIds;
+  try {
+    heldThreadIds = heldCodexThreadIds(await listOpenFiles(lockDirectory, env), lockDirectory);
+  } catch {
+    return threads;
+  }
+  if (heldThreadIds.size === 0) return threads;
+  const activeThreadIds = /* @__PURE__ */ new Set();
+  await Promise.all(threads.map(async (thread) => {
+    if (codexStatusType(thread.status) === "active") {
+      activeThreadIds.add(thread.id);
+      return;
+    }
+    if (!heldThreadIds.has(thread.id) || !thread.path || !isCodexRolloutPath(thread.path, codexHome)) return;
+    try {
+      const tail = await readRolloutTail(thread.path);
+      if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) activeThreadIds.add(thread.id);
+    } catch {
+    }
+  }));
+  return threads.map((thread) => activeThreadIds.has(thread.id) ? { ...thread, status: { type: "active" } } : thread);
+}
+function heldCodexThreadIds(output, lockDirectory) {
+  const normalizedDirectory = `${path2.resolve(lockDirectory)}${path2.sep}`;
+  const ids = /* @__PURE__ */ new Set();
+  for (const line of output.split(/\r?\n/u)) {
+    if (!line.startsWith("n")) continue;
+    const filePath = path2.resolve(line.slice(1));
+    if (!filePath.startsWith(normalizedDirectory) || path2.extname(filePath) !== ".lock") continue;
+    const id = path2.basename(filePath, ".lock");
+    if (/^[0-9a-f]{8}-[0-9a-f-]{27}$/iu.test(id)) ids.add(id);
+  }
+  return ids;
+}
+function rolloutTailShowsActiveTurn(tail, truncated = false) {
+  const lines = tail.split(/\r?\n/u);
+  if (truncated) lines.shift();
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]?.trim();
+    if (!line) continue;
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event.type === "event_msg" && event.payload?.type === "task_complete") return false;
+    if (event.type === "session_meta") return false;
+    if (event.type === "turn_context" || event.type === "response_item" || event.type === "event_msg" || event.type === "inter_agent_communication_metadata") {
+      return true;
+    }
+  }
+  return false;
+}
+function codexStatusType(status) {
+  return typeof status === "string" ? status : status?.type ?? "unknown";
+}
+function isCodexRolloutPath(filePath, codexHome) {
+  const resolved = path2.resolve(filePath);
+  const sessions = `${path2.join(codexHome, "sessions")}${path2.sep}`;
+  return resolved.startsWith(sessions) && resolved.endsWith(".jsonl");
+}
+async function readRolloutTail(filePath) {
+  const fileStat = await stat(filePath);
+  const length = Math.min(fileStat.size, MAX_ROLLOUT_TAIL_BYTES);
+  const truncated = fileStat.size > length;
+  const buffer = Buffer.alloc(length);
+  const file2 = await open(filePath, "r");
+  try {
+    await file2.read(buffer, 0, length, fileStat.size - length);
+    return { text: buffer.toString("utf8"), truncated };
+  } finally {
+    await file2.close();
+  }
+}
+function listOpenFiles(lockDirectory, env) {
+  const executable = env.GAJENDRA_LSOF_BIN ?? "/usr/sbin/lsof";
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, ["-Fn", "+D", lockDirectory], {
+      stdio: ["ignore", "pipe", "pipe"],
+      env
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = (error51, value = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error51) reject(error51);
+      else resolve(value);
+    };
+    const timeout = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(new Error(`lsof timed out after ${LSOF_TIMEOUT_MS}ms.`));
+    }, LSOF_TIMEOUT_MS);
+    timeout.unref();
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout = `${stdout}${chunk}`.slice(-512 * 1024);
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr = `${stderr}${chunk}`.slice(-2e3);
+    });
+    child.once("error", (error51) => finish(error51));
+    child.once("exit", (code) => {
+      if (code === 0 || code === 1) finish(null, stdout);
+      else finish(new Error(stderr.trim() || `lsof exited with status ${code ?? "unknown"}.`));
+    });
+  });
+}
 function resolveRpcTimeout(env = process.env) {
   const configured = Number(env.GAJENDRA_RPC_TIMEOUT_MS ?? env.AADI_RPC_TIMEOUT_MS ?? env.PRIORITY_DECK_RPC_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0 ? configured : 15e3;
 }
 
 // src/server/thread-sources.ts
-var MAX_THREADS_PER_SOURCE = 200;
+var MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 var MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 var MAX_GROK_METADATA_BYTES = 128 * 1024;
 var MAX_CATALOG_BYTES = 2 * 1024 * 1024;
@@ -32104,7 +32238,7 @@ var ThreadSourceRegistry = class {
         status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads.")
       };
       try {
-        const threads2 = (await adapter.listThreads()).slice(0, MAX_THREADS_PER_SOURCE);
+        const threads2 = selectSourceThreads(await adapter.listThreads());
         return { threads: threads2, status: statusFor(adapter, "ready", true, threads2.length, null) };
       } catch (error52) {
         const state = error52 instanceof SourceUnavailableError ? error52.state : "error";
@@ -32158,11 +32292,11 @@ var ClaudeThreadSource = class {
   async listThreads() {
     const executable = await resolveExecutable(
       this.env.GAJENDRA_CLAUDE_BIN,
-      [path2.join(os2.homedir(), ".local", "bin", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
+      [path3.join(os3.homedir(), ".local", "bin", "claude"), "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
     );
     if (!executable) throw new SourceUnavailableError("not-installed", "Claude Code CLI was not found.");
-    const configDirectory = path2.resolve(this.env.GAJENDRA_CLAUDE_CONFIG_DIR ?? this.env.CLAUDE_CONFIG_DIR ?? path2.join(os2.homedir(), ".claude"));
-    const projectsDirectory = path2.join(configDirectory, "projects");
+    const configDirectory = path3.resolve(this.env.GAJENDRA_CLAUDE_CONFIG_DIR ?? this.env.CLAUDE_CONFIG_DIR ?? path3.join(os3.homedir(), ".claude"));
+    const projectsDirectory = path3.join(configDirectory, "projects");
     const files = await recentClaudeSessionFiles(projectsDirectory);
     const threads = (await Promise.all(files.map((file2) => readClaudeThreadMetadata(file2, executable)))).filter(isPresent2);
     return threads.sort((left, right) => right.updatedAt - left.updatedAt);
@@ -32179,7 +32313,7 @@ var CursorThreadSource = class {
   async listThreads() {
     const executable = await resolveExecutable(
       this.env.GAJENDRA_CURSOR_BIN,
-      [path2.join(os2.homedir(), ".local", "bin", "cursor-agent"), "/opt/homebrew/bin/cursor-agent", "/usr/local/bin/cursor-agent"]
+      [path3.join(os3.homedir(), ".local", "bin", "cursor-agent"), "/opt/homebrew/bin/cursor-agent", "/usr/local/bin/cursor-agent"]
     );
     if (!executable) throw new SourceUnavailableError("not-installed", "Cursor Agent CLI was not found.");
     return parseCursorSessionList(await collectProcessOutput(executable, ["ls"], this.env), executable);
@@ -32196,11 +32330,11 @@ var GrokThreadSource = class {
   async listThreads() {
     const executable = await resolveExecutable(
       this.env.GAJENDRA_GROK_BIN,
-      [path2.join(os2.homedir(), ".local", "bin", "grok"), "/opt/homebrew/bin/grok", "/usr/local/bin/grok"]
+      [path3.join(os3.homedir(), ".local", "bin", "grok"), "/opt/homebrew/bin/grok", "/usr/local/bin/grok"]
     );
     if (!executable) throw new SourceUnavailableError("not-installed", "Grok Build CLI was not found.");
-    const configDirectory = path2.resolve(this.env.GAJENDRA_GROK_CONFIG_DIR ?? path2.join(os2.homedir(), ".grok"));
-    const summaryFiles = await recentGrokSummaryFiles(path2.join(configDirectory, "sessions"));
+    const configDirectory = path3.resolve(this.env.GAJENDRA_GROK_CONFIG_DIR ?? path3.join(os3.homedir(), ".grok"));
+    const summaryFiles = await recentGrokSummaryFiles(path3.join(configDirectory, "sessions"));
     const threads = (await Promise.all(summaryFiles.map((file2) => readGrokThreadMetadata(file2, executable)))).filter(isPresent2);
     return threads.sort((left, right) => right.updatedAt - left.updatedAt);
   }
@@ -32215,7 +32349,7 @@ var CatalogThreadSource = class {
   kind = "configured";
   enabledByDefault;
   async listThreads() {
-    const catalogStat = await stat(this.catalogPath).catch((error51) => {
+    const catalogStat = await stat2(this.catalogPath).catch((error51) => {
       if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", `Catalog not found: ${this.catalogPath}`);
       throw error51;
     });
@@ -32276,15 +32410,15 @@ async function recentClaudeSessionFiles(projectsDirectory) {
   const files = [];
   for (const project of projects) {
     if (!project.isDirectory()) continue;
-    const directory = path2.join(projectsDirectory, project.name);
+    const directory = path3.join(projectsDirectory, project.name);
     for (const entry of await readdir(directory, { withFileTypes: true })) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
-      const filePath = path2.join(directory, entry.name);
-      const fileStat = await stat(filePath);
+      const filePath = path3.join(directory, entry.name);
+      const fileStat = await stat2(filePath);
       files.push({ path: filePath, modifiedAt: fileStat.mtimeMs });
     }
   }
-  return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((file2) => file2.path);
+  return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((file2) => file2.path);
 }
 async function recentGrokSummaryFiles(sessionsDirectory) {
   let workspaces;
@@ -32294,34 +32428,34 @@ async function recentGrokSummaryFiles(sessionsDirectory) {
     if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
     throw error51;
   }
-  const workspaceDirectories = await Promise.all(workspaces.filter((entry) => entry.isDirectory()).slice(0, MAX_THREADS_PER_SOURCE).map(async (entry) => {
-    const directory = path2.join(sessionsDirectory, entry.name);
-    const directoryStat = await stat(directory);
+  const workspaceDirectories = await Promise.all(workspaces.filter((entry) => entry.isDirectory()).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map(async (entry) => {
+    const directory = path3.join(sessionsDirectory, entry.name);
+    const directoryStat = await stat2(directory);
     return { directory, modifiedAt: directoryStat.mtimeMs };
   }));
   const summaries = [];
   for (const workspace of workspaceDirectories.sort((left, right) => right.modifiedAt - left.modifiedAt)) {
     for (const entry of await readdir(workspace.directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const summaryPath = path2.join(workspace.directory, entry.name, "summary.json");
+      const summaryPath = path3.join(workspace.directory, entry.name, "summary.json");
       try {
-        const summaryStat = await stat(summaryPath);
+        const summaryStat = await stat2(summaryPath);
         if (summaryStat.isFile()) summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
       } catch (error51) {
         if (!isMissing2(error51)) throw error51;
       }
     }
   }
-  return summaries.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((summary) => summary.path);
+  return summaries.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((summary) => summary.path);
 }
 async function readClaudeThreadMetadata(filePath, executable) {
-  const fileStat = await stat(filePath);
-  const file2 = await open(filePath, "r");
+  const fileStat = await stat2(filePath);
+  const file2 = await open2(filePath, "r");
   try {
     const length = Math.min(fileStat.size, MAX_CLAUDE_METADATA_BYTES);
     const buffer = Buffer.alloc(length);
     await file2.read(buffer, 0, length, 0);
-    let sessionId = path2.basename(filePath, ".jsonl");
+    let sessionId = path3.basename(filePath, ".jsonl");
     let cwd = "";
     let title = "";
     let slug = "";
@@ -32358,7 +32492,7 @@ async function readClaudeThreadMetadata(filePath, executable) {
   }
 }
 async function readGrokThreadMetadata(filePath, executable) {
-  const fileStat = await stat(filePath);
+  const fileStat = await stat2(filePath);
   if (fileStat.size > MAX_GROK_METADATA_BYTES) return null;
   let value;
   try {
@@ -32367,7 +32501,7 @@ async function readGrokThreadMetadata(filePath, executable) {
     return null;
   }
   const info = value.info && typeof value.info === "object" ? value.info : {};
-  const sessionId = typeof info.id === "string" ? info.id : typeof value.session_id === "string" ? value.session_id : path2.basename(path2.dirname(filePath));
+  const sessionId = typeof info.id === "string" ? info.id : typeof value.session_id === "string" ? value.session_id : path3.basename(path3.dirname(filePath));
   if (!sessionId) return null;
   const cwd = typeof info.cwd === "string" ? info.cwd : typeof value.cwd === "string" ? value.cwd : "";
   const generatedTitle = typeof value.generated_title === "string" ? value.generated_title : "";
@@ -32448,16 +32582,16 @@ async function loadConfiguredSources(env) {
   }
 }
 function resolveSourcesConfigPath(env = process.env) {
-  if (env.GAJENDRA_SOURCES_CONFIG) return path2.resolve(env.GAJENDRA_SOURCES_CONFIG);
-  if (process.platform === "darwin") return path2.join(os2.homedir(), "Library", "Application Support", "Gajendra", "sources.json");
-  const configHome = env.XDG_CONFIG_HOME ? path2.resolve(env.XDG_CONFIG_HOME) : path2.join(os2.homedir(), ".config");
-  return path2.join(configHome, "gajendra", "sources.json");
+  if (env.GAJENDRA_SOURCES_CONFIG) return path3.resolve(env.GAJENDRA_SOURCES_CONFIG);
+  if (process.platform === "darwin") return path3.join(os3.homedir(), "Library", "Application Support", "Gajendra", "sources.json");
+  const configHome = env.XDG_CONFIG_HOME ? path3.resolve(env.XDG_CONFIG_HOME) : path3.join(os3.homedir(), ".config");
+  return path3.join(configHome, "gajendra", "sources.json");
 }
 function statusFor(adapter, state, enabled, threadCount, detail) {
   return { id: adapter.id, name: adapter.name, kind: adapter.kind, state, enabled, threadCount, detail };
 }
 async function resolveExecutable(explicit, candidates) {
-  const paths = explicit ? [path2.resolve(explicit), ...candidates] : candidates;
+  const paths = explicit ? [path3.resolve(explicit), ...candidates] : candidates;
   for (const candidate of paths) {
     try {
       await access(candidate, constants.X_OK);
@@ -32475,7 +32609,7 @@ function collectProcessOutput(executable, args, env) {
     let stderr = "";
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`${path2.basename(executable)} ${args.join(" ")} timed out.`));
+      reject(new Error(`${path3.basename(executable)} ${args.join(" ")} timed out.`));
     }, 1e4);
     timeout.unref();
     child.stdout.setEncoding("utf8");
@@ -32510,7 +32644,7 @@ function cleanTitle(value) {
 }
 function cleanProject(value) {
   if (!value) return "No project";
-  return cleanTitle(path2.basename(value) || value) || "No project";
+  return cleanTitle(path3.basename(value) || value) || "No project";
 }
 function normalizeTimestamp(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value > 1e10 ? value / 1e3 : value;
@@ -32531,9 +32665,9 @@ function gajendraThreadLink(threadId) {
   return `gajendra://thread/${encodeURIComponent(threadId)}`;
 }
 function expandHome(value) {
-  if (value === "~") return os2.homedir();
-  if (value.startsWith("~/")) return path2.join(os2.homedir(), value.slice(2));
-  return path2.resolve(value);
+  if (value === "~") return os3.homedir();
+  if (value.startsWith("~/")) return path3.join(os3.homedir(), value.slice(2));
+  return path3.resolve(value);
 }
 function deduplicate(threads) {
   const seen = /* @__PURE__ */ new Set();
@@ -32542,6 +32676,12 @@ function deduplicate(threads) {
     seen.add(thread.id);
     return true;
   });
+}
+function selectSourceThreads(threads) {
+  const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
+  const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
+  const background = ordered.filter((thread) => !isRunningThreadStatus(thread.status)).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
+  return [...running, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 function readableError(error51) {
   return error51 instanceof Error ? error51.message : "Thread source failed.";
@@ -32699,11 +32839,11 @@ function toolResult(snapshot) {
   };
 }
 async function loadUiHtml() {
-  const currentDirectory = path3.dirname(fileURLToPath(import.meta.url));
+  const currentDirectory = path4.dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    path3.join(currentDirectory, "gajendra.html"),
-    path3.join(currentDirectory, "..", "dist", "gajendra.html"),
-    path3.join(currentDirectory, "..", "..", "dist", "gajendra.html")
+    path4.join(currentDirectory, "gajendra.html"),
+    path4.join(currentDirectory, "..", "dist", "gajendra.html"),
+    path4.join(currentDirectory, "..", "..", "dist", "gajendra.html")
   ];
   for (const candidate of candidates) {
     try {

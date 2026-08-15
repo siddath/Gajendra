@@ -13,10 +13,11 @@ import type {
   SourceState,
   ThreadSourceStatus,
 } from "../shared/contracts.js";
+import { isRunningThreadStatus } from "../shared/contracts.js";
 import { canonicalThreadId } from "./domain.js";
 import { CodexAppServerClient } from "./codex-app-server.js";
 
-const MAX_THREADS_PER_SOURCE = 200;
+const MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 const MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 const MAX_GROK_METADATA_BYTES = 128 * 1024;
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
@@ -62,7 +63,7 @@ export class ThreadSourceRegistry {
         status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads."),
       };
       try {
-        const threads = (await adapter.listThreads()).slice(0, MAX_THREADS_PER_SOURCE);
+        const threads = selectSourceThreads(await adapter.listThreads());
         return { threads, status: statusFor(adapter, "ready", true, threads.length, null) };
       } catch (error) {
         const state = error instanceof SourceUnavailableError ? error.state : "error";
@@ -260,7 +261,7 @@ async function recentClaudeSessionFiles(projectsDirectory: string): Promise<stri
       files.push({ path: filePath, modifiedAt: fileStat.mtimeMs });
     }
   }
-  return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_THREADS_PER_SOURCE).map((file) => file.path);
+  return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((file) => file.path);
 }
 
 async function recentGrokSummaryFiles(sessionsDirectory: string): Promise<string[]> {
@@ -273,7 +274,7 @@ async function recentGrokSummaryFiles(sessionsDirectory: string): Promise<string
   }
   const workspaceDirectories = await Promise.all(workspaces
     .filter((entry) => entry.isDirectory())
-    .slice(0, MAX_THREADS_PER_SOURCE)
+    .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE)
     .map(async (entry) => {
       const directory = path.join(sessionsDirectory, entry.name);
       const directoryStat = await stat(directory);
@@ -294,7 +295,7 @@ async function recentGrokSummaryFiles(sessionsDirectory: string): Promise<string
   }
   return summaries
     .sort((left, right) => right.modifiedAt - left.modifiedAt)
-    .slice(0, MAX_THREADS_PER_SOURCE)
+    .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE)
     .map((summary) => summary.path);
 }
 
@@ -554,6 +555,15 @@ function deduplicate(threads: AgentThread[]): AgentThread[] {
     seen.add(thread.id);
     return true;
   });
+}
+
+export function selectSourceThreads(threads: AgentThread[]): AgentThread[] {
+  const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
+  const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
+  const background = ordered
+    .filter((thread) => !isRunningThreadStatus(thread.status))
+    .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
+  return [...running, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 function readableError(error: unknown): string {

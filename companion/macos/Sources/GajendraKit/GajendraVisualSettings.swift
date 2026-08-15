@@ -37,6 +37,29 @@ public enum GajendraAppearance: String, CaseIterable, Identifiable, Sendable {
         case .dark: return .darkAqua
         }
     }
+
+}
+
+public enum GajendraPillAnchor: String, CaseIterable, Identifiable, Sendable {
+    case topLeading = "top-left"
+    case topTrailing = "top-right"
+    case center
+    case bottomLeading = "bottom-left"
+    case bottomCenter = "bottom-center"
+    case bottomTrailing = "bottom-right"
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .topLeading: return "Top Left"
+        case .topTrailing: return "Top Right"
+        case .center: return "Center"
+        case .bottomLeading: return "Bottom Left"
+        case .bottomCenter: return "Bottom Center"
+        case .bottomTrailing: return "Bottom Right"
+        }
+    }
 }
 
 public enum GajendraHoverCardSize: String, CaseIterable, Identifiable, Sendable {
@@ -65,11 +88,11 @@ public enum GajendraHoverCardSizing {
         let baseSize: CGSize
         switch preference {
         case .compact:
-            baseSize = CGSize(width: 560, height: 460)
+            baseSize = CGSize(width: 560, height: 570)
         case .comfortable:
-            baseSize = CGSize(width: 660, height: 500)
+            baseSize = CGSize(width: 660, height: 610)
         case .expanded:
-            baseSize = CGSize(width: 760, height: 560)
+            baseSize = CGSize(width: 760, height: 680)
         }
 
         let displayScale = min(
@@ -101,6 +124,7 @@ public final class GajendraVisualSettings: ObservableObject {
     public static let themeKey = "gajendra.visual.theme"
     public static let appearanceKey = "gajendra.visual.appearance"
     public static let hoverCardSizeKey = "gajendra.visual.hover-card-size"
+    public static let pillAnchorKey = "gajendra.visual.pill-anchor"
 
     @Published public var theme: GajendraVisualTheme {
         didSet { persist(theme.rawValue, forKey: Self.themeKey) }
@@ -114,6 +138,10 @@ public final class GajendraVisualSettings: ObservableObject {
         didSet { persist(hoverCardSize.rawValue, forKey: Self.hoverCardSizeKey) }
     }
 
+    @Published public var pillAnchor: GajendraPillAnchor {
+        didSet { persist(pillAnchor.rawValue, forKey: Self.pillAnchorKey) }
+    }
+
     private let defaults: UserDefaults?
 
     public init(defaults: UserDefaults = .standard) {
@@ -121,17 +149,20 @@ public final class GajendraVisualSettings: ObservableObject {
         theme = GajendraVisualTheme(rawValue: defaults.string(forKey: Self.themeKey) ?? "") ?? .nativePopover
         appearance = GajendraAppearance(rawValue: defaults.string(forKey: Self.appearanceKey) ?? "") ?? .automatic
         hoverCardSize = GajendraHoverCardSize(rawValue: defaults.string(forKey: Self.hoverCardSizeKey) ?? "") ?? .comfortable
+        pillAnchor = GajendraPillAnchor(rawValue: defaults.string(forKey: Self.pillAnchorKey) ?? "") ?? .bottomTrailing
     }
 
     public init(
         theme: GajendraVisualTheme,
         appearance: GajendraAppearance,
-        hoverCardSize: GajendraHoverCardSize = .comfortable
+        hoverCardSize: GajendraHoverCardSize = .comfortable,
+        pillAnchor: GajendraPillAnchor = .bottomTrailing
     ) {
         defaults = nil
         self.theme = theme
         self.appearance = appearance
         self.hoverCardSize = hoverCardSize
+        self.pillAnchor = pillAnchor
     }
 
     private func persist(_ value: String, forKey key: String) {

@@ -7,6 +7,11 @@ public struct DeckContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @State private var search = ""
+    @State private var isNowHovered = false
+    @State private var isSearchHovered = false
+    @State private var isRunningHeaderHovered = false
+    @State private var isRunningExpanded = true
+    @State private var searchFocused = false
     private let usesScrollView: Bool
     private let isPreview: Bool
 
@@ -30,13 +35,22 @@ public struct DeckContentView: View {
             }
             if let snapshot = model.snapshot {
                 if usesScrollView {
-                    ScrollView {
-                        deckSections(snapshot)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            deckSections(snapshot)
+                        }
+                        .onChange(of: search) { value in
+                            guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                            withAnimation(deckAnimation) {
+                                proxy.scrollTo("gajendra-organizer-search-results", anchor: .top)
+                            }
+                        }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     deckSections(snapshot)
                 }
+                organizerSearchFooter(snapshot: snapshot)
             } else if model.isLoading {
                 HStack {
                     Spacer()
@@ -74,7 +88,9 @@ public struct DeckContentView: View {
     }
 
     private func deckSections(_ snapshot: DeckSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let running = snapshot.runningThreads
+        let recent = snapshot.available.filter { !$0.isRunning }
+        return VStack(alignment: .leading, spacing: 12) {
             sourceStrip(snapshot.sources)
             nowCard(snapshot.current)
             prioritySection(
@@ -89,35 +105,48 @@ public struct DeckContentView: View {
                 threads: snapshot.important,
                 collapsed: snapshot.collapsed.important
             )
-            availableSection(snapshot.available)
+            runningSection(running)
+            availableSection(snapshot: snapshot, recent: recent)
+                .id("gajendra-organizer-search-results")
         }
     }
 
     private var header: some View {
-        HStack(spacing: 10) {
-            GajendraMark(size: 24)
-            VStack(alignment: .leading, spacing: 1) {
+        ZStack(alignment: .center) {
+            VStack(alignment: .center, spacing: 1) {
                 Text("Gaja")
                     .font(.headline)
                 Text("Elephant Focus for AI Power Users")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            Spacer()
-            if model.isLoading {
-                Text("Refreshing")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            HStack(spacing: 10) {
+                GajendraMark(size: 34)
+                    .frame(width: 42, height: 42)
+
+                Spacer(minLength: 12)
+
+                HStack(spacing: 5) {
+                    if model.isLoading {
+                        Text("Refreshing")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    refreshButton
+                    if isPreview {
+                        settingsIcon
+                    } else {
+                        visualSettingsMenu
+                    }
+                }
+                .fixedSize()
             }
-            if isPreview {
-                Image(systemName: "paintpalette")
-                    .frame(width: 20, height: 20)
-                    .foregroundStyle(.secondary)
-            } else {
-                visualSettingsMenu
-            }
-            refreshButton
         }
+        .frame(height: 42, alignment: .center)
     }
 
     private var visualSettingsMenu: some View {
@@ -139,20 +168,29 @@ public struct DeckContentView: View {
                     Text(size.title).tag(size)
                 }
             }
-        } label: {
-            HStack(spacing: 5) {
-                Image(systemName: "paintpalette")
-                Text(visualSettings.theme.title)
-                    .font(.caption.weight(.medium))
-                    .lineLimit(1)
+            Divider()
+            Picker("Lotus position", selection: $visualSettings.pillAnchor) {
+                ForEach(GajendraPillAnchor.allCases) { anchor in
+                    Text(anchor.title).tag(anchor)
+                }
             }
-            .frame(height: 20)
-            .contentShape(Rectangle())
+        } label: {
+            settingsIcon
         }
+        .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("Theme, appearance, and hover-card size")
-        .accessibilityLabel("Theme, appearance, and hover-card size")
+        .help("Gaja settings")
+        .accessibilityLabel("Open Gaja settings")
+        .accessibilityHint("Choose theme, appearance, card size, or lotus position")
+    }
+
+    private var settingsIcon: some View {
+        Image(systemName: "gearshape")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.secondary)
+            .frame(width: 28, height: 28)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     @ViewBuilder
@@ -250,6 +288,8 @@ public struct DeckContentView: View {
                         Text(current.title)
                             .font(.title3.weight(.semibold))
                             .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         HStack(spacing: 6) {
                             Text(current.project)
                                 .font(.caption)
@@ -257,23 +297,30 @@ public struct DeckContentView: View {
                             if let context = current.context {
                                 contextBadge(context)
                             }
-                            Button {
-                                model.open(current)
-                            } label: {
-                                sourceBadge(current)
-                            }
-                            .buttonStyle(.plain)
-                            .help("Open \(current.title) in \(current.sourceName)")
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Button("Open thread") {
-                        model.open(current)
+                    HStack(spacing: 8) {
+                        Button("Open thread") {
+                            model.open(current)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.accentColor)
+                        .keyboardShortcut(.return, modifiers: [])
+                        .fixedSize()
+
+                        executionSignal(current)
+
+                        Button {
+                            model.open(current)
+                        } label: {
+                            sourceBadge(current)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Open \(current.title) in \(current.sourceName)")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.accentColor)
-                    .keyboardShortcut(.return, modifiers: [])
                     .fixedSize()
                 }
             } else {
@@ -284,15 +331,50 @@ public struct DeckContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(nowSurfaceColor)
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(nowSurfaceColor)
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isNowHovered ? Color.primary.opacity(0.055) : Color.clear)
+            }
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(nowBorderColor, lineWidth: visualSettings.theme == .focusDeck ? 1.25 : 1)
+                .stroke(
+                    isNowHovered ? Color.gajendraAccent(for: colorScheme).opacity(0.8) : nowBorderColor,
+                    lineWidth: isNowHovered ? 1.5 : (visualSettings.theme == .focusDeck ? 1.25 : 1)
+                )
         )
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .onHover { isNowHovered = $0 }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isNowHovered)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(current == nil ? "No current NOW task" : "Current NOW task")
+    }
+
+    private func executionSignal(_ thread: DeckThread) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: thread.isRunning ? "waveform" : "clock")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(thread.isRunning ? Color.green : Color.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(thread.isRunning ? "Running now" : "Ready to resume")
+                    .font(.caption.weight(.semibold))
+                Text(isPreview ? "Updated recently" : relativeUpdateText(thread.updatedAt))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(thread.isRunning ? Color.green.opacity(0.3) : Color.secondary.opacity(0.16), lineWidth: 0.75)
+        )
+        .fixedSize()
+        .help("Provider status: \(thread.status)")
+        .accessibilityElement(children: .combine)
     }
 
     private func prioritySection(
@@ -500,26 +582,149 @@ public struct DeckContentView: View {
         .foregroundStyle(.secondary)
     }
 
-    private func availableSection(_ available: [DeckThread]) -> some View {
-        let normalizedQuery = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let matches = available.filter { thread in
-            normalizedQuery.isEmpty || thread.title.lowercased().contains(normalizedQuery) || thread.project.lowercased().contains(normalizedQuery) || thread.sourceName.lowercased().contains(normalizedQuery)
-        }
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("Add from recent threads")
-                .font(.subheadline.weight(.semibold))
-            if isPreview {
-                Text("Search threads, projects, or agents")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
-                    .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+    private func runningSection(_ threads: [DeckThread]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if threads.isEmpty {
+                runningSectionHeader(count: 0, expanded: false)
             } else {
-                TextField("Search threads, projects, or agents", text: $search)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel("Search recent AI-agent threads")
+                Button {
+                    withAnimation(deckAnimation) {
+                        isRunningExpanded.toggle()
+                    }
+                } label: {
+                    runningSectionHeader(count: threads.count, expanded: isRunningExpanded)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(
+                    isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .onHover { isRunningHeaderHovered = $0 }
+                .accessibilityLabel("Running, \(threads.count) active threads")
+                .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isRunningExpanded ? "Collapse the running thread list" : "Expand the running thread list")
             }
+
+            Divider()
+
+            if threads.isEmpty {
+                Text("No provider reports active work.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+            } else if isRunningExpanded {
+                ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
+                    runningRow(thread)
+                    if index < threads.count - 1 { Divider() }
+                }
+            } else {
+                Text("\(threads.count) active threads across every priority lane")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.green.opacity(colorScheme == .dark ? 0.055 : 0.035))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.green.opacity(0.22), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Running, \(threads.count) active threads across all priority lanes")
+    }
+
+    private func runningSectionHeader(count: Int, expanded: Bool) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "waveform")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.green)
+            Text("Running")
+                .font(.subheadline.weight(.semibold))
+            Text("\(count)")
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 5) {
+                Text("All priority lanes")
+                    .lineLimit(1)
+                if count > 0 {
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .rotationEffect(.degrees(expanded ? 0 : -90))
+                        .accessibilityHidden(true)
+                }
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(count > 0 ? runningControlColor : Color.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.green.opacity(count > 0 ? 0.09 : 0.035), in: Capsule())
+            .overlay(Capsule().stroke(Color.green.opacity(count > 0 ? 0.28 : 0.12), lineWidth: 0.75))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+    }
+
+    private func runningRow(_ thread: DeckThread) -> some View {
+        HStack(spacing: 8) {
+            Button {
+                model.open(thread)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(thread.title).lineLimit(1)
+                    HStack(spacing: 6) {
+                        sourceBadge(thread)
+                        Text(thread.project)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if let placement = thread.placementLabel {
+                            Text(placement)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open in \(thread.sourceName)")
+
+            if !thread.isCurrent {
+                Button("Make NOW") {
+                    model.apply(.setCurrent(threadId: thread.id))
+                }
+                .controlSize(.small)
+                .disabled(model.isLoading)
+            }
+            if thread.level != .important {
+                Button("Important") {
+                    model.apply(.setLevel(threadId: thread.id, level: .important))
+                }
+                .controlSize(.small)
+                .disabled(model.isLoading)
+            }
+            if thread.level != .focus {
+                Button("Focus ✦✦") {
+                    model.apply(.setLevel(threadId: thread.id, level: .focus))
+                }
+                .controlSize(.small)
+                .disabled(model.isLoading)
+            }
+        }
+        .padding(10)
+    }
+
+    private func availableSection(snapshot: DeckSnapshot, recent: [DeckThread]) -> some View {
+        let normalizedQuery = search.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let matches = normalizedQuery.isEmpty ? recent : snapshot.searchThreads(search)
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(normalizedQuery.isEmpty ? "Add from recent threads" : "Search every thread")
+                .font(.subheadline.weight(.semibold))
             ForEach(Array(matches.prefix(8))) { thread in
                 recentDragRow(HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -535,25 +740,48 @@ public struct DeckContentView: View {
                             Text(thread.project)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                            if let placement = thread.placementLabel {
+                                Text(placement)
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                            }
                         }
                     }
                     Spacer()
-                    Button("Important") {
-                        model.apply(.setLevel(threadId: thread.id, level: .important))
+                    if !thread.isCurrent {
+                        Button("Make NOW") {
+                            model.apply(.setCurrent(threadId: thread.id))
+                        }
+                        .controlSize(.small)
+                        .disabled(model.isLoading)
                     }
-                    .controlSize(.small)
-                    .disabled(model.isLoading)
-                    Button("Focus ✦✦") {
-                        model.apply(.setLevel(threadId: thread.id, level: .focus))
+                    if thread.level != .important {
+                        Button("Important") {
+                            model.apply(.setLevel(threadId: thread.id, level: .important))
+                        }
+                        .controlSize(.small)
+                        .disabled(model.isLoading)
                     }
-                    .controlSize(.small)
-                    .disabled(model.isLoading)
+                    if thread.level != .focus {
+                        Button("Focus ✦✦") {
+                            model.apply(.setLevel(threadId: thread.id, level: .focus))
+                        }
+                        .controlSize(.small)
+                        .disabled(model.isLoading)
+                    }
+                    if thread.level != nil {
+                        Button("Remove") {
+                            model.apply(.setLevel(threadId: thread.id, level: nil))
+                        }
+                        .controlSize(.small)
+                        .disabled(model.isLoading)
+                    }
                 }, threadId: thread.id)
                 .padding(.vertical, 3)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
             if matches.isEmpty {
-                Text("No matching recent threads.")
+                Text(normalizedQuery.isEmpty ? "Every recent thread is already organized." : "No matching threads.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -570,6 +798,86 @@ public struct DeckContentView: View {
         .animation(deckAnimation, value: matches.map(\.id))
     }
 
+    @ViewBuilder
+    private func organizerSearchField(snapshot: DeckSnapshot) -> some View {
+        let isSearchActive = searchFocused || isSearchHovered
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(isSearchActive ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
+            if isPreview {
+                Text(search.isEmpty ? "Search all \(snapshot.allThreads.count) threads" : search)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                GajendraSearchTextField(
+                    text: $search,
+                    isFocused: $searchFocused,
+                    prompt: "Search all \(snapshot.allThreads.count) threads",
+                    fontSize: NSFont.systemFontSize,
+                    onFocusRequested: {},
+                    onSubmit: {
+                        guard let thread = snapshot.searchThreads(search).first else { return }
+                        model.open(thread)
+                    }
+                )
+                .frame(maxWidth: .infinity, minHeight: 22)
+            }
+            if !search.isEmpty && !isPreview {
+                Button {
+                    search = ""
+                    searchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Clear thread search")
+                .accessibilityLabel("Clear thread search")
+            }
+        }
+        .padding(.horizontal, 11)
+        .frame(maxWidth: .infinity, minHeight: 38)
+        .background(Color.primary.opacity(isSearchActive ? 0.07 : 0.04), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(
+                    isSearchActive ? Color.gajendraAccent(for: colorScheme).opacity(0.58) : Color.secondary.opacity(0.2),
+                    lineWidth: isSearchActive ? 1 : 0.75
+                )
+        )
+        .overlay {
+            if !isPreview && !searchFocused {
+                Button {
+                    searchFocused = true
+                } label: {
+                    Color.clear
+                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, search.isEmpty ? 0 : 30)
+                .accessibilityHidden(true)
+            }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .onTapGesture {
+            if !isPreview { searchFocused = true }
+        }
+        .onHover { isSearchHovered = $0 }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isSearchActive)
+    }
+
+    private func organizerSearchFooter(snapshot: DeckSnapshot) -> some View {
+        VStack(spacing: 8) {
+            Divider()
+            organizerSearchField(snapshot: snapshot)
+        }
+        .padding(.top, 2)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("All-thread search footer")
+    }
+
     private func errorBanner(_ error: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
@@ -584,6 +892,15 @@ public struct DeckContentView: View {
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Gaja error: \(error)")
+    }
+
+    private func relativeUpdateText(_ timestamp: Double) -> String {
+        guard timestamp > 0 else { return "Update time unavailable" }
+        let elapsed = max(0, Date().timeIntervalSince1970 - timestamp)
+        if elapsed < 60 { return "Updated just now" }
+        if elapsed < 3_600 { return "Updated \(Int(elapsed / 60))m ago" }
+        if elapsed < 86_400 { return "Updated \(Int(elapsed / 3_600))h ago" }
+        return "Updated \(Int(elapsed / 86_400))d ago"
     }
 
     private func sourceBadge(_ thread: DeckThread) -> some View {
@@ -642,6 +959,12 @@ public struct DeckContentView: View {
         colorScheme == .dark
             ? Color(red: 0.055, green: 0.075, blue: 0.12)
             : Color(red: 0.965, green: 0.945, blue: 0.9)
+    }
+
+    private var runningControlColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.38, green: 0.9, blue: 0.54)
+            : Color(red: 0.04, green: 0.39, blue: 0.16)
     }
 
     private var nowSurfaceColor: Color {

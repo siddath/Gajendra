@@ -1,7 +1,7 @@
 # Status
 
 **Candidate:** Gaja, Elephant Focus for AI Power Users 0.3.1
-**Reconciled:** 2026-08-13
+**Reconciled:** 2026-08-15
 **Publication state:** public source repository at [siddath/Gajendra](https://github.com/siddath/Gajendra); macOS binary distribution remains separate
 
 **Repository/compatibility identity:** Gajendra (`gajendra` packages, plugin ID, URL scheme, bundle identifier, executable, and state paths)
@@ -9,31 +9,35 @@
 ## Implemented
 
 - One global NOW plus ordered Focus/Important tiers across canonical `source:thread` IDs.
+- Provider-derived Running surfaces for every explicit active status across NOW, Focus, Important, and unprioritized work, with placement labels, deduplication, and no new persisted tier or recency inference.
 - Codex app-server source, opt-in Claude Code metadata source, Cursor Agent CLI source, and configured JSON-catalog sources.
 - Source enablement and health display in the native organizer and MCP App.
 - Safe return paths: Codex deep links and short-lived, shell-quoted Terminal resume scripts for CLI-owned sessions.
-- Bottom-right icon-only native utility, hover card, resizable organizer, Dock/menu-bar recovery, and reversible login item.
+- Snap-anchored icon-only native utility with Top Left, Top Right, Center, Bottom Left, Bottom Center, and Bottom Right positions in the trailing Settings and app menus; selected display and position persistence; click-to-open/card-pinned interaction with outside-click and Escape dismissal; hover-only launcher feedback; and inward card geometry that does not cover the launcher.
+- Compact, single-owner card scrolling; expandable provider-wide Running rows; fixed search footers in both the focus card and full organizer; bottom-edge queue overflow shortcuts; whole-surface hover feedback; aligned Open → Running/Ready → Provider NOW actions; and keyboard-capable multi-term search whose entire capsule focuses and selects existing text. The organizer remains resizable, with Dock/menu-bar recovery and a reversible login item.
+- Double-click launcher edit mode with icon-and-close-control-only jiggle, stable card materials, movement below six points ignored, intentional drag snapping to the nearest hotspot, and card suppression while editing. Native card and organizer headers keep the elephant-and-lotus mark on the left, hold the two-line Gaja identity on the true centerline, and place Organizer, Refresh, then Settings on the right. The trailing gear owns theme, appearance, card size, and position without mutating a choice when opened. A secondary-click/Control-click context menu and matching app-menu command offer confirmed self-uninstall while retaining local priority metadata.
+- Canonical NOW normalization across native and MCP App snapshots, so malformed provider payloads cannot render multiple selected collection rows.
 - macOS 26 Liquid Glass with semantic material fallback on macOS 13–15; light/dark and Reduce Motion support.
-- Original seven-stroke thin-line lotus with identical Bézier geometry across native, menu-bar, app-icon, and web surfaces.
+- Official approved elephant-and-lotus mark: seventeen deterministic contours plus one attentive pupil form an Indian-elephant profile with a listening ear, calm eye, short tusk, raised two-edge trunk, two-lobe grip around one curved stem, and a softly asymmetric layered lotus. Structural, detail, and petal strokes are optically weighted and shared across native, menu-bar, app-icon, and web surfaces.
 - Private v2 metadata store with atomic writes and copy-only Aadi/Priority Deck migration.
 - MIT license, contribution/security guidance, source schema, Apple design rationale, and release checklist.
 
 ## Local verification
 
 - Hosted GitHub Actions: initial public `main` commit `8f9360c` passed both `plugin` and `macos-companion` jobs in [run 31662304586](https://github.com/siddath/Gajendra/actions/runs/31662304586).
-- Release gauntlet: passed from `2026-08-12T18:52:39.700Z` to `2026-08-12T18:54:15.936Z`, 18/18 receipts; report SHA-256 `b49f7930061ef80ac56324fceda838d71f20cfa5b8d0956ede7932bb02d6c6e6`.
-- Tests: 19 unit/integration tests, 7 browser journeys, 35 repeated browser journeys, and five repeated unit suites all passed.
-- Supply chain: `npm audit --omit=dev --audit-level=high` found 0 vulnerabilities.
-- Post-UI artifact gate: passed; `dist/server.mjs` remained present after 35 repeated UI journeys and matched the installed plugin cache.
-- Installed plugin: `gajendra@gajendra` 0.3.1 enabled; all nine checked runtime, artwork, and skill cache artifacts match source; six tools and one MCP App resource registered.
-- Installed app: visible name `Gaja`, compatibility executable `Gajendra`, version 0.3.1, ad-hoc signature valid; binary SHA-256 `02865e04d0cb2bd2ed1a47a24f231ee40bb89d87505c72890f6fbc6bfb9d504b`; icon SHA-256 `0e44c3fa05a98925aac3e8e1f52ffaeda9ef61c2f3be01c052f5a7e230db444c`.
-- Artwork: canonical SVG SHA-256 `9b37a08596c0c6c03d345da34703aed549f93dfb7791955ffd8672847d04bef9`; generated 1024px PNG SHA-256 `ef1e549403186e8c020ac2c5587bdb1020811c3968e6721164b22aaaf2189546`.
-- Running installed UI: 60×60 lotus at `(1434, 904)`, the exact 18-point bottom-right margin on the active 1512×982 display; a temporary cursor probe revealed the 404×310 card at `(1090, 584)` and restored the pointer.
+- Official icon/header iteration: `npm run check` passed with 30 unit/integration tests, TypeScript, deterministic web/server builds, one-pupil plus exact seventeen-contour cross-surface geometry validation, and all 13 Playwright journeys. Swift self-test, release build, companion validator, and the full native preview matrix passed. The mark was reviewed at 512, 64, 34, 24, and 18 pixels, then inspected in light, dark, Compact, Expanded, Native Popover, and Focus Deck renders before installation.
+- The current full release gauntlet passed all 18 gates, including the live Codex probe, 13 browser journeys, five repeated unit suites, 65 repeated browser journeys, native build/signature/bundle parity, final artifact validation, and dependency audit.
+- Supply chain: the current production dependency audit found 0 vulnerabilities.
+- Artifact parity: the generated `dist/server.mjs` remained present, the installed app bundles that exact service, and all nine installed plugin runtime/artwork/skill artifacts match source.
+- Installed plugin: `gajendra@gajendra` 0.3.1 enabled; all nine checked runtime, artwork, and skill cache artifacts match source; seven tools and one MCP App resource registered.
+- Installed app: visible name `Gaja`, compatibility executable `Gajendra`, version 0.3.1, ad-hoc signature valid; installed and source-built binary SHA-256 `26fc0e806ae6f327fe8525f4c9dfebf6ccabaa6741f31b808ba630827ab3af5d`; installed ICNS SHA-256 `ce14ad09bdc2dd48a48fa9a39c9407b356571ae207bdfa0bbaba8ec040b8faff`; bundled service SHA-256 `e37e1714d5912db9992a54573d0475398622e093337573eace2fb067476ef2d1`.
+- Artwork: canonical SVG SHA-256 `6353e527436dec8daa8b4f36ccf3b45efa4ce9da53c2a8a7ce2696be83e1136e`; generated 1024px PNG SHA-256 `2df9143748b8719bd9f7e870049eec7edebcc8660a1c3690d8f6434df61f41b0`.
+- Running installed runtime: relaunched as PID `84251`, with the persisted launcher at Bottom Right. A clean one-second hover left only the 60 × 60 pill visible; primary click opened the 760 × 680 detail card, and a second click closed it. Installed Accessibility geometry placed the card center at x=`1114`, the title/subtitle centers at x=`1113.5`, and Organizer/Refresh/Settings at x=`1364`/`1401`/`1438`, proving a true centered lockup and trailing gear. The immediately previous installed app is recoverable at `/Users/i556940/Applications/Gajendra.app.rollback-20260815-234203`.
 - State: v2 store valid with one NOW, `0600` file, `0700` directory, and no persisted live thread content.
 
 ## Provider proof levels
 
-- Codex: live and `ready`, 123 bounded threads observed.
+- Codex: live and `ready`, 129 threads observed during the release gauntlet; a desktop-owned active task can be recovered from held writer-lock plus lifecycle metadata after the separate app-server reports it as unloaded.
 - Claude Code: explicitly enabled and `ready`, 200 bounded metadata records observed; prompts/transcripts were not emitted or persisted.
 - Cursor: adapter and official CLI contract are fixture/unit tested; `cursor-agent` is not installed on this machine, so live discovery/resume is unverified here.
 - Configured agents: schema/fixture tested; each third-party catalog and resume target remains operator-owned.
@@ -45,5 +49,6 @@
 - The 14-day adoption trial has not yet produced three real reuse receipts.
 - A WidgetKit extension is an evaluated future surface, not part of 0.3.1.
 - The running Codex process predates the 0.3.1 plugin refresh. No forced restart was performed; native Gaja is already independent, installed, and running.
+- No Developer ID binary, notarized download, or new version tag is claimed by this source iteration.
 
 Follow [the release checklist](docs/RELEASE_CHECKLIST.md) before publication.

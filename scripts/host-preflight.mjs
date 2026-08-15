@@ -46,7 +46,8 @@ if (hardChecks.statePermissionsPrivate === false) {
   nextActions.push("Restore owner-only permissions on the Gajendra state directory and file.");
 }
 if (hardFailures.length === 0) {
-  nextActions.push("Hover the bottom-right lotus and confirm the details card appears without activating a full window.");
+  nextActions.push("Hover the configured lotus and confirm it only highlights; click once and confirm the details card opens.");
+  nextActions.push("Click the search capsule and confirm typing starts with a visible focus state.");
   nextActions.push("Use Open thread, then return and confirm the same global NOW remains selected.");
 }
 
@@ -70,8 +71,9 @@ const report = {
   visibleProof: {
     status: "requires-primary-window-observation",
     required: [
-      "the icon-only lotus remains visible at the bottom right",
-      "hover reveals the glass details card",
+      "the icon-only elephant-and-lotus mark remains visible at its configured hotspot",
+      "hover does not open the card and primary click does",
+      "the search capsule visibly accepts keyboard input",
       "Open thread resumes in the owning AI agent",
       "the same NOW choice persists after returning",
     ],

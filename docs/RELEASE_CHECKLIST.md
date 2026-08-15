@@ -5,7 +5,7 @@
 - [ ] Review `git diff --check`, rename state, and untracked files; exclude private content and machine-only artifacts.
 - [ ] Confirm example catalogs contain synthetic data only.
 - [ ] Run `npm ci` and `npm run gauntlet` from a clean clone.
-- [ ] Install Gaja locally from `Gajendra.app`; verify the bottom-right pill, hover card, resizable organizer, and source health.
+- [ ] Install Gaja locally from `Gajendra.app`; verify hover does not open, click toggles the focus card, outside click/Escape dismiss, search accepts typing, the organizer resizes, and source health is accurate.
 - [ ] Verify Codex live; label Claude/Cursor proof exactly as observed.
 - [ ] Set the actual clone URL in `README.md` only after the remote exists.
 - [ ] Create/push the public repository, then confirm hosted GitHub Actions.

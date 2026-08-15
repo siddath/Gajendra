@@ -18,6 +18,7 @@ focus_dark_card_destination="$repo_root/evidence/companion/gajendra-focus-deck-h
 focus_dark_pill_destination="$repo_root/evidence/companion/gajendra-focus-deck-pill-dark.png"
 compact_card_destination="$repo_root/evidence/companion/gajendra-hover-card-compact.png"
 expanded_card_destination="$repo_root/evidence/companion/gajendra-hover-card-expanded.png"
+search_card_destination="$repo_root/evidence/companion/gajendra-hover-card-search.png"
 
 mkdir -p "${destination:h}"
 swift run --package-path "$package_root" -c release GajendraPreview \
@@ -25,7 +26,7 @@ swift run --package-path "$package_root" -c release GajendraPreview \
   "$dark_destination" "$dark_card_destination" "$dark_pill_destination" \
   "$focus_destination" "$focus_card_destination" "$focus_pill_destination" \
   "$focus_dark_destination" "$focus_dark_card_destination" "$focus_dark_pill_destination" \
-  "$compact_card_destination" "$expanded_card_destination"
+  "$compact_card_destination" "$expanded_card_destination" "$search_card_destination"
 echo "$destination"
 echo "$card_destination"
 echo "$pill_destination"
@@ -40,3 +41,4 @@ echo "$focus_dark_card_destination"
 echo "$focus_dark_pill_destination"
 echo "$compact_card_destination"
 echo "$expanded_card_destination"
+echo "$search_card_destination"
