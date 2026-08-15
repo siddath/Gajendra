@@ -351,6 +351,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private func dismissPresentedCard(animated: Bool = true) {
         guard cardPresentation.dismiss() else { return }
         removeCardDismissalMonitors()
+        cardWindow?.makeFirstResponder(nil)
         if animated {
             hideCard()
         } else {
@@ -832,7 +833,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         )
         panel.contentMaxSize = maximumSize
         panel.setAccessibilityLabel("Gaja priority details")
-        panel.contentViewController = NSHostingController(
+        panel.contentView = GajendraFirstMouseHostingView(
             rootView: GajendraHoverCardView(
                 model: model,
                 visualSettings: visualSettings,

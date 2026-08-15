@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fixed native thread search in both the floating card and Organizer: the first cross-app click reaches the real text field, normal multi-character typing is never replaced by delayed select-all work, existing queries select once on a new focus entry, and clear/backspace keep the field ready for continued search.
 - Finalized the approved Gaja visual master as seventeen deterministic contours plus one attentive pupil across native, web, menu-bar, and app-icon surfaces: an Indian-elephant profile with a listening ear, calm eye, short tusk, raised trunk holding one curved stem, and a softly asymmetric lotus. Native headers keep the mark left, the two-line Gaja identity truly centered, and Settings trailing after Organizer and Refresh.
 - Added user-assigned Design, Engineering, and Life context labels across the native organizer, hover card, and MCP App without persisting provider content or free text.
 - Publication, hosted CI, signing, notarization, and an optional WidgetKit extension remain separate owner-gated work.
