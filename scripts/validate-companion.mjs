@@ -91,6 +91,15 @@ for (const required of [
   "override var canBecomeKey: Bool { acceptsKeyboardInput }",
   'makeOverlayPanel(title: "Gaja Details", size: cardSize, acceptsKeyboardInput: true)',
   "cardWindow?.makeFirstResponder(nil)",
+  'NSMenu(title: "Edit")',
+  'withTitle: "Cut"',
+  'withTitle: "Copy"',
+  'withTitle: "Paste"',
+  'withTitle: "Select All"',
+  '#selector(NSText.cut(_:))',
+  '#selector(NSText.copy(_:))',
+  '#selector(NSText.paste(_:))',
+  '#selector(NSText.selectAll(_:))',
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
 }
@@ -273,6 +282,7 @@ console.log(JSON.stringify({
   nativeSearchPreservesMultiCharacterInput: true,
   nativeSearchCancelsStaleSelectionOnEdit: true,
   searchSelectsExistingTextOnFocus: true,
+  nativeSearchEditingShortcuts: ["command-a", "command-c", "command-v", "command-x"],
   nowActionOrder: ["open", "activity", "provider"],
   hoverCardSizes: ["compact", "comfortable", "expanded"],
   distinctNativeAndFocusDeckSurfaces: true,
