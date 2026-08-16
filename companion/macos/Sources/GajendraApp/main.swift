@@ -67,11 +67,12 @@ enum GajendraMenuBarMain {
 }
 
 @MainActor
-final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
+final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let model = DeckViewModel()
     let visualSettings = GajendraVisualSettings()
     let pillEditController = GajendraPillEditController()
     private var organizerWindow: NSWindow?
+    private var sourceOnboardingWindow: NSWindow?
     private var pillWindow: NSPanel?
     private var cardWindow: NSPanel?
     private var statusItem: NSStatusItem?
@@ -102,8 +103,12 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     private let pillOriginXKey = "gajendra.pill.origin.x"
     private let pillOriginYKey = "gajendra.pill.origin.y"
     private let pillScreenNumberKey = "gajendra.pill.screen-number"
+    private let sourceOnboardingState = GajendraSourceOnboardingState()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let shouldPresentSourceOnboarding = sourceOnboardingState.shouldPresentOnLaunch(
+            hasPriorNativeState: hasPriorNativePreferences()
+        )
         migrateLegacyPillPosition()
         configureApplicationMenu()
         configureAppearance()
@@ -116,6 +121,9 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         model.refresh()
         if !UserDefaults.standard.bool(forKey: pillHiddenKey) {
             showPill(on: preferredScreen())
+        }
+        if shouldPresentSourceOnboarding {
+            showSourceOnboarding(refresh: false)
         }
     }
 
@@ -138,6 +146,12 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
+    func windowWillClose(_ notification: Notification) {
+        guard let onboardingWindow = sourceOnboardingWindow,
+              notification.object as? NSWindow === onboardingWindow else { return }
+        sourceOnboardingState.markCompleted()
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
         for url in urls where url.scheme == "gajendra" && url.host == "thread" {
             let encoded = url.pathComponents.dropFirst().joined(separator: "/")
@@ -150,6 +164,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
     @objc
     private func showOrganizerFromMenu(_ sender: Any?) {
         showOrganizer()
+    }
+
+    @objc
+    private func showSourceOnboardingFromMenu(_ sender: Any?) {
+        showSourceOnboarding()
     }
 
     @objc
@@ -211,6 +230,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         organizerWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    private func showSourceOnboarding(refresh: Bool = true) {
+        dismissPresentedCard(animated: false)
+        popover.performClose(nil)
+        if refresh { model.refresh() }
+        let window = sourceOnboardingWindow ?? makeSourceOnboardingWindow()
+        sourceOnboardingWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    private func completeSourceOnboarding() {
+        sourceOnboardingState.markCompleted()
+        sourceOnboardingWindow?.close()
     }
 
     private func showPill(on screen: NSScreen) {
@@ -526,6 +560,15 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         organizerItem.target = self
         appMenu.addItem(organizerItem)
 
+        let sourcesItem = NSMenuItem(
+            title: "Connect AI Tools…",
+            action: #selector(showSourceOnboardingFromMenu(_:)),
+            keyEquivalent: ""
+        )
+        sourcesItem.target = self
+        appMenu.addItem(sourcesItem)
+        appMenu.addItem(.separator())
+
         let positionItem = NSMenuItem(title: "Lotus Position", action: nil, keyEquivalent: "")
         let positionMenu = NSMenu(title: "Lotus Position")
         for anchor in GajendraPillAnchor.allCases {
@@ -790,7 +833,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
         popover.animates = true
         popover.contentSize = NSSize(width: 520, height: 650)
         popover.contentViewController = NSHostingController(
-            rootView: DeckContentView(model: model, visualSettings: visualSettings)
+            rootView: DeckContentView(
+                model: model,
+                visualSettings: visualSettings,
+                onManageSources: { [weak self] in self?.showSourceOnboarding() }
+            )
         )
     }
 
@@ -802,11 +849,43 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
         window.title = "Gaja"
-        window.contentViewController = NSHostingController(rootView: DeckContentView(model: model, visualSettings: visualSettings))
+        window.contentViewController = NSHostingController(
+            rootView: DeckContentView(
+                model: model,
+                visualSettings: visualSettings,
+                onManageSources: { [weak self] in self?.showSourceOnboarding() }
+            )
+        )
         window.setContentSize(NSSize(width: 620, height: 700))
         window.contentMinSize = NSSize(width: 520, height: 620)
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
+        window.center()
+        return window
+    }
+
+    private func makeSourceOnboardingWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(origin: .zero, size: NSSize(width: 640, height: 620)),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "Connect AI Tools"
+        window.identifier = NSUserInterfaceItemIdentifier("gajendra-source-onboarding")
+        window.contentViewController = NSHostingController(
+            rootView: GajendraSourceOnboardingView(
+                model: model,
+                onFinish: { [weak self] in self?.completeSourceOnboarding() },
+                onSkip: { [weak self] in self?.completeSourceOnboarding() }
+            )
+        )
+        window.setContentSize(NSSize(width: 640, height: 620))
+        window.contentMinSize = NSSize(width: 560, height: 560)
+        window.isReleasedWhenClosed = false
+        window.hidesOnDeactivate = false
+        window.delegate = self
+        window.setAccessibilityLabel("Connect AI tools to Gaja")
         window.center()
         return window
     }
@@ -857,6 +936,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
                 model: model,
                 visualSettings: visualSettings,
                 onOpenOrganizer: { [weak self] in self?.showOrganizer() },
+                onManageSources: { [weak self] in self?.showSourceOnboarding() },
                 onDismiss: { [weak self] in self?.dismissPresentedCard() },
                 onSearchFocusRequested: { [weak self] in self?.focusCardSearch() }
             )
@@ -909,6 +989,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate {
             ?? statusItem?.button?.window?.screen
             ?? pillWindow?.screen
             ?? NSScreen.main
+    }
+
+    private func hasPriorNativePreferences() -> Bool {
+        let defaults = UserDefaults.standard
+        return [
+            pillHiddenKey,
+            pillHasCustomOriginKey,
+            pillOriginXKey,
+            pillOriginYKey,
+            pillScreenNumberKey,
+            GajendraVisualSettings.themeKey,
+            GajendraVisualSettings.appearanceKey,
+            GajendraVisualSettings.hoverCardSizeKey,
+            GajendraVisualSettings.pillAnchorKey,
+        ].contains { defaults.object(forKey: $0) != nil }
     }
 
     private func observeDesktopChanges() {

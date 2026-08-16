@@ -876,6 +876,7 @@ public struct GajendraHoverCardView: View {
     @State private var searchFocused = false
     private let isPreview: Bool
     private let onOpenOrganizer: () -> Void
+    private let onManageSources: () -> Void
     private let onDismiss: () -> Void
     private let onSearchFocusRequested: () -> Void
 
@@ -885,6 +886,7 @@ public struct GajendraHoverCardView: View {
         isPreview: Bool = false,
         previewSearchQuery: String = "",
         onOpenOrganizer: @escaping () -> Void = {},
+        onManageSources: @escaping () -> Void = {},
         onDismiss: @escaping () -> Void = {},
         onSearchFocusRequested: @escaping () -> Void = {}
     ) {
@@ -893,6 +895,7 @@ public struct GajendraHoverCardView: View {
         self.isPreview = isPreview
         _searchQuery = State(initialValue: previewSearchQuery)
         self.onOpenOrganizer = onOpenOrganizer
+        self.onManageSources = onManageSources
         self.onDismiss = onDismiss
         self.onSearchFocusRequested = onSearchFocusRequested
     }
@@ -1026,6 +1029,12 @@ public struct GajendraHoverCardView: View {
 
     private var visualSettingsMenu: some View {
         Menu {
+            Button {
+                onManageSources()
+            } label: {
+                Label("Connect AI Tools…", systemImage: "point.3.connected.trianglepath.dotted")
+            }
+            Divider()
             Picker("Theme", selection: $visualSettings.theme) {
                 ForEach(GajendraVisualTheme.allCases) { theme in
                     Text(theme.title).tag(theme)
@@ -1058,7 +1067,7 @@ public struct GajendraHoverCardView: View {
         .gajendraHoverSurface()
         .help("Gaja settings")
         .accessibilityLabel("Open Gaja settings")
-        .accessibilityHint("Choose theme, appearance, card size, or lotus position")
+        .accessibilityHint("Connect AI tools or choose theme, appearance, card size, and lotus position")
     }
 
     private var settingsIcon: some View {

@@ -14,6 +14,7 @@ const menuBarSource = path.resolve("companion/macos/Sources/GajendraApp/main.swi
 const contentSource = path.resolve("companion/macos/Sources/GajendraKit/DeckContentView.swift");
 const overlaySource = path.resolve("companion/macos/Sources/GajendraKit/DeckWidgetView.swift");
 const visualSettingsSource = path.resolve("companion/macos/Sources/GajendraKit/GajendraVisualSettings.swift");
+const sourceOnboardingSource = path.resolve("companion/macos/Sources/GajendraKit/SourceOnboardingView.swift");
 const modelsSource = path.resolve("companion/macos/Sources/GajendraKit/Models.swift");
 const codexSource = path.resolve("plugins/gajendra/src/server/codex-app-server.ts");
 const threadSourcesSource = path.resolve("plugins/gajendra/src/server/thread-sources.ts");
@@ -28,6 +29,7 @@ await Promise.all([
   access(contentSource, constants.R_OK),
   access(overlaySource, constants.R_OK),
   access(visualSettingsSource, constants.R_OK),
+  access(sourceOnboardingSource, constants.R_OK),
   access(modelsSource, constants.R_OK),
   access(codexSource, constants.R_OK),
   access(threadSourcesSource, constants.R_OK),
@@ -43,11 +45,12 @@ if (bundleDisplayName !== "Gaja") throw new Error("The visible bundle name must 
 const bundleVersion = run("plutil", ["-extract", "CFBundleShortVersionString", "raw", info]).stdout.trim();
 if (bundleVersion !== "0.3.1") throw new Error("The Gaja bundle version must be 0.3.1.");
 
-const [menuBar, content, overlay, visualSettings, models, codex, threadSources] = await Promise.all([
+const [menuBar, content, overlay, visualSettings, sourceOnboarding, models, codex, threadSources] = await Promise.all([
   readFile(menuBarSource, "utf8"),
   readFile(contentSource, "utf8"),
   readFile(overlaySource, "utf8"),
   readFile(visualSettingsSource, "utf8"),
+  readFile(sourceOnboardingSource, "utf8"),
   readFile(modelsSource, "utf8"),
   readFile(codexSource, "utf8"),
   readFile(threadSourcesSource, "utf8"),
@@ -100,6 +103,13 @@ for (const required of [
   '#selector(NSText.copy(_:))',
   '#selector(NSText.paste(_:))',
   '#selector(NSText.selectAll(_:))',
+  "GajendraSourceOnboardingState",
+  "shouldPresentOnLaunch",
+  "hasPriorNativePreferences()",
+  "showSourceOnboarding(refresh: false)",
+  'title: "Connect AI Tools…"',
+  'window.title = "Connect AI Tools"',
+  'window.identifier = NSUserInterfaceItemIdentifier("gajendra-source-onboarding")',
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
 }
@@ -126,6 +136,33 @@ for (const source of [overlay, content]) {
     if (!source.includes(required)) throw new Error(`Gajendra consolidated settings or Running disclosure contract is missing: ${required}`);
   }
   if (source.includes("toggleLightDark")) throw new Error("Opening native header settings must not also toggle appearance.");
+  if (!source.includes('Label("Connect AI Tools…", systemImage: "point.3.connected.trianglepath.dotted")')) {
+    throw new Error("Every native Settings menu must expose AI-tool connection setup.");
+  }
+}
+for (const required of [
+  'completionKey = "gajendra.onboarding.sources.completed.v1"',
+  "hasPriorNativeState",
+  'Text("Connect your AI tools")',
+  'Text("Local metadata only")',
+  "No account sign-in or cloud sync",
+  "never stores prompts, transcripts, tokens, credentials, or provider databases",
+  'Text("LOCAL SOURCES")',
+  'Label(model.isLoading ? "Scanning" : "Rescan"',
+  "ForEach(Array(sources.enumerated())",
+  ".setSourceEnabled(sourceId: source.id, enabled: enabled)",
+  'Button("Skip for now"',
+  'Button("Finish setup"',
+  'accessibilityIdentifier("gajendra-source-rescan")',
+  'accessibilityIdentifier("gajendra-source-toggle-\\(source.id)")',
+  'accessibilityIdentifier("gajendra-source-onboarding-skip")',
+  'accessibilityIdentifier("gajendra-source-onboarding-finish")',
+  'source.id != "configured-sources"',
+  'case "claude": return "Local session metadata · opt-in"',
+  'case "grok": return "Local summary metadata · opt-in"',
+  'default: return "Explicit bounded local catalog"',
+]) {
+  if (!sourceOnboarding.includes(required)) throw new Error(`Gaja source onboarding contract is missing: ${required}`);
 }
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
 for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "Show \\(remaining) more in Organizer", "executionSignal(", "runningSummary(", "runningDisclosureHeader(", "isRunningExpanded.toggle()", "ScrollView(.vertical, showsIndicators: true)", "persistentSearchFooter(total:", "gajendra-card-scroll-top", "quickSearch(total:", "GajendraSearchTextField(", "GajendraSearchField", "selectsAllOnNextMouseDown", "cancelPendingMouseSelection", "reconcileText(in:", "selectExistingTextIfUnchanged", "pendingSelectionValue = nil", "field.currentEditor()", "NSWindow.didResignKeyNotification", "searchResults(", "searchActions(", "snapshot.allThreads.count", "snapshot.searchThreads(searchQuery)", "isNowHovered", "isSearchHovered", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on open · Local metadata"]) {
@@ -283,6 +320,11 @@ console.log(JSON.stringify({
   nativeSearchCancelsStaleSelectionOnEdit: true,
   searchSelectsExistingTextOnFocus: true,
   nativeSearchEditingShortcuts: ["command-a", "command-c", "command-v", "command-x"],
+  firstLaunchSourceOnboarding: true,
+  existingUserOnboardingMigration: "silent-complete",
+  sourceOnboardingReplayLocations: ["settings", "application-menu"],
+  sourceConnectionMode: "local-metadata-refresh",
+  sourceOnboardingSkippable: true,
   nowActionOrder: ["open", "activity", "provider"],
   hoverCardSizes: ["compact", "comfortable", "expanded"],
   distinctNativeAndFocusDeckSurfaces: true,

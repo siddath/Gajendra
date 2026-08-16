@@ -10,8 +10,10 @@ Codex app-server reports desktop-owned threads as `notLoaded` to a separate clie
 
 - Codex is enabled by default and uses the local app-server.
 - Cursor is enabled by default; an absent `cursor-agent` is reported as `not-installed`.
-- Claude Code is disabled by default because enabling it reads local session metadata. Enable or disable any source from the organizer’s source chips.
+- Claude Code is disabled by default because enabling it reads local session metadata. Enable or disable any source during clean first-launch setup, from **Settings → Connect AI Tools…**, or from the organizer’s source chips.
 - Grok Build is disabled by default because enabling it reads only the documented local `summary.json` metadata under `~/.grok/sessions`; it never reads Grok prompts, responses, tool calls, or file snapshots. An absent `grok` CLI is reported as `not-installed`.
+
+The setup screen and its **Rescan** action use this same local registry. They do not create provider accounts, transmit credentials, or broaden discovery beyond these built-ins and explicitly configured catalogs. A valid entry added to `sources.json` appears automatically as another setup row.
 
 Executable overrides are optional:
 

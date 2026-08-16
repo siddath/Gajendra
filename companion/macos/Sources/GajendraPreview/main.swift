@@ -77,6 +77,8 @@ enum GajendraPreview {
         let compactCardDestination = arguments.dropFirst(12).first ?? "gajendra-hover-card-compact.png"
         let expandedCardDestination = arguments.dropFirst(13).first ?? "gajendra-hover-card-expanded.png"
         let searchCardDestination = arguments.dropFirst(14).first ?? "gajendra-hover-card-search.png"
+        let onboardingDestination = arguments.dropFirst(15).first ?? "gajendra-source-onboarding.png"
+        let darkOnboardingDestination = arguments.dropFirst(16).first ?? "gajendra-source-onboarding-dark.png"
 
         try renderSuite(
             organizerModel: organizerModel,
@@ -135,6 +137,20 @@ enum GajendraPreview {
             size: .comfortable,
             destination: searchCardDestination,
             searchQuery: "Gaja"
+        )
+        try render(
+            GajendraSourceOnboardingView(model: cardModel, isPreview: true),
+            width: 640,
+            height: 620,
+            destination: onboardingDestination,
+            colorScheme: .light
+        )
+        try render(
+            GajendraSourceOnboardingView(model: cardModel, isPreview: true),
+            width: 640,
+            height: 620,
+            destination: darkOnboardingDestination,
+            colorScheme: .dark
         )
     }
 

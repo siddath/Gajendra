@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a skippable, keyboard-accessible first-launch **Connect your AI tools** screen that reports real local source health, preserves Claude/Grok opt-in boundaries, discovers explicitly configured agents, supports local rescan and source toggles, avoids upgrade interruption for existing users, and remains replayable from Settings or the application menu.
 - Fixed native thread search in both the floating card and Organizer: the first cross-app click reaches the real text field, normal multi-character typing is never replaced by delayed select-all work, existing queries select once on a new focus entry, clear/backspace keep the field ready for continued search, and the standard macOS Edit menu now routes ⌘A, ⌘C, ⌘V, and ⌘X through the native field editor.
 - Finalized the approved Gaja visual master as seventeen deterministic contours plus one attentive pupil across native, web, menu-bar, and app-icon surfaces: an Indian-elephant profile with a listening ear, calm eye, short tusk, raised trunk holding one curved stem, and a softly asymmetric lotus. Native headers keep the mark left, the two-line Gaja identity truly centered, and Settings trailing after Organizer and Refresh.
 - Added user-assigned Design, Engineering, and Life context labels across the native organizer, hover card, and MCP App without persisting provider content or free text.

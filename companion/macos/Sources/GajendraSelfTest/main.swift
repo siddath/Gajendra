@@ -298,6 +298,7 @@ enum GajendraSelfTest {
             try require(!editController.acceptsDrag, "Escape must leave pill edit mode")
         }
         try await verifyVisualSettings()
+        try await verifySourceOnboarding()
         try await verifyQueuedRefresh(with: snapshot)
         try await verifyQueuedMutation(with: snapshot)
         print("Gaja companion self-test passed")
@@ -338,6 +339,77 @@ enum GajendraSelfTest {
             try require(GajendraAppearance.automatic.appKitName == nil, "Auto must follow the system appearance")
             try require(GajendraAppearance.light.appKitName == .aqua, "Light must map to Aqua")
             try require(GajendraAppearance.dark.appKitName == .darkAqua, "Dark must map to Dark Aqua")
+        }
+    }
+
+    private static func verifySourceOnboarding() async throws {
+        try await MainActor.run {
+            let freshSuite = "gajendra-source-onboarding-fresh-\(UUID().uuidString)"
+            guard let freshDefaults = UserDefaults(suiteName: freshSuite) else {
+                throw SelfTestError.failed("could not create isolated first-launch onboarding store")
+            }
+            defer { freshDefaults.removePersistentDomain(forName: freshSuite) }
+            let freshState = GajendraSourceOnboardingState(defaults: freshDefaults)
+            try require(
+                freshState.shouldPresentOnLaunch(hasPriorNativeState: false),
+                "a clean first launch must present source onboarding"
+            )
+            try require(!freshState.isCompleted, "presenting onboarding must not silently complete it")
+            freshState.markCompleted()
+            try require(freshState.isCompleted, "onboarding completion did not persist")
+            try require(
+                !freshState.shouldPresentOnLaunch(hasPriorNativeState: false),
+                "completed onboarding must not present twice"
+            )
+
+            let upgradeSuite = "gajendra-source-onboarding-upgrade-\(UUID().uuidString)"
+            guard let upgradeDefaults = UserDefaults(suiteName: upgradeSuite) else {
+                throw SelfTestError.failed("could not create isolated upgrade onboarding store")
+            }
+            defer { upgradeDefaults.removePersistentDomain(forName: upgradeSuite) }
+            let upgradeState = GajendraSourceOnboardingState(defaults: upgradeDefaults)
+            try require(
+                !upgradeState.shouldPresentOnLaunch(hasPriorNativeState: true),
+                "an existing native installation must not receive an unsolicited onboarding window"
+            )
+            try require(upgradeState.isCompleted, "the existing-user migration must remain completed")
+
+            let codex = ThreadSourceStatus(
+                id: "codex",
+                name: "Codex",
+                kind: "codex-app-server",
+                state: "ready",
+                enabled: true,
+                threadCount: 3
+            )
+            let configuredError = ThreadSourceStatus(
+                id: "configured-sources",
+                name: "Configured sources",
+                kind: "configured",
+                state: "error",
+                enabled: false,
+                threadCount: 0,
+                detail: "Invalid catalog"
+            )
+            let custom = ThreadSourceStatus(
+                id: "windsurf",
+                name: "Windsurf",
+                kind: "configured",
+                state: "disabled",
+                enabled: false,
+                threadCount: 0
+            )
+            try require(GajendraSourceOnboardingCopy.isToggleable(codex), "Codex onboarding must expose source enablement")
+            try require(!GajendraSourceOnboardingCopy.isToggleable(configuredError), "the registry error row must not be toggleable")
+            try require(GajendraSourceOnboardingCopy.isToggleable(custom), "configured supported agents must be toggleable")
+            try require(
+                GajendraSourceOnboardingCopy.connectionMethod(for: custom).contains("bounded local catalog"),
+                "configured agents must disclose their bounded local catalog"
+            )
+            try require(
+                GajendraSourceOnboardingCopy.detail(for: codex) == "3 threads available",
+                "ready source thread counts must use accurate copy"
+            )
         }
     }
 

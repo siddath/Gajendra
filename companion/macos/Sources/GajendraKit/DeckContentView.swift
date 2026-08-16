@@ -14,17 +14,20 @@ public struct DeckContentView: View {
     @State private var searchFocused = false
     private let usesScrollView: Bool
     private let isPreview: Bool
+    private let onManageSources: () -> Void
 
     public init(
         model: DeckViewModel,
         visualSettings: GajendraVisualSettings,
         usesScrollView: Bool = true,
-        isPreview: Bool = false
+        isPreview: Bool = false,
+        onManageSources: @escaping () -> Void = {}
     ) {
         self.model = model
         self.visualSettings = visualSettings
         self.usesScrollView = usesScrollView
         self.isPreview = isPreview
+        self.onManageSources = onManageSources
     }
 
     public var body: some View {
@@ -151,6 +154,12 @@ public struct DeckContentView: View {
 
     private var visualSettingsMenu: some View {
         Menu {
+            Button {
+                onManageSources()
+            } label: {
+                Label("Connect AI Tools…", systemImage: "point.3.connected.trianglepath.dotted")
+            }
+            Divider()
             Picker("Theme", selection: $visualSettings.theme) {
                 ForEach(GajendraVisualTheme.allCases) { theme in
                     Text(theme.title).tag(theme)
@@ -182,7 +191,7 @@ public struct DeckContentView: View {
         .fixedSize()
         .help("Gaja settings")
         .accessibilityLabel("Open Gaja settings")
-        .accessibilityHint("Choose theme, appearance, card size, or lotus position")
+        .accessibilityHint("Connect AI tools or choose theme, appearance, card size, and lotus position")
     }
 
     private var settingsIcon: some View {
