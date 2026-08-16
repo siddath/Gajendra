@@ -16,11 +16,17 @@ The repository and compatibility identity is **Gajendra** (`gajendra` in package
 
 The daily surface is an icon-only outline of an elephant lifting its trunk to hold a lotus, defaulting to the bottom right. Click it to show or hide the current thread, its explicit provider activity state, the short priority lanes, and every thread a provider reports as running - even when that thread is also NOW, Focus, or Important. Hover only highlights the launcher, so incidental pointer crossings never open the card. The card stays open for interaction until another launcher click, an outside click, or Escape. Running expands into a complete active-thread list inside one vertically scrollable card body, so Compact remains useful with several simultaneous tasks. A full-width search capsule stays pinned below that body and finds or reprioritizes any loaded thread without leaving the card. Choose **Open** or the provider badge to resume that exact thread in the owning agent.
 
-Choose Top Left, Top Right, Center, Bottom Left, Bottom Center, or Bottom Right from the trailing Settings gear or from the app menu. Settings also owns theme, Auto/Light/Dark appearance, and Compact/Comfortable/Expanded card size; opening it never changes a preference. Double-click the floating mark to enter or leave edit mode, then drag it toward a hotspot or use the jiggling X to hide it. Micro-drags are ignored, an intentional drag snaps to the nearest hotspot, and the card closes while the mark moves. The card opens inward above, below, or beside the launcher instead of covering it. Secondary-click or Control-click the floating mark for its contextual menu, including a confirmed **Uninstall Gaja…** command that retains local priority metadata. A resizable drag-and-drop organizer remains available from the card, Dock, menu bar, or `⇧⌘O`.
+Choose Top Left, Top Right, Center, Bottom Left, Bottom Center, or Bottom Right from the trailing Settings gear or from the app menu. Settings also owns source connection, theme, Auto/Light/Dark appearance, and Compact/Comfortable/Expanded card size; opening it never changes a preference. Double-click the floating mark to enter or leave edit mode, then drag it toward a hotspot or use the jiggling X to hide it. Micro-drags are ignored, an intentional drag snaps to the nearest hotspot, and the card closes while the mark moves. The card opens inward above, below, or beside the launcher instead of covering it. Secondary-click or Control-click the floating mark for its contextual menu, including a confirmed **Uninstall Gaja…** command that retains local priority metadata. A resizable drag-and-drop organizer remains available from the card, Dock, menu bar, or `⇧⌘O`.
 
 > “Widget” describes the compact experience. The current release is a native AppKit/SwiftUI floating utility, not a WidgetKit extension. WidgetKit cannot implement this cross-application, always-on-top interactive card.
 
 ![Gaja hover card](evidence/companion/gajendra-hover-card.png)
+
+## First launch: connect local tools
+
+On a clean first launch, Gaja opens one skippable **Connect your AI tools** screen. It scans the source contracts Gaja actually supports, shows whether each local integration is ready, missing, off, or needs setup, and lets the user opt sources in or out. Codex and Cursor retain their documented defaults; Claude Code and Grok Build remain explicit opt-ins. **Rescan** refreshes local availability and metadata—it is not account authentication or cloud sync. Existing native installations do not receive an unsolicited upgrade popup, and the same screen remains available from the trailing Settings gear or **Connect AI Tools…** in the application menu.
+
+![Gaja local source setup](evidence/companion/gajendra-source-onboarding.png)
 
 ## Why Gaja
 
@@ -30,7 +36,7 @@ AI tools own their sessions; Gaja owns only the decision about what matters next
 - One resume action back to Codex, Claude Code, Cursor, Grok Build, or a configured agent.
 - A derived Running view across every priority lane for threads whose provider explicitly reports active work; placement labels disambiguate duplicates, while resumable or recent metadata is never promoted by inference.
 - Optional Design, Engineering, or Life context on prioritized threads, visible at a glance and editable without copying provider content.
-- Source health and opt-in controls in the organizer.
+- First-launch source discovery plus replayable source health and opt-in controls in Settings and the organizer.
 - Owner-only, metadata-only local persistence.
 - Native light/dark appearance, Reduce Motion support, keyboard commands, and VoiceOver labels.
 
@@ -44,7 +50,7 @@ AI tools own their sessions; Gaja owns only the decision about what matters next
 | Grok Build | Documented local `summary.json` metadata | `grok --resume <session-id>` in Terminal | Off, explicit opt-in | Parser/fixture tested; live CLI proof requires Grok Build installed |
 | Other agents | Size-bounded JSON catalogs | Declared deep link or explicit resume command | Per configuration | Schema and fixture tested |
 
-Gaja never persists titles, prompts, transcript bodies, previews, source files, tokens, or credentials. Claude Code scanning is disabled until the user enables it.
+Gaja never persists titles, prompts, transcript bodies, previews, source files, tokens, or credentials. The native setup screen stores only its completion flag; source choices remain in the private Gaja metadata store. Claude Code scanning is disabled until the user enables it.
 
 See [thread source configuration](docs/THREAD_SOURCES.md) for the generic adapter.
 

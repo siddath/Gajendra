@@ -1,117 +1,117 @@
 {
   "contractVersion": 1,
   "status": "passed",
-  "startedAt": "2026-08-15T19:12:42.584Z",
-  "completedAt": "2026-08-15T19:15:22.887Z",
+  "startedAt": "2026-08-16T06:26:31.499Z",
+  "completedAt": "2026-08-16T06:29:15.133Z",
   "hardFailurePolicy": "Any failed gate stops the run; soft visual judgment cannot erase a hard failure.",
   "results": [
     {
       "gate": "repository-scripts",
       "trial": 1,
       "status": "passed",
-      "durationMs": 375
+      "durationMs": 423
     },
     {
       "gate": "static",
       "trial": 1,
       "status": "passed",
-      "durationMs": 948
+      "durationMs": 2685
     },
     {
       "gate": "behavior",
       "trial": 1,
       "status": "passed",
-      "durationMs": 1191
+      "durationMs": 1196
     },
     {
       "gate": "build",
       "trial": 1,
       "status": "passed",
-      "durationMs": 2560
+      "durationMs": 2599
     },
     {
       "gate": "plugin",
       "trial": 1,
       "status": "passed",
-      "durationMs": 169
+      "durationMs": 175
     },
     {
       "gate": "live-mcp",
       "trial": 1,
       "status": "passed",
-      "durationMs": 3335
+      "durationMs": 3931
     },
     {
       "gate": "companion-self-test",
       "trial": 1,
       "status": "passed",
-      "durationMs": 864
+      "durationMs": 5359
     },
     {
       "gate": "companion-build",
       "trial": 1,
       "status": "passed",
-      "durationMs": 3803
+      "durationMs": 3907
     },
     {
       "gate": "companion-live",
       "trial": 1,
       "status": "passed",
-      "durationMs": 3832
+      "durationMs": 3975
     },
     {
       "gate": "ui",
       "trial": 1,
       "status": "passed",
-      "durationMs": 23414
+      "durationMs": 24872
     },
     {
       "gate": "reliability-unit",
       "trial": 1,
       "status": "passed",
-      "durationMs": 3871
+      "durationMs": 1168
     },
     {
       "gate": "reliability-unit",
       "trial": 2,
       "status": "passed",
-      "durationMs": 1128
+      "durationMs": 1176
     },
     {
       "gate": "reliability-unit",
       "trial": 3,
       "status": "passed",
-      "durationMs": 1174
+      "durationMs": 1173
     },
     {
       "gate": "reliability-unit",
       "trial": 4,
       "status": "passed",
-      "durationMs": 1163
+      "durationMs": 1117
     },
     {
       "gate": "reliability-unit",
       "trial": 5,
       "status": "passed",
-      "durationMs": 1154
+      "durationMs": 1185
     },
     {
       "gate": "reliability-ui",
       "trial": 1,
       "status": "passed",
-      "durationMs": 110116
+      "durationMs": 107620
     },
     {
       "gate": "final-artifacts",
       "trial": 1,
       "status": "passed",
-      "durationMs": 226
+      "durationMs": 220
     },
     {
       "gate": "dependency-audit",
       "trial": 1,
       "status": "passed",
-      "durationMs": 999
+      "durationMs": 851
     }
   ]
 }
