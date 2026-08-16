@@ -90,8 +90,21 @@ for (const required of [
   "override func acceptsFirstMouse",
   "override var canBecomeKey: Bool { acceptsKeyboardInput }",
   'makeOverlayPanel(title: "Gaja Details", size: cardSize, acceptsKeyboardInput: true)',
+  "cardWindow?.makeFirstResponder(nil)",
+  'NSMenu(title: "Edit")',
+  'withTitle: "Cut"',
+  'withTitle: "Copy"',
+  'withTitle: "Paste"',
+  'withTitle: "Select All"',
+  '#selector(NSText.cut(_:))',
+  '#selector(NSText.copy(_:))',
+  '#selector(NSText.paste(_:))',
+  '#selector(NSText.selectAll(_:))',
 ]) {
   if (!menuBar.includes(required)) throw new Error(`Gajendra overlay contract is missing: ${required}`);
+}
+if ((menuBar.match(/panel\.contentView = GajendraFirstMouseHostingView\(/gu) ?? []).length < 2) {
+  throw new Error("Both the launcher and detail card must accept the first cross-app mouse click.");
 }
 for (const required of ["bottomTrailingOrigin", "origin(", "nearestAnchor", "cardMaximumSize", "cardOrigin", "isMeaningfulDrag", "GajendraCardPresentationState", "isPresented.toggle()", ".onHover", ".glassEffect(", "#available(macOS 26.0", ".thinMaterial"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra floating-card contract is missing: ${required}`);
@@ -115,8 +128,13 @@ for (const source of [overlay, content]) {
   if (source.includes("toggleLightDark")) throw new Error("Opening native header settings must not also toggle appearance.");
 }
 if (!overlay.includes("contextBadge(")) throw new Error("The Gaja hover card is missing bounded context labels.");
-for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "Show \\(remaining) more in Organizer", "executionSignal(", "runningSummary(", "runningDisclosureHeader(", "isRunningExpanded.toggle()", "ScrollView(.vertical, showsIndicators: true)", "persistentSearchFooter(total:", "gajendra-card-scroll-top", "quickSearch(total:", "GajendraSearchTextField(", "field.selectText(nil)", "searchResults(", "searchActions(", "snapshot.allThreads.count", "snapshot.searchThreads(searchQuery)", "isNowHovered", "isSearchHovered", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on open · Local metadata"]) {
+for (const required of ["queueColumn(", "threads.prefix(5)", "moreButton(", "Show \\(remaining) more in Organizer", "executionSignal(", "runningSummary(", "runningDisclosureHeader(", "isRunningExpanded.toggle()", "ScrollView(.vertical, showsIndicators: true)", "persistentSearchFooter(total:", "gajendra-card-scroll-top", "quickSearch(total:", "GajendraSearchTextField(", "GajendraSearchField", "selectsAllOnNextMouseDown", "cancelPendingMouseSelection", "reconcileText(in:", "selectExistingTextIfUnchanged", "pendingSelectionValue = nil", "field.currentEditor()", "NSWindow.didResignKeyNotification", "searchResults(", "searchActions(", "snapshot.allThreads.count", "snapshot.searchThreads(searchQuery)", "isNowHovered", "isSearchHovered", "hoveredThreadId", "providerBadge(", "openButtonForeground", "GajendraThreadRowButtonStyle", "showsTopDivider", "pressedColor", "Fresh on open · Local metadata"]) {
   if (!overlay.includes(required)) throw new Error(`Gajendra redesigned hover card contract is missing: ${required}`);
+}
+const searchCoordinator = overlay.slice(overlay.indexOf("final class Coordinator: NSObject, NSTextFieldDelegate"), overlay.indexOf("public struct GajendraHoverCardView"));
+const beginEditingHandler = searchCoordinator.slice(searchCoordinator.indexOf("func controlTextDidBeginEditing"), searchCoordinator.indexOf("func controlTextDidChange"));
+if (beginEditingHandler.includes("DispatchQueue.main.async")) {
+  throw new Error("Native search must not defer select-all from begin editing; delayed selection can replace each typed character.");
 }
 for (const required of ["runningSection(", "runningSectionHeader(", "organizerSearchFooter(snapshot:", "gajendra-organizer-search-results", "executionSignal(", "snapshot.runningThreads", "snapshot.searchThreads(search)"]) {
   if (!content.includes(required)) throw new Error(`Gajendra organizer activity contract is missing: ${required}`);
@@ -260,7 +278,11 @@ console.log(JSON.stringify({
   codexDesktopRuntimeStatusEnrichment: "lock-and-lifecycle-metadata-only",
   inCardGlobalThreadSearch: true,
   keyboardCapableSearchPanel: true,
+  nativeSearchAcceptsFirstCrossAppClick: true,
+  nativeSearchPreservesMultiCharacterInput: true,
+  nativeSearchCancelsStaleSelectionOnEdit: true,
   searchSelectsExistingTextOnFocus: true,
+  nativeSearchEditingShortcuts: ["command-a", "command-c", "command-v", "command-x"],
   nowActionOrder: ["open", "activity", "provider"],
   hoverCardSizes: ["compact", "comfortable", "expanded"],
   distinctNativeAndFocusDeckSurfaces: true,

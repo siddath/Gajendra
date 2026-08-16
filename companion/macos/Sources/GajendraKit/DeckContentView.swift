@@ -847,19 +847,6 @@ public struct DeckContentView: View {
                     lineWidth: isSearchActive ? 1 : 0.75
                 )
         )
-        .overlay {
-            if !isPreview && !searchFocused {
-                Button {
-                    searchFocused = true
-                } label: {
-                    Color.clear
-                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, search.isEmpty ? 0 : 30)
-                .accessibilityHidden(true)
-            }
-        }
         .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .onTapGesture {
             if !isPreview { searchFocused = true }

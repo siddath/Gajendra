@@ -659,6 +659,45 @@ private struct GajendraJigglingView<Content: View>: View {
     }
 }
 
+private final class GajendraSearchField: NSTextField {
+    private var selectsAllOnNextMouseDown = true
+    private var pendingMouseSelectionValue: String?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    func prepareForFocusEntry() {
+        selectsAllOnNextMouseDown = true
+        pendingMouseSelectionValue = nil
+    }
+
+    func markFocusEntryHandled() {
+        selectsAllOnNextMouseDown = false
+        pendingMouseSelectionValue = nil
+    }
+
+    func cancelPendingMouseSelection() {
+        pendingMouseSelectionValue = nil
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        let shouldSelectExistingText = selectsAllOnNextMouseDown
+        let selectionValue = stringValue
+        markFocusEntryHandled()
+        super.mouseDown(with: event)
+
+        guard shouldSelectExistingText, !selectionValue.isEmpty else { return }
+        pendingMouseSelectionValue = selectionValue
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  self.pendingMouseSelectionValue == selectionValue,
+                  self.stringValue == selectionValue,
+                  let editor = self.currentEditor() as? NSTextView else { return }
+            self.pendingMouseSelectionValue = nil
+            editor.selectAll(nil)
+        }
+    }
+}
+
 struct GajendraSearchTextField: NSViewRepresentable {
     @Binding var text: String
     @Binding var isFocused: Bool
@@ -672,7 +711,7 @@ struct GajendraSearchTextField: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = GajendraSearchField()
         field.delegate = context.coordinator
         field.isBordered = false
         field.isBezeled = false
@@ -687,46 +726,128 @@ struct GajendraSearchTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
-        context.coordinator.parent = self
-        if field.stringValue != text { field.stringValue = text }
+        let coordinator = context.coordinator
+        coordinator.parent = self
+        coordinator.observeWindow(of: field)
+        coordinator.reconcileText(in: field, with: text)
         if field.placeholderString != prompt { field.placeholderString = prompt }
         field.font = .systemFont(ofSize: fontSize)
 
-        if isFocused, !context.coordinator.appliedFocusRequest {
-            context.coordinator.appliedFocusRequest = true
-            DispatchQueue.main.async {
-                onFocusRequested()
-                field.window?.makeFirstResponder(field)
-                field.selectText(nil)
-            }
-        } else if !isFocused {
-            context.coordinator.appliedFocusRequest = false
+        if isFocused {
+            coordinator.requestFocusIfNeeded(for: field)
+        } else if field.currentEditor() == nil {
+            coordinator.resetFocusRequest()
         }
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: GajendraSearchTextField
-        var appliedFocusRequest = false
+        private var appliedFocusRequest = false
+        private var pendingSelectionValue: String?
+        private var pendingUserText: String?
+        private weak var observedWindow: NSWindow?
+        private var resignKeyObserver: NSObjectProtocol?
 
         init(parent: GajendraSearchTextField) {
             self.parent = parent
         }
 
-        func controlTextDidBeginEditing(_ notification: Notification) {
-            parent.onFocusRequested()
-            parent.isFocused = true
-            DispatchQueue.main.async {
-                (notification.object as? NSTextField)?.selectText(nil)
+        deinit {
+            if let resignKeyObserver { NotificationCenter.default.removeObserver(resignKeyObserver) }
+        }
+
+        func observeWindow(of field: NSTextField) {
+            guard let window = field.window, observedWindow !== window else { return }
+            if let resignKeyObserver { NotificationCenter.default.removeObserver(resignKeyObserver) }
+            observedWindow = window
+            resignKeyObserver = NotificationCenter.default.addObserver(
+                forName: NSWindow.didResignKeyNotification,
+                object: window,
+                queue: .main
+            ) { [weak self, weak field] _ in
+                guard let self else { return }
+                (field as? GajendraSearchField)?.prepareForFocusEntry()
+                self.pendingUserText = nil
+                self.resetFocusRequest()
+                self.parent.isFocused = false
             }
+        }
+
+        func reconcileText(in field: NSTextField, with value: String) {
+            if let pendingUserText {
+                if value == pendingUserText {
+                    self.pendingUserText = nil
+                } else if field.stringValue == pendingUserText {
+                    return
+                } else {
+                    self.pendingUserText = nil
+                }
+            }
+            if field.stringValue != value { field.stringValue = value }
+        }
+
+        func requestFocusIfNeeded(for field: NSTextField) {
+            guard !appliedFocusRequest else { return }
+            appliedFocusRequest = true
+            pendingSelectionValue = field.stringValue
+            parent.onFocusRequested()
+
+            if field.window?.makeFirstResponder(field) == true {
+                selectExistingTextIfUnchanged(in: field)
+                return
+            }
+
+            DispatchQueue.main.async { [weak self, weak field] in
+                guard let self, let field, self.parent.isFocused else { return }
+                field.window?.makeFirstResponder(field)
+                self.selectExistingTextIfUnchanged(in: field)
+            }
+        }
+
+        func resetFocusRequest() {
+            appliedFocusRequest = false
+            pendingSelectionValue = nil
+        }
+
+        private func selectExistingTextIfUnchanged(in field: NSTextField) {
+            guard let pendingSelectionValue else { return }
+            self.pendingSelectionValue = nil
+            guard !pendingSelectionValue.isEmpty,
+                  pendingUserText == nil,
+                  field.stringValue == pendingSelectionValue,
+                  let editor = field.currentEditor() as? NSTextView else { return }
+            (field as? GajendraSearchField)?.markFocusEntryHandled()
+            editor.selectAll(nil)
+        }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            if !appliedFocusRequest {
+                appliedFocusRequest = true
+                pendingSelectionValue = field.stringValue
+                parent.onFocusRequested()
+            }
+            parent.isFocused = true
         }
 
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
-            parent.text = field.stringValue
+            pendingSelectionValue = nil
+            pendingUserText = field.stringValue
+            (field as? GajendraSearchField)?.cancelPendingMouseSelection()
+            if parent.text != field.stringValue { parent.text = field.stringValue }
         }
 
         func controlTextDidEndEditing(_ notification: Notification) {
-            parent.isFocused = false
+            guard let field = notification.object as? NSTextField else { return }
+            pendingSelectionValue = nil
+            (field as? GajendraSearchField)?.prepareForFocusEntry()
+            DispatchQueue.main.async { [weak self, weak field] in
+                guard let self, let field, field.currentEditor() == nil else { return }
+                self.pendingUserText = nil
+                self.resetFocusRequest()
+                self.parent.isFocused = false
+            }
         }
 
         func control(
@@ -1376,23 +1497,12 @@ public struct GajendraHoverCardView: View {
                 lineWidth: isSearchActive ? 1 : 0.75
             )
         )
-        .overlay {
-            if !isPreview && !searchFocused {
-                Button {
-                    onSearchFocusRequested()
-                    searchFocused = true
-                } label: {
-                    Color.clear
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.trailing, searchQuery.isEmpty ? 0 : 28 * contentScale)
-                .accessibilityHidden(true)
-            }
-        }
         .contentShape(Capsule())
         .onTapGesture {
-            if !isPreview { searchFocused = true }
+            if !isPreview {
+                onSearchFocusRequested()
+                searchFocused = true
+            }
         }
         .onHover { isSearchHovered = $0 }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isSearchActive)
