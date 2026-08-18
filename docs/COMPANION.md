@@ -4,6 +4,9 @@ Gajendra is intended to provide a quiet native macOS focus surface: one NOW, a s
 Important, provider-reported Running, and an explicit Ready for Review disclosure, with source
 opening retained in the source product.
 
+For a short build, first-launch, daily-use, and troubleshooting path, start with the
+[user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
+
 This page records the **source/build contract** and the narrow installed launcher receipt. On
 2026-08-18, `npm run companion:test`, `npm run companion:build`,
 `npm run companion:ui-test`, `npm run companion:validate`, and
@@ -43,6 +46,8 @@ npm run companion:build
 npm run companion:ui-test
 npm run companion:validate
 npm run companion:bundle-readiness
+npm run launch:assets
+npm run validate:launch-assets
 ```
 
 The UI command launches the built app with a temporary empty store and disabled built-in sources;
@@ -52,6 +57,9 @@ CI compiles the target but does not claim that physical journey. The last comman
 inspection, not a release authorization: it checks source-controlled bundle requirements and reports
 ad-hoc signing honestly. Developer ID, notarization, Gatekeeper, archive, and distribution receipts
 are separate, fail-closed steps.
+
+The last two commands render and validate the public screenshot package using a dedicated synthetic
+fixture. The app surfaces are actual SwiftUI output; no private provider thread is used.
 
 See [Host validation](HOST_VALIDATION.md), [release checklist](RELEASE_CHECKLIST.md), and
 [STATUS.md](../STATUS.md) for the pending proof sequence.

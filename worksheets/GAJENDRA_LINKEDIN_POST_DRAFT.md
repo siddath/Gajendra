@@ -1,49 +1,69 @@
-# Gajendra LinkedIn post draft
+# Gajendra LinkedIn launch post
 
-- **Status:** local draft only — not approved or published
-- **Image:** `evidence/launch/gajendra-linkedin-synthetic.png` (synthetic demo data; no private threads)
-- **Claim boundary:** public source-review candidate with a narrow installed launcher receipt; not Developer ID signed, notarized, or download-ready
-- **Series:** this is the long-form launch draft; the ten-post set is in [GAJENDRA_LINKEDIN_SERIES.md](GAJENDRA_LINKEDIN_SERIES.md)
+- **Status:** final draft for owner review — not published
+- **Primary image:** [`evidence/launch/gajendra-hero.png`](../evidence/launch/gajendra-hero.png)
+- **Suggested post time:** **Wednesday, 19 August 2026 at 4:00 PM IST**
+- **Availability boundary:** source is public and buildable; there is no signed/notarized download
 
----
+## Why this time
 
-I kept losing the one AI thread I actually needed to return to.
+Buffer's July 2026 analysis of 4.8 million LinkedIn posts found Wednesday at 4:00 PM to be the
+highest-performing overall slot, with times normalized to the audience's local timezone. Treat this
+as a first experiment, not a guarantee, and prefer your own profile analytics after the post has
+enough history: [Buffer's 2026 timing analysis](https://buffer.com/resources/best-time-to-post-on-linkedin/).
 
-The sessions were still there, spread across different tools. What was missing was a small layer that
-remembered my decision: this is the thread for now; these few come next.
+Post manually and keep 4:00–5:00 PM free for real replies. LinkedIn says its feed is reducing generic
+content, engagement bait, automated comments, and engagement pods in favor of authentic professional
+conversation: [LinkedIn's 2026 feed update](https://news.linkedin.com/2026/ImprovingTheFeed).
 
-🧭 So I built a small side project called Gajendra. It gives me one NOW, a short Focus queue,
-Important, explicit Running state, search, and a direct route back to the source thread.
+## Ready-to-paste post
+
+I did not need another AI tool.
+
+I needed one place to remember which thread deserved my attention.
+
+Codex might be running a build. Claude might be helping me shape the story. Another result might be
+ready for review. The work was not lost—but my focus was scattered across the tools.
+
+So I built a small macOS side project called **Gajendra**.
+
+🎯 **NOW** keeps one thread unmistakably current.
+
+🏃 **Running** shows the work the provider says is still active.
+
+👀 **Ready for Review** separates finished work that needs a human decision.
+
+🔗 **Open** takes me back to the owning tool instead of copying the conversation into another app.
+
+The principle is simple:
 
 **One NOW. One short queue. One click back to the exact thread.**
 
-🛠️ I chose a native macOS surface because I wanted it to feel quiet and close at hand, not like
-another dashboard. That choice made details such as keyboard use, VoiceOver labels, Reduce Motion,
-compact density, and a self-contained runtime part of the product—not polish for later.
+I built it local-first. Gajendra stores its priority metadata, not prompts, transcripts, credentials,
+or review content. Codex, Claude, and the other tools continue to own their sessions.
 
-The harder work started when I treated it like a real release candidate.
+I also built it with a bounded multi-agent workflow: separate implementation lanes, adversarial
+review, and one integration owner. That changed the quality of the result. The reviewers found the
+kind of failures happy-path demos miss, while the product stayed small and self-contained.
 
-🔍 Atomic file replacement turned out not to be concurrency safety. A nice drag interaction was
-still unsafe when it translated into several writes. “Local-first” meant auditing every metadata
-read and every error, not just avoiding cloud storage. And a Mac app isn't self-contained if the
-first clean machine still needs Homebrew and Node.
+The source is public today. A signed and notarized download comes later; the mobile companion is
+still a plan, not a shipped feature.
 
-I used Codex Harness plus bounded model lanes to separate server, native, and adversarial review
-work. That separation found failures the happy-path tests missed: stale undo history, process-group
-leaks, corrupt-state recovery gaps, unsafe deep-link boundaries, and archive checks that looked
-strict without proving the archive matched the app.
+What is the smallest layer you wish existed above your AI tools?
 
-The current source-review candidate now passes the full repository gauntlet, native build and
-validator, isolated real-window launcher automation, and an offline bundled-runtime check. The
-exact ad-hoc build also passed its launcher journey after local installation. It is still not a
-signed, notarized download. Physical VoiceOver, login-item, drag, and clean-Mac checks stay open.
+#BuildInPublic #LocalFirst #AIEngineering #MacOS
 
-📱 The next planned step is a paired iOS/Android companion through one opt-in Mac relay: start with
-Open on Mac, then prove pairing, lifecycle, connectivity, and privacy on real devices. That is a
-plan today, not a shipped mobile feature.
+## Suggested alt text
 
-If this cross-tool problem is familiar, I'd value testers once the signed build exists. Source
-contributors who want to pressure-test the provider, accessibility, and release boundaries are
-welcome now.
+Gajendra macOS utility with synthetic demo data. The screen shows one NOW task, two Focus tasks, two
+Important tasks, two Running tasks, and one Ready for Review item across Codex, Claude, and an
+explicitly labeled demo review feed.
 
-*Image uses synthetic demo data.*
+## Publication checklist
+
+- Attach `gajendra-hero.png` as the first image.
+- Paste the suggested alt text.
+- Confirm the repository link and visibility immediately before posting.
+- Publish manually at the suggested time and reply in your own voice.
+- Do not add a download CTA until Developer ID, notarization, Gatekeeper, archive, and clean-Mac
+  gates are complete.

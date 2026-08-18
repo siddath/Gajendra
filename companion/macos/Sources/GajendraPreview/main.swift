@@ -139,6 +139,135 @@ enum GajendraPreview {
             client: nil,
             initialSnapshot: reviewPreviewSnapshot([reviewRows[0]], Array(reviewRows.dropFirst()))
         )
+
+        // Public launch captures use real SwiftUI views with deliberately synthetic metadata.
+        // The titles mirror common Codex and Claude workflows without copying any private thread.
+        let launchReviewSignal = reviewSignal(
+            kind: .diff,
+            updatedAt: 1_786_475_030,
+            destination: ReviewDestination(
+                type: .url,
+                url: "https://example.invalid/reviews/gajendra-launch"
+            ),
+            providerStatus: "FINISHED"
+        )
+        let launchNow = thread(
+            "launch-now",
+            "Prepare Gajendra's public launch",
+            "Gajendra",
+            level: .focus,
+            current: true,
+            context: .design,
+            sourceId: "codex",
+            sourceName: "Codex",
+            status: "working",
+            updatedAt: 1_786_475_100
+        )
+        let launchClaudeStory = thread(
+            "launch-story",
+            "Turn the build notes into a clear story",
+            "Launch",
+            level: .focus,
+            context: .design,
+            sourceId: "claude",
+            sourceName: "Claude",
+            status: "working",
+            updatedAt: 1_786_475_080
+        )
+        let launchCodexInteraction = thread(
+            "launch-interaction",
+            "Polish the widget reopen flow",
+            "Gajendra",
+            level: .focus,
+            context: .engineering,
+            sourceId: "codex",
+            sourceName: "Codex",
+            updatedAt: 1_786_475_060
+        )
+        let launchClaudeSetup = thread(
+            "launch-setup",
+            "Simplify the first-run setup guide",
+            "Docs",
+            level: .important,
+            context: .design,
+            sourceId: "claude",
+            sourceName: "Claude",
+            updatedAt: 1_786_475_040
+        )
+        let launchCodexRelease = thread(
+            "launch-release",
+            "Verify the public release checklist",
+            "Release",
+            level: .important,
+            context: .engineering,
+            sourceId: "codex",
+            sourceName: "Codex",
+            updatedAt: 1_786_475_020
+        )
+        let launchReviewThread = thread(
+            "launch-review",
+            "Review the launch screenshot set",
+            "Launch",
+            sourceId: "demo-review",
+            sourceName: "Demo Review Feed",
+            updatedAt: 1_786_475_010,
+            review: launchReviewSignal
+        )
+        let launchSources = [
+            ThreadSourceStatus(
+                id: "codex", name: "Codex", kind: "codex-app-server", state: "ready",
+                enabled: true, threadCount: 3
+            ),
+            ThreadSourceStatus(
+                id: "claude", name: "Claude", kind: "claude-jsonl", state: "ready",
+                enabled: true, threadCount: 2
+            ),
+            ThreadSourceStatus(
+                id: "demo-review", name: "Demo Review Feed", kind: "configured", state: "ready",
+                enabled: true, threadCount: 1
+            ),
+        ]
+        let launchSnapshot = DeckSnapshot(
+            generatedAt: "2026-08-18T00:00:00Z",
+            current: launchNow,
+            focus: [launchNow, launchClaudeStory, launchCodexInteraction],
+            important: [launchClaudeSetup, launchCodexRelease],
+            available: [launchReviewThread],
+            collapsed: CollapsedSections(focus: false, important: false),
+            focusGuide: 5,
+            focusOverGuide: false,
+            staleEntryCount: 0,
+            source: "synthetic-launch-fixture",
+            sources: launchSources,
+            error: nil
+        )
+        let launchReviewNow = thread(
+            "launch-review-now",
+            "Keep one clear focus during launch week",
+            "Gajendra",
+            level: .focus,
+            current: true,
+            context: .design,
+            sourceId: "codex",
+            sourceName: "Codex",
+            updatedAt: 1_786_475_100
+        )
+        let launchReviewSnapshot = DeckSnapshot(
+            generatedAt: launchSnapshot.generatedAt,
+            current: launchReviewNow,
+            focus: [launchReviewNow],
+            important: [launchClaudeSetup],
+            available: [launchReviewThread],
+            collapsed: CollapsedSections(focus: false, important: false),
+            focusGuide: 5,
+            focusOverGuide: false,
+            staleEntryCount: 0,
+            source: launchSnapshot.source,
+            sources: launchSources,
+            error: nil
+        )
+        let launchModel = DeckViewModel(client: nil, initialSnapshot: launchSnapshot)
+        let launchReviewModel = DeckViewModel(client: nil, initialSnapshot: launchReviewSnapshot)
         let arguments = Array(CommandLine.arguments.dropFirst())
         let organizerDestination = arguments.first ?? "gajendra-organizer.png"
         let cardDestination = arguments.dropFirst().first ?? "gajendra-hover-card.png"
@@ -162,6 +291,11 @@ enum GajendraPreview {
         let oneReviewDestination = arguments.dropFirst(19).first ?? "gajendra-hover-card-review-one.png"
         let emptyReviewDestination = arguments.dropFirst(20).first ?? "gajendra-hover-card-review-empty.png"
         let tenReviewDestination = arguments.dropFirst(21).first ?? "gajendra-hover-card-review-ten-dark-static.png"
+        let launchOverviewDestination = arguments.dropFirst(22).first ?? "gajendra-launch-overview.png"
+        let launchReviewDestination = arguments.dropFirst(23).first ?? "gajendra-launch-ready-for-review.png"
+        let launchSearchDestination = arguments.dropFirst(24).first ?? "gajendra-launch-search.png"
+        let launchQueueDestination = arguments.dropFirst(25).first ?? "gajendra-launch-queue-editing.png"
+        let launchOrganizerDestination = arguments.dropFirst(26).first ?? "gajendra-launch-organizer.png"
 
         try renderSuite(
             organizerModel: organizerModel,
@@ -256,6 +390,48 @@ enum GajendraPreview {
             appearance: .dark,
             size: .expanded,
             destination: tenReviewDestination
+        )
+        try renderCard(
+            model: launchModel,
+            theme: .nativePopover,
+            appearance: .light,
+            size: .expanded,
+            destination: launchOverviewDestination
+        )
+        try renderCard(
+            model: launchReviewModel,
+            theme: .nativePopover,
+            appearance: .light,
+            size: .comfortable,
+            destination: launchReviewDestination
+        )
+        try renderCard(
+            model: launchModel,
+            theme: .nativePopover,
+            appearance: .light,
+            size: .comfortable,
+            destination: launchSearchDestination,
+            searchQuery: "Codex"
+        )
+        try renderCard(
+            model: launchModel,
+            theme: .nativePopover,
+            appearance: .light,
+            size: .comfortable,
+            destination: launchQueueDestination,
+            queueEditing: true
+        )
+        try render(
+            DeckContentView(
+                model: launchModel,
+                visualSettings: GajendraVisualSettings(theme: .nativePopover, appearance: .light),
+                usesScrollView: false,
+                isPreview: true
+            ),
+            width: 620,
+            height: 900,
+            destination: launchOrganizerDestination,
+            colorScheme: .light
         )
         try render(
             GajendraSourceOnboardingView(model: cardModel, isPreview: true),
