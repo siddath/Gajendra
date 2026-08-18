@@ -26,6 +26,11 @@ busy_card_destination="$repo_root/evidence/companion/gajendra-hover-card-busy.pn
 one_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-one.png"
 empty_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-empty.png"
 ten_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-ten-dark-static.png"
+launch_overview_destination="$repo_root/evidence/launch/gajendra-launch-overview.png"
+launch_review_destination="$repo_root/evidence/launch/gajendra-launch-ready-for-review.png"
+launch_search_destination="$repo_root/evidence/launch/gajendra-launch-search.png"
+launch_queue_destination="$repo_root/evidence/launch/gajendra-launch-queue-editing.png"
+launch_organizer_destination="$repo_root/evidence/launch/gajendra-launch-organizer.png"
 
 mkdir -p "${destination:h}"
 swift run --package-path "$package_root" -c release GajendraPreview \
@@ -36,7 +41,8 @@ swift run --package-path "$package_root" -c release GajendraPreview \
   "$compact_card_destination" "$expanded_card_destination" "$search_card_destination" \
   "$onboarding_destination" "$dark_onboarding_destination" "$queue_editing_destination" \
   "$busy_card_destination" "$one_review_destination" "$empty_review_destination" \
-  "$ten_review_destination"
+  "$ten_review_destination" "$launch_overview_destination" "$launch_review_destination" \
+  "$launch_search_destination" "$launch_queue_destination" "$launch_organizer_destination"
 echo "$destination"
 echo "$card_destination"
 echo "$pill_destination"
@@ -59,3 +65,8 @@ echo "$busy_card_destination"
 echo "$one_review_destination"
 echo "$empty_review_destination"
 echo "$ten_review_destination"
+echo "$launch_overview_destination"
+echo "$launch_review_destination"
+echo "$launch_search_destination"
+echo "$launch_queue_destination"
+echo "$launch_organizer_destination"

@@ -7,132 +7,168 @@
 <p align="center"><strong>One clear focus across your AI tools.</strong><br />
 One NOW. One short queue. One click back to the exact thread.</p>
 
-Gajendra is a local-first macOS focus utility for AI-agent threads. It keeps one global NOW and
-short Focus and Important queues across supported sources; the source product continues to own the
-thread, its content, and its credentials.
+![Gajendra product hero showing the real macOS app UI with synthetic Codex and Claude workflow data](evidence/launch/gajendra-hero.png)
 
-`Gajendra` is the visible product name. The lower-case compatibility identifiers remain unchanged:
-`gajendra` packages and plugin IDs, `gajendra://` URLs, `dev.sid.gajendra`, the executable name,
-and the `Application Support/Gajendra` state path.
+Gajendra is a local-first macOS focus utility for AI-agent threads. It gives you one place to decide
+what deserves attention across Codex, Claude Code, and other explicitly enabled local sources—then
+returns you to the owning tool when it is time to work.
 
-## Current candidate boundary
+It does not replace those tools or copy their conversations. It adds a small, quiet attention layer
+above them.
 
-This branch is a **source-review candidate** based on `53e9855`, not a binary release. Source
-publication on GitHub does not imply that an app bundle is Developer ID signed, notarized,
-Gatekeeper-approved, or safe to distribute. Exact commit, pull-request, and hosted-CI receipts are
-recorded in [STATUS.md](STATUS.md) after they exist.
+## Why Gajendra exists
 
-The release evidence ledger and the remaining gates are in [STATUS.md](STATUS.md) and
-[the execution worksheet](worksheets/2026-08-18-gajendra-release-brand-mobile-execution.md).
+AI work rarely stays inside one session. A coding task may still be running in Codex, a writing task
+may be waiting in Claude, and a finished result may need review somewhere else. The sessions exist;
+the missing piece is a trusted answer to four simple questions:
 
-The current local receipts recorded on 2026-08-18 are `npm run check` (**83/83** tests),
-`npm run test:e2e` (**17/17**), `npm run companion:test`, `npm run companion:build`,
-`npm run companion:ui-test`, `npm run companion:validate`, and
-`npm run companion:bundle-readiness`. The real-window UI journey uses an isolated empty store and
-source catalog; it covers stationary and 2 px taps, recovery from move/hide mode, an actual macOS
-accessibility press, and the launcher edge target. The exact ad-hoc build also passed that launcher
-journey after local installation without changing the private state-file hash or modes. This is not
-a clean-Mac, physical VoiceOver, login-item, drag, Developer ID, notarization, or distribution
-receipt.
+- What am I doing **NOW**?
+- What are the few things I should return to next?
+- What is still **Running**?
+- What is **Ready for Review**?
 
-The current [local gauntlet receipt](evidence/gauntlet/report.json) passed on 2026-08-18 with 19
-passing result records. It covers repository/static/behavior/build/plugin/live MCP, companion,
-real-window launcher UI, browser UI, reliability, final-artifact, and dependency-audit checks; it
-is not a clean-Mac or external-release receipt.
+Gajendra keeps those answers close without becoming another project-management system.
 
-## Product and privacy contract
+## Product tour
 
-- **NOW** is global and is always a member of **Focus**. **Focus** and **Important** retain their
-  full ordered queues; compact surfaces show at most five entries per lane and link to Organizer
-  for the remainder. **Running** is a provider-reported status, not a persisted priority tier or a
-  recency guess. **Ready for Review** is a second derived disclosure populated only by an explicit
-  provider signal; Running takes precedence when a stale source reports both.
-- Canonical IDs are `source-id:provider-thread-id`. Gajendra stores only IDs, priority order, the
-  bounded Design/Engineering/Life context enum, preferences, a monotonic revision, and bounded
-  hashed idempotency receipts. It never persists titles, prompts, transcript bodies, source files,
-  credentials, tokens, or arbitrary provider responses.
-- Sources are explicit and bounded. Claude Code metadata remains opt-in; configured sources are
-  bounded catalogs with validated unique source IDs, not arbitrary directory or command discovery.
-  A configured catalog may declare a validated live-only `review` signal as shown in
-  [the synthetic example](examples/review-catalog.json); Gajendra never infers review readiness from
-  `idle`, `resumable`, or recency.
-- Gajendra opens an allowed source destination only after source-specific URL validation. Unsafe
-  `javascript:`, `data:`, and `file:` destinations fail both when catalog data is read and when an
-  open is attempted.
+These are deterministic screenshots of the real SwiftUI views. Every title, project, ID, and status
+comes from a public synthetic fixture shaped like common Codex and Claude workflows; no private
+thread content is used.
 
-Read [Architecture](docs/ARCHITECTURE.md), [thread-source boundaries](docs/THREAD_SOURCES.md),
-[security](SECURITY.md), and [compatibility](docs/COMPATIBILITY.md) before changing these rules.
+| Focus overview | Ready for Review |
+| --- | --- |
+| ![Gajendra overview with one NOW, Focus, Important, Running, and Ready for Review](evidence/launch/gajendra-launch-overview.png) | ![Gajendra Ready for Review disclosure with a synthetic configured review feed](evidence/launch/gajendra-launch-ready-for-review.png) |
 
-## A1–A6 source contract
+| Search | Edit priorities |
+| --- | --- |
+| ![Gajendra filtered search results for Codex threads](evidence/launch/gajendra-launch-search.png) | ![Gajendra priority editing with remove controls and drag handles](evidence/launch/gajendra-launch-queue-editing.png) |
 
-| Gate | Current source contract | Evidence boundary |
-| --- | --- | --- |
-| A1 | One private store authority serializes cross-process mutations with revision/CAS, SHA-256 idempotency receipts, and typed stale conflicts. `GAJENDRA_DATA_DIR` does not inherit legacy `~/.codex` state unless migration is explicitly requested. | Current source coverage and the local gauntlet are recorded; external proof remains open. |
-| A2 | `move-before` is one atomic mutation for reorder, lane move, append, NOW repair, and context retention. Duplicate keys replay exactly once; an absent target rejects before mutation. | Current domain/service fault and replay coverage plus the local gauntlet are recorded; physical/installed proof remains open. |
-| A3 | Launch at Login is source-controlled only after explicit user action. | Native source, self-test, companion validator, build, and local bundle-readiness are recorded; no installed login-item claim is made. |
-| A4 | Codex activity enrichment is optional, bounded, metadata-only, and never persists rollout content. | Current adapter/persistence coverage, companion-validator boundary checks, and the local gauntlet are recorded; installed-provider proof remains open. |
-| A5 | Per-source safe schemes are enforced at catalog parsing and again at web/native opening. | Current local TypeScript/web coverage is a source receipt; installed/native interaction proof remains open. |
-| A6 | Unknown IDs fail closed; store/catalog reads are bounded; corrupt state is quarantined and only a structurally valid private last-known-good copy can recover it. | Current recovery coverage and the local gauntlet are recorded; external/installed proof remains open. |
+![Gajendra Organizer showing sources, NOW, ordered queues, Running, and Ready for Review](evidence/launch/gajendra-launch-organizer.png)
 
-### Codex rollout-tail boundary (A4)
+## What you can do
 
-On macOS only, Gajendra may enrich an app-server status by inspecting a held Codex writer-lock path
-under `~/.codex/thread-writer-locks`. It realpath-confines the matching rollout under
-`~/.codex/sessions`, opens it without following links, reads no more than the final **256 KiB**, and
-considers only allow-listed lifecycle markers after the last `task_complete` marker. Response items,
-messages, coordination payloads, and raw rollout content are neither returned nor persisted.
+| Capability | What it is for |
+| --- | --- |
+| **NOW** | Keep exactly one current thread visible and open it immediately. NOW always belongs to Focus. |
+| **Focus and Important** | Maintain short ordered queues, move work between them, add bounded Design/Engineering/Life context, and keep the full list in Organizer. |
+| **Running** | See provider-reported active work across every priority lane. It is live status, not a guessed priority or a recency label. |
+| **Ready for Review** | See an explicit live review signal and open its Review or Task destination. Running takes precedence if a source reports both. |
+| **Search** | Filter local thread metadata across enabled sources without copying conversation bodies. |
+| **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
+| **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
+| **Adapt the surface** | Choose compact, comfortable, or expanded cards; light, dark, or system appearance; native or Focus Deck styling; and a preferred screen position. |
+| **Start quietly** | Choose sources on first launch and enable Launch at Login only through an explicit action. |
 
-Set `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable this optional enrichment. If a lock, path,
-open, bounded read, lifecycle marker, or local probe fails, the app-server status is retained rather
-than inferred from file age or content.
+Built-in Codex, Claude Code, Cursor, and Grok adapters currently provide thread metadata. Ready for
+Review is available through an explicitly configured bounded catalog that supplies a validated live
+review signal; the built-in adapters do not infer it from idle time or recency.
 
-Codex app-server JSON-RPC stdout accepts one response line up to a **512 KiB default**, selected
-after a measured `thread/list limit=100` response of 383,665 bytes. An environment override can
-lower or raise that value only to a fixed **1 MiB hard maximum**. Oversized or unterminated output
-fails generically, is cleaned up, and is neither exposed nor persisted.
+## Set it up on macOS
 
-## Build from source
+### Requirements
 
-The source-build contract is macOS **13.5 or later**, Xcode/Swift, and Node **20 or later** for
-development. It is distinct from a binary distribution: a built app is expected to contain the
-pinned Node **v24.19.0** runtime, checksum-verified during extraction, with its notices. One exact
-ad-hoc local build has an installed launcher-interaction receipt; no downloadable or
-distribution-ready binary is claimed.
+- macOS **13.5 or later**
+- Xcode or the Xcode Command Line Tools
+- Node.js **20 or later** for the source build
+- At least one supported local AI tool whose threads you want to see
+
+### Build and open the app
 
 ```sh
 git clone https://github.com/siddath/Gajendra.git gajendra
 cd gajendra
 npm ci
-npm run check
 npm run companion:build
-npm run companion:ui-test
+open build/Gajendra.app
 ```
 
-`npm run companion:bundle-readiness` is a local, fail-closed inspection of an existing bundle. It
-reports ad-hoc signing honestly; it does not sign, notarize, publish, or make an artifact
-distribution-ready. The separate distribution-readiness mode requires explicit Developer ID,
-Gatekeeper, notarization/staple, archive, and checksum inputs and intentionally fails closed when
-they are absent.
+The first build downloads and checksum-verifies the pinned Node runtime used inside the app bundle.
+The running app uses that bundled runtime; it does not depend on Homebrew or a separately installed
+Node binary.
 
-## State and support
+### Choose your sources
 
-The default macOS state location is:
+1. On first launch, keep the local sources you want enabled.
+2. Codex uses its local app-server when available. Claude Code metadata is **opt-in**.
+3. Select **Done**, then single-click the floating elephant-and-lotus button to show or hide the
+   focus card.
+4. Open **Settings → Manage AI tools…** later to change sources or rescan them.
+
+For the full daily workflow, interaction reference, configured review example, and troubleshooting,
+read the [user guide](docs/USER_GUIDE.md).
+
+### Optional: add the Codex plugin
+
+If you also want Gajendra's MCP tools inside Codex, with the Codex CLI available locally:
+
+```sh
+npm run install:local
+```
+
+This installs the local plugin from the checked-out source. It is separate from opening the macOS
+companion.
+
+## Local-first privacy
+
+- Provider products continue to own sessions, credentials, prompts, transcripts, and source files.
+- Gajendra persists only namespaced thread IDs, priority order, the bounded context enum, source
+  preferences, revision data, and bounded idempotency receipts.
+- It does **not** persist thread titles, prompts, transcript bodies, tokens, credentials, review
+  results, diffs, or arbitrary provider responses.
+- Every source is explicit and bounded. There is no arbitrary filesystem crawl or shell discovery.
+- Open actions revalidate source-specific URL schemes immediately before launch.
+
+The private default state path is:
 
 ```text
 ~/Library/Application Support/Gajendra/gajendra.v2.json
 ```
 
-State is private (`0700` directory and `0600` files), bounded, atomically replaced, and backed by
-a private last-known-good copy. Aadi/Priority Deck migration is copy-only; legacy files are never
-moved or deleted by migration.
+See [Security](SECURITY.md) and [thread-source boundaries](docs/THREAD_SOURCES.md) for the complete
+contract.
+
+## Verify a checkout
+
+```sh
+npm run check
+npm run test:e2e
+npm run companion:test
+npm run companion:build
+npm run companion:ui-test
+npm run companion:validate
+npm run companion:bundle-readiness
+```
+
+Regenerate the public synthetic screenshot suite and screenshot-led hero with:
+
+```sh
+npm run launch:assets
+npm run validate:launch-assets
+```
+
+The repository's current evidence and remaining release gates are recorded in [Status](STATUS.md)
+and the [release checklist](docs/RELEASE_CHECKLIST.md).
+
+## Release boundary
+
+The source repository is public and the current local candidate has source, browser, native,
+real-window launcher, bundle, and local-gauntlet receipts. There is no downloadable release claimed
+here: the app has not yet completed Developer ID signing, notarization, stapling, Gatekeeper, and
+clean-Mac distribution proof. Build from source if you want to try it today.
+
+The retained mobile work is a documentation-only protocol and security plan, not a shipped iOS or
+Android companion. See the [mobile plan](worksheets/GAJENDRA_MOBILE_APP_PLAN.md).
+
+## Project guides
+
+- [User guide](docs/USER_GUIDE.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [macOS companion contract](docs/COMPANION.md)
+- [Thread sources](docs/THREAD_SOURCES.md)
+- [Compatibility](docs/COMPATIBILITY.md)
+- [Release checklist](docs/RELEASE_CHECKLIST.md)
+- [Support](SUPPORT.md)
 
 Use [GitHub Discussions](https://github.com/siddath/Gajendra/discussions) for support and
 [private security reporting](https://github.com/siddath/Gajendra/security/advisories/new) for
-vulnerabilities. See [SUPPORT.md](SUPPORT.md) and [SECURITY.md](SECURITY.md).
-
-## Mobile planning boundary
-
-The retained mobile pack is an **E0 documentation-only protocol and security amendment**. It does
-not create a listener, relay, mobile app, credentials, dependency, branch, signing, or app-store
-claim. D01–D07 and D11 remain explicit approvals; see
-[the mobile plan](worksheets/GAJENDRA_MOBILE_APP_PLAN.md).
+vulnerabilities.
