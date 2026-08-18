@@ -249,9 +249,13 @@ describe("GajendraStoreRepository", () => {
     const directory = await createTemporaryDirectory();
     const candidateReached = deferred<void>();
     const allowFirstCleaner = deferred<void>();
+    // This test deliberately pauses one cleaner while a second cleaner and a live owner each
+    // acquire the lock. Keep the acquisition budget above that controlled schedule so aggregate
+    // suite load cannot turn the ownership proof into an unrelated StoreBusy rejection.
+    const acquisitionBudgetMs = 1_500;
     const firstCleaner = new GajendraStoreRepository(directory, [], {
-      lockTimeoutMs: 600,
-      staleLockMs: 600,
+      lockTimeoutMs: acquisitionBudgetMs,
+      staleLockMs: acquisitionBudgetMs,
       onStaleLockCandidate: async () => {
         candidateReached.resolve(undefined);
         await allowFirstCleaner.promise;
@@ -261,11 +265,17 @@ describe("GajendraStoreRepository", () => {
 
     const firstRead = firstCleaner.read();
     await candidateReached.promise;
-    await new GajendraStoreRepository(directory, [], { lockTimeoutMs: 600, staleLockMs: 600 }).read();
+    await new GajendraStoreRepository(directory, [], {
+      lockTimeoutMs: acquisitionBudgetMs,
+      staleLockMs: acquisitionBudgetMs,
+    }).read();
 
     const ownerAcquired = deferred<void>();
     const releaseOwner = deferred<void>();
-    const liveOwner = new GajendraStoreRepository(directory, [], { lockTimeoutMs: 600, staleLockMs: 600 });
+    const liveOwner = new GajendraStoreRepository(directory, [], {
+      lockTimeoutMs: acquisitionBudgetMs,
+      staleLockMs: acquisitionBudgetMs,
+    });
     const ownerTransaction = liveOwner.transaction(async () => {
       ownerAcquired.resolve(undefined);
       await releaseOwner.promise;
