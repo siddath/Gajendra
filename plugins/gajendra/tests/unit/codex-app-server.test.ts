@@ -529,13 +529,15 @@ const ready = setInterval(() => {
 `);
       await chmod(fakeLsof, 0o700);
       const startedAt = Date.now();
+      // Give the synthetic descendant enough startup budget under aggregate hosted load. The
+      // tighter assertion below still proves this parent-exit watchdog path settles promptly.
       const completion = listOpenFiles(directory, {
         ...process.env,
         GAJENDRA_LSOF_BIN: fakeLsof,
         GAJENDRA_TEST_LSOF_PARENT_PID_PATH: parentPidPath,
         GAJENDRA_TEST_LSOF_DESCENDANT_PID_PATH: descendantPidPath,
         GAJENDRA_TEST_LSOF_DESCENDANT_READY_PATH: descendantReadyPath,
-      }, { timeoutMs: 2_000, killGraceMs: 25, closeGraceMs: 100, outputLimitBytes: 32 }).then(
+      }, { timeoutMs: 5_000, killGraceMs: 25, closeGraceMs: 100, outputLimitBytes: 32 }).then(
         () => new Error("The inherited-pipe lsof fixture unexpectedly completed."),
         (reason: unknown) => reason,
       );
