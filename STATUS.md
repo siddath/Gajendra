@@ -6,6 +6,9 @@
 **Baseline:** `53e9855e8d19f90bb1d35e7432d5bc514e418f67`
 **Branch:** `codex/gajendra-public-release`
 **State:** public source-review candidate; not a binary release declaration.
+**Public review:** [PR #12](https://github.com/siddath/Gajendra/pull/12) is open; it is not merged.
+**Hosted product receipt:** commit `1c322fc` passed both jobs in
+[CI run 32141824097](https://github.com/siddath/Gajendra/actions/runs/32141824097).
 
 ## Evidence boundary
 
@@ -39,8 +42,9 @@
 - Preserve the TypeScript/E2E, native self-test, process-level launcher UI, companion
   build/validator, and local bundle-readiness receipts; rerun them if their inputs change.
 - Preserve the passed integrated local gauntlet receipt and rerun it if its inputs change.
-  The privacy-reviewed synthetic launch image and evidence-bounded local post draft now exist;
-  Sid's image/text approval, timing decision, and publication authorization remain pending.
+  The privacy-reviewed synthetic launch image, launch draft, and ten-post evidence-bounded series
+  now exist; Sid's per-post text/image approval, timing decision, and publication authorization
+  remain pending.
 - Keep mobile at documentation-only E0. D01–D07 and D11 remain pending; no relay, listener,
   mobile app, credential, dependency, branch, signing, distribution, or app-store action exists.
 - Obtain separate authorization and proof for the remaining clean-Mac, physical accessibility,

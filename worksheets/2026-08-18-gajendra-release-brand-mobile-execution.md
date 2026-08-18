@@ -71,11 +71,11 @@ writer begins.
 | D1 | Provider discovery is correct under large catalogs and has measured, bounded behavior | Synthetic-catalog correctness/performance test | Current candidate local gauntlet and source check proven; installed/provider and later external measurement pending |
 | D2 | User-visible diagnostics redact paths/content; temporary launch artifacts are owner-private and cleaned on startup/exit | Error-sanitization and file-lifecycle tests | Current local gauntlet and source error-sanitization/file-lifecycle proof recorded; installed/provider and external receipts pending |
 | D3 | Status, release, security, compatibility, architecture, and mobile docs describe current source truth without implementation claims for gated work | Documentation reconciliation review | Current documentation/link/copy reconciliation proven; future source changes reopen it |
-| D4 | CI runs behavior-level server/native/release validators and rejects missing privacy, identity, or bundle artifacts | Local CI-equivalent command set | Current local gauntlet/check/companion validator/bundle-readiness proven; hosted-CI receipt pending |
+| D4 | CI runs behavior-level server/native/release validators and rejects missing privacy, identity, or bundle artifacts | Local CI-equivalent command set | Current local gates proven; public product head `1c322fc` passed both hosted jobs in [run 32141824097](https://github.com/siddath/Gajendra/actions/runs/32141824097) |
 | D5 | Product language uses Focus consistently and removes retired product/queue copy except explicitly documented compatibility/history | Narrow copy audit | Current narrow copy scan proven; validator retains the sole intentional retired-copy detector |
 | E0 | Mobile plan covers transport, auth, pairing, discovery, lifecycle, connectivity, deep-link policy, app-store/privacy, architecture, and test matrix against the current MCP transport/auth contract | Protocol review against primary sources; no listener/client code | Documentation-only amendment proven; D01–D07 and D11 remain pending |
 | IMG | Synthetic launch image contains no private data, is labeled synthetic, and is generated only after brand/UX gates pass | Image inspection and exact-path artifact | Local artifact and [generation/privacy receipt](../evidence/launch/README.md) proven; publication approval pending |
-| POST | LinkedIn draft is human, specific, evidence-bounded, labels prototype/gated states, and is not published | Local draft review | [Local draft](GAJENDRA_LINKEDIN_POST_DRAFT.md) reviewed for claim, privacy, brand, spelling, and synthetic-image disclosure; Sid approval/publication pending |
+| POST | LinkedIn drafts are human, specific, evidence-bounded, label prototype/gated states, and are not published | Local draft review | [Launch draft](GAJENDRA_LINKEDIN_POST_DRAFT.md) and [ten-post series](GAJENDRA_LINKEDIN_SERIES.md) prepared with claim/privacy boundaries; Sid's per-post approval/publication remains pending |
 
 ## Verification sequence
 
@@ -90,8 +90,10 @@ writer begins.
 
 ## Live evidence boundary
 
-- The current candidate is prepared on `codex/gajendra-public-release` from baseline `53e9855`.
-  Commit, push, pull-request, and hosted-CI receipts are added only after they exist; it is not a
+- The candidate was committed and pushed on `codex/gajendra-public-release` from baseline
+  `53e9855`. [PR #12](https://github.com/siddath/Gajendra/pull/12) is open and unmerged. Product
+  head `1c322fc` passed the Linux plugin and macOS companion jobs in hosted
+  [CI run 32141824097](https://github.com/siddath/Gajendra/actions/runs/32141824097); this is not a
   binary release artifact.
 - The server/web source lane recorded focused tests, `npm run check` (**80/80**), and E2E
   (**16/16**) after the final cap/canon correction. Those source-lane receipts were subsequently
@@ -118,8 +120,8 @@ writer begins.
   process-level journey passed stationary reopen, 2 px reopen, move/hide recovery, AX press, and
   edge target; executable/service parity passed and the private state hash plus `0700`/`0600` modes
   stayed unchanged. This is a launcher-only installed receipt.
-- Earlier hosted-CI and historical installed records are not reused as proof for this candidate.
-  The synthetic image and post drafts remain creative artifacts, not binary-distribution or
-  LinkedIn-publication proof.
+- Earlier historical installed records are not reused as proof for this candidate. The synthetic
+  image and post drafts remain creative artifacts, not binary-distribution or LinkedIn-publication
+  proof.
 - This machine has Swift 6.3.2 and Node 26.3.0; it has no `simctl`, Android SDK, or `adb`. Mobile
   platform execution is not a proof surface for this documentation-only amendment.

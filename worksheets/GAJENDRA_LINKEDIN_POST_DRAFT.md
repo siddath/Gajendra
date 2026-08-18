@@ -3,6 +3,7 @@
 - **Status:** local draft only — not approved or published
 - **Image:** `evidence/launch/gajendra-linkedin-synthetic.png` (synthetic demo data; no private threads)
 - **Claim boundary:** public source-review candidate with a narrow installed launcher receipt; not Developer ID signed, notarized, or download-ready
+- **Series:** this is the long-form launch draft; the ten-post set is in [GAJENDRA_LINKEDIN_SERIES.md](GAJENDRA_LINKEDIN_SERIES.md)
 
 ---
 
