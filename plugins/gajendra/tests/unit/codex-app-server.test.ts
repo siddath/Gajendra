@@ -638,7 +638,9 @@ function delay(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function readFileWhenAvailable(filePath: string, timeoutMs = 1_500): Promise<string> {
+// Hosted aggregate runs can delay synthetic child startup beyond the local 1.5s observation
+// window. This remains below every fixture's 5s request budget and does not change product timeouts.
+async function readFileWhenAvailable(filePath: string, timeoutMs = 3_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     try {
