@@ -30,6 +30,53 @@ private final class GajendraFirstMouseHostingView<Content: View>: NSHostingView<
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
+private final class GajendraPillHostingView<Content: View>: NSHostingView<Content> {
+    var onAccessibilityPress: (() -> Void)?
+    var onAccessibilityMove: (() -> Void)?
+    var accessibilityHelpProvider: (() -> String)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .button }
+    override func accessibilityLabel() -> String? { GajendraBrandCopy.name }
+    override func accessibilityHelp() -> String? { accessibilityHelpProvider?() }
+
+    override func accessibilityPerformPress() -> Bool {
+        onAccessibilityPress?()
+        return onAccessibilityPress != nil
+    }
+
+    override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
+        guard onAccessibilityMove != nil else { return nil }
+        return [
+            NSAccessibilityCustomAction(name: "Move or hide Gajendra") { [weak self] in
+                self?.onAccessibilityMove?()
+                return self?.onAccessibilityMove != nil
+            }
+        ]
+    }
+}
+
+private struct GajendraSMAppServiceAdapter: GajendraLaunchAtLoginServicing {
+    func readStatus() -> GajendraLaunchAtLoginStatus {
+        switch SMAppService.mainApp.status {
+        case .enabled: return .enabled
+        case .requiresApproval: return .requiresApproval
+        case .notRegistered: return .notRegistered
+        case .notFound: return .notFound
+        @unknown default: return .unknown
+        }
+    }
+
+    func register() throws {
+        try SMAppService.mainApp.register()
+    }
+
+    func unregister() throws {
+        try SMAppService.mainApp.unregister()
+    }
+}
+
 @main
 enum GajendraMenuBarMain {
     @MainActor
@@ -40,19 +87,14 @@ enum GajendraMenuBarMain {
                 if service.status == .enabled || service.status == .requiresApproval { try service.unregister() }
                 print("launchAtLoginStatus=\(service.status)")
             } catch {
-                print("launchAtLoginStatus=\(service.status);error=\(error.localizedDescription)")
+                print("launchAtLoginStatus=\(service.status);error=operation-failed")
                 exit(1)
             }
             return
         }
         if CommandLine.arguments.contains("--diagnose-launch-at-login") {
             let service = SMAppService.mainApp
-            do {
-                if service.status != .enabled && service.status != .requiresApproval { try service.register() }
-                print("launchAtLoginStatus=\(service.status)")
-            } catch {
-                print("launchAtLoginStatus=\(service.status);error=\(error.localizedDescription)")
-            }
+            print("launchAtLoginStatus=\(service.status)")
             return
         }
         let app = NSApplication.shared
@@ -71,6 +113,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     let model = DeckViewModel()
     let visualSettings = GajendraVisualSettings()
     let pillEditController = GajendraPillEditController()
+    let cardInteractionSession = GajendraCardInteractionSession()
     private var organizerWindow: NSWindow?
     private var sourceOnboardingWindow: NSWindow?
     private var pillWindow: NSPanel?
@@ -81,12 +124,15 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var cardPresentation = GajendraCardPresentationState()
     private var cardAnimationGeneration = 0
     private var launchAtLoginItem: NSMenuItem?
+    private var undoMenuItem: NSMenuItem?
+    private var redoMenuItem: NSMenuItem?
     private var pillVisibilityItem: NSMenuItem?
     private var pillAnchorItems: [GajendraPillAnchor: NSMenuItem] = [:]
     private var appearanceCancellable: AnyCancellable?
     private var hoverCardSizeCancellable: AnyCancellable?
     private var pillAnchorCancellable: AnyCancellable?
     private var pillEditCancellable: AnyCancellable?
+    private var historyCancellable: AnyCancellable?
     private var localCardDismissMonitor: Any?
     private var globalCardDismissMonitor: Any?
     private var localEditDismissMonitor: Any?
@@ -111,12 +157,16 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         )
         migrateLegacyPillPosition()
         configureApplicationMenu()
+        historyCancellable = model.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateHistoryMenuState() }
+        }
         configureAppearance()
         configurePillPlacement()
         configurePillInteraction()
         configureStatusItem()
         configurePopover()
         observeDesktopChanges()
+        model.cleanupResumeScripts()
         configureLaunchAtLogin()
         model.refresh()
         if !UserDefaults.standard.bool(forKey: pillHiddenKey) {
@@ -135,6 +185,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
         }
+        historyCancellable = nil
+        model.cleanupResumeScripts()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -149,7 +201,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     func windowWillClose(_ notification: Notification) {
         guard let onboardingWindow = sourceOnboardingWindow,
               notification.object as? NSWindow === onboardingWindow else { return }
-        sourceOnboardingState.markCompleted()
+        // Closing the window, including the cancel button or the window close control, does not
+        // complete onboarding. It must be offered again on the next launch.
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -202,15 +255,24 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     @objc
     private func toggleLaunchAtLogin(_ sender: NSMenuItem) {
         do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
+            let service = GajendraSMAppServiceAdapter()
+            _ = try GajendraLaunchAtLoginToggle(service: service).toggle()
         } catch {
             NSSound.beep()
         }
         updateLaunchAtLoginMenuState()
+    }
+
+    @objc
+    private func undoFromMenu(_ sender: Any?) {
+        model.undo()
+        updateHistoryMenuState()
+    }
+
+    @objc
+    private func redoFromMenu(_ sender: Any?) {
+        model.redo()
+        updateHistoryMenuState()
     }
 
     @objc
@@ -244,6 +306,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func completeSourceOnboarding() {
         sourceOnboardingState.markCompleted()
+        sourceOnboardingWindow?.close()
+    }
+
+    private func dismissSourceOnboarding() {
         sourceOnboardingWindow?.close()
     }
 
@@ -295,11 +361,16 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
         if !pillDragDidMove {
             pillDragDidMove = true
+            // Consume the recognition dead zone instead of making the launcher
+            // jump by the threshold distance on the first accepted drag sample.
+            pillDragStart = panel.frame.origin
+            pillDragPointerStart = pointerLocation
             dismissPresentedCard(animated: false)
+            if !ended { return }
         }
         let proposed = GajendraOverlayPlacement.draggedOrigin(
-            startOrigin: start,
-            pointerStart: pointerStart,
+            startOrigin: pillDragStart ?? start,
+            pointerStart: pillDragPointerStart ?? pointerStart,
             pointerLocation: pointerLocation
         )
         let targetScreen = NSScreen.screens.first(where: { $0.frame.contains(pointerLocation) })
@@ -320,11 +391,20 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             storePillScreen(targetScreen)
             UserDefaults.standard.set(false, forKey: pillHasCustomOriginKey)
             visualSettings.pillAnchor = anchor
-            panel.setFrameOrigin(GajendraOverlayPlacement.origin(
+            let snappedOrigin = GajendraOverlayPlacement.origin(
                 for: anchor,
                 windowSize: panel.frame.size,
                 visibleFrame: targetScreen.visibleFrame
-            ))
+            )
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                panel.setFrameOrigin(snappedOrigin)
+            } else {
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = 0.18
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    panel.animator().setFrameOrigin(snappedOrigin)
+                }
+            }
             resetPillDrag()
         }
     }
@@ -395,6 +475,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func showCard() {
         guard !pillEditController.isEditing else { return }
+        cardInteractionSession.resetTransientState()
         let panel = cardWindow ?? makeCardPanel()
         let wasVisible = panel.isVisible
         cardWindow = panel
@@ -416,6 +497,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func hideCard() {
+        cardInteractionSession.resetTransientState()
         guard let panel = cardWindow, panel.isVisible else { return }
         cardAnimationGeneration += 1
         let generation = cardAnimationGeneration
@@ -440,6 +522,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func hideCardImmediately() {
+        cardInteractionSession.resetTransientState()
         cardAnimationGeneration += 1
         cardWindow?.orderOut(nil)
         cardWindow?.alphaValue = 1
@@ -475,6 +558,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func eventTargetsPresentedSurface(_ event: NSEvent) -> Bool {
         if event.window === cardWindow || event.window === pillWindow { return true }
+        if event.window?.level == .popUpMenu { return true }
         return pointTargetsPresentedSurface(NSEvent.mouseLocation)
     }
 
@@ -552,7 +636,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let appMenu = NSMenu()
         let organizerItem = NSMenuItem(
-            title: "Open Gaja",
+            title: "Open Gajendra",
             action: #selector(showOrganizerFromMenu(_:)),
             keyEquivalent: "o"
         )
@@ -561,7 +645,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         appMenu.addItem(organizerItem)
 
         let sourcesItem = NSMenuItem(
-            title: "Connect AI Tools…",
+            title: "Manage AI tools…",
             action: #selector(showSourceOnboardingFromMenu(_:)),
             keyEquivalent: ""
         )
@@ -586,7 +670,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         appMenu.addItem(positionItem)
 
         let visibilityItem = NSMenuItem(
-            title: "Hide Gaja Lotus",
+            title: "Hide Gajendra Lotus",
             action: #selector(togglePillVisibility(_:)),
             keyEquivalent: ""
         )
@@ -604,7 +688,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         appMenu.addItem(refreshItem)
 
         let loginItem = NSMenuItem(
-            title: "Launch Gaja at Login",
+            title: "Launch Gajendra at Login",
             action: #selector(toggleLaunchAtLogin(_:)),
             keyEquivalent: ""
         )
@@ -613,14 +697,14 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         appMenu.addItem(loginItem)
         appMenu.addItem(.separator())
         let uninstallItem = NSMenuItem(
-            title: "Uninstall Gaja…",
+            title: "Uninstall Gajendra…",
             action: #selector(requestUninstallFromMenu(_:)),
             keyEquivalent: ""
         )
         uninstallItem.target = self
         appMenu.addItem(uninstallItem)
         appMenu.addItem(
-            withTitle: "Quit Gaja",
+            withTitle: "Quit Gajendra",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
@@ -628,14 +712,22 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
-        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let undoItem = editMenu.addItem(
+            withTitle: "Undo",
+            action: #selector(undoFromMenu(_:)),
+            keyEquivalent: "z"
+        )
+        undoItem.target = self
+        undoMenuItem = undoItem
 
         let redoItem = editMenu.addItem(
             withTitle: "Redo",
-            action: Selector(("redo:")),
+            action: #selector(redoFromMenu(_:)),
             keyEquivalent: "z"
         )
         redoItem.keyEquivalentModifierMask = [.command, .shift]
+        redoItem.target = self
+        redoMenuItem = redoItem
         editMenu.addItem(.separator())
         editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
@@ -647,16 +739,22 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         NSApplication.shared.mainMenu = mainMenu
         updatePillVisibilityMenuState()
         updatePillAnchorMenuState()
+        updateHistoryMenuState()
     }
 
     private func updatePillVisibilityMenuState() {
-        pillVisibilityItem?.title = pillWindow?.isVisible == true ? "Hide Gaja Lotus" : "Show Gaja Lotus"
+        pillVisibilityItem?.title = pillWindow?.isVisible == true ? "Hide Gajendra Lotus" : "Show Gajendra Lotus"
     }
 
     private func updatePillAnchorMenuState() {
         for (anchor, item) in pillAnchorItems {
             item.state = anchor == visualSettings.pillAnchor ? .on : .off
         }
+    }
+
+    private func updateHistoryMenuState() {
+        undoMenuItem?.isEnabled = model.canUndo && !model.isLoading
+        redoMenuItem?.isEnabled = model.canRedo && !model.isLoading
     }
 
     @objc
@@ -668,7 +766,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         NSApplication.shared.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Uninstall Gaja?"
+        alert.messageText = "Uninstall Gajendra?"
         alert.informativeText = "This moves the Gajendra app to Trash and stops Launch at Login. Your local priority metadata and provider threads are retained."
         alert.addButton(withTitle: "Move App to Trash")
         alert.addButton(withTitle: "Cancel")
@@ -676,7 +774,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let appURL = Bundle.main.bundleURL.standardizedFileURL
         guard Bundle.main.bundleIdentifier == "dev.sid.gajendra", appURL.pathExtension == "app" else {
-            showUninstallError("Gaja must be running from its installed app bundle before it can uninstall itself.")
+            showUninstallError("Gajendra must be running from its installed app bundle before it can uninstall itself.")
             return
         }
 
@@ -688,14 +786,14 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             try FileManager.default.trashItem(at: appURL, resultingItemURL: nil)
             NSApplication.shared.terminate(nil)
         } catch {
-            showUninstallError(error.localizedDescription)
+            showUninstallError("Gajendra could not be uninstalled.")
         }
     }
 
     private func showUninstallError(_ message: String) {
         let alert = NSAlert()
         alert.alertStyle = .critical
-        alert.messageText = "Gaja Could Not Be Uninstalled"
+        alert.messageText = "Gajendra Could Not Be Uninstalled"
         alert.informativeText = message
         alert.addButton(withTitle: "OK")
         alert.runModal()
@@ -808,24 +906,30 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let image = Bundle.main.url(forResource: "GajendraMenuBar", withExtension: "svg")
             .flatMap(NSImage.init(contentsOf:))
-            ?? NSImage(systemSymbolName: "camera.macro", accessibilityDescription: "Gaja")
+            ?? NSImage(systemSymbolName: "camera.macro", accessibilityDescription: "Gajendra")
         image?.isTemplate = true
         button.image = image
-        button.toolTip = "Gaja, Elephant Focus for AI Power Users"
+        button.toolTip = GajendraBrandCopy.descriptor
         button.target = self
         button.action = #selector(togglePopover(_:))
         statusItem = item
     }
 
     private func configureLaunchAtLogin() {
-        if SMAppService.mainApp.status != .enabled && SMAppService.mainApp.status != .requiresApproval {
-            try? SMAppService.mainApp.register()
-        }
         updateLaunchAtLoginMenuState()
     }
 
     private func updateLaunchAtLoginMenuState() {
-        launchAtLoginItem?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        let status = SMAppService.mainApp.status
+        launchAtLoginItem?.state = status == .enabled ? .on : .off
+        switch status {
+        case .enabled:
+            launchAtLoginItem?.title = "Launch Gajendra at Login (On)"
+        case .requiresApproval:
+            launchAtLoginItem?.title = "Launch Gajendra at Login (Approval Required)"
+        default:
+            launchAtLoginItem?.title = "Launch Gajendra at Login (Off)"
+        }
     }
 
     private func configurePopover() {
@@ -848,7 +952,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             backing: .buffered,
             defer: false
         )
-        window.title = "Gaja"
+        window.title = "Gajendra"
         window.contentViewController = NSHostingController(
             rootView: DeckContentView(
                 model: model,
@@ -871,13 +975,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             backing: .buffered,
             defer: false
         )
-        window.title = "Connect AI Tools"
+        window.title = "Choose your AI tools"
         window.identifier = NSUserInterfaceItemIdentifier("gajendra-source-onboarding")
         window.contentViewController = NSHostingController(
             rootView: GajendraSourceOnboardingView(
                 model: model,
                 onFinish: { [weak self] in self?.completeSourceOnboarding() },
-                onSkip: { [weak self] in self?.completeSourceOnboarding() }
+                onSkip: { [weak self] in self?.dismissSourceOnboarding() }
             )
         )
         window.setContentSize(NSSize(width: 640, height: 620))
@@ -885,15 +989,15 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         window.isReleasedWhenClosed = false
         window.hidesOnDeactivate = false
         window.delegate = self
-        window.setAccessibilityLabel("Connect AI tools to Gaja")
+        window.setAccessibilityLabel("Choose your AI tools for Gajendra")
         window.center()
         return window
     }
 
     private func makePillPanel() -> NSPanel {
-        let panel = makeOverlayPanel(title: "Gaja Focus Pill", size: pillSize, acceptsKeyboardInput: false)
-        panel.setAccessibilityLabel("Gaja focus pill")
-        panel.contentView = GajendraFirstMouseHostingView(
+        let panel = makeOverlayPanel(title: "Gajendra Focus Pill", size: pillSize, acceptsKeyboardInput: false)
+        panel.setAccessibilityLabel("Gajendra focus pill")
+        let hostingView = GajendraPillHostingView(
             rootView: GajendraPillView(
                 model: model,
                 visualSettings: visualSettings,
@@ -905,6 +1009,18 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 onRequestUninstall: { [weak self] in self?.requestUninstall() }
             )
         )
+        hostingView.onAccessibilityPress = { [weak self] in
+            guard let self else { return }
+            self.pillEditController.performPrimaryAction { self.toggleCardFromPill() }
+        }
+        hostingView.onAccessibilityMove = { [weak self] in self?.pillEditController.enter() }
+        hostingView.accessibilityHelpProvider = { [weak self] in
+            guard let self else { return "Click to show or hide priorities." }
+            return self.pillEditController.isEditing
+                ? "Click to open priorities and finish moving. Drag to a snap position. Double-click, click outside, or press Escape to finish without opening."
+                : "Click to show or hide priorities. Double-click to move or hide Gajendra. Use the contextual menu for more options."
+        }
+        panel.contentView = hostingView
         panel.setContentSize(pillSize)
         return panel
     }
@@ -924,17 +1040,18 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             width: min(preferredSize.width, maximumSize.width),
             height: min(preferredSize.height, maximumSize.height)
         )
-        let panel = makeOverlayPanel(title: "Gaja Details", size: cardSize, acceptsKeyboardInput: true)
+        let panel = makeOverlayPanel(title: "Gajendra Details", size: cardSize, acceptsKeyboardInput: true)
         panel.contentMinSize = NSSize(
             width: min(320, maximumSize.width),
             height: min(360, maximumSize.height)
         )
         panel.contentMaxSize = maximumSize
-        panel.setAccessibilityLabel("Gaja priority details")
+        panel.setAccessibilityLabel("Gajendra priority details")
         panel.contentView = GajendraFirstMouseHostingView(
             rootView: GajendraHoverCardView(
                 model: model,
                 visualSettings: visualSettings,
+                interactionSession: cardInteractionSession,
                 onOpenOrganizer: { [weak self] in self?.showOrganizer() },
                 onManageSources: { [weak self] in self?.showSourceOnboarding() },
                 onDismiss: { [weak self] in self?.dismissPresentedCard() },

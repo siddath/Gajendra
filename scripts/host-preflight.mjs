@@ -283,7 +283,7 @@ async function inspectMcpInventory(appServerBinary) {
           (server) =>
             server.name === "gajendra" ||
             server.serverInfo?.name === "gajendra" ||
-            server.serverInfo?.title === "Gaja, Elephant Focus for AI Power Users",
+            server.serverInfo?.title === "Gajendra",
         );
         if (candidate) match = summarizeGajendraServer(candidate);
 

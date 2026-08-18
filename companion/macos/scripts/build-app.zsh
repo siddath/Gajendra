@@ -10,6 +10,8 @@ icon_vector="$repo_root/plugins/gajendra/assets/gajendra-app-icon.svg"
 menu_bar_icon="$repo_root/plugins/gajendra/assets/gajendra-menubar.svg"
 iconset_dir="$repo_root/build/Gajendra.iconset"
 icon_file="$repo_root/build/Gajendra.icns"
+runtime_fetch="$script_dir/fetch-node-runtime.zsh"
+runtime_notice="$package_root/Resources/NODE_RUNTIME_NOTICES.md"
 
 cd "$repo_root"
 npm run build
@@ -35,7 +37,20 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 /usr/bin/install -m 0644 "$icon_file" "$app_dir/Contents/Resources/Gajendra.icns"
 /usr/bin/install -m 0644 "$menu_bar_icon" "$app_dir/Contents/Resources/GajendraMenuBar.svg"
 /usr/bin/install -m 0644 "$repo_root/plugins/gajendra/dist/server.mjs" "$app_dir/Contents/Resources/server.mjs"
+/bin/mkdir -p "$app_dir/Contents/Resources/Runtime/node/bin" "$app_dir/Contents/Resources/ThirdPartyNotices"
+runtime_dir=$(/bin/zsh "$runtime_fetch" --path)
+runtime_binary="$runtime_dir/bin/node"
+runtime_license="$runtime_dir/LICENSE"
+if [[ ! -x "$runtime_binary" || ! -f "$runtime_license" ]]; then
+  print -u2 -- "Verified Node runtime cache is incomplete."
+  exit 66
+fi
+/usr/bin/install -m 0755 "$runtime_binary" "$app_dir/Contents/Resources/Runtime/node/bin/node"
+/usr/bin/install -m 0644 "$runtime_license" "$app_dir/Contents/Resources/ThirdPartyNotices/Node-24.19.0-LICENSE"
+/usr/bin/install -m 0644 "$runtime_notice" "$app_dir/Contents/Resources/ThirdPartyNotices/Node-24.19.0-NOTICES.md"
+/usr/bin/codesign --force --sign - "$app_dir/Contents/Resources/Runtime/node/bin/node"
 /usr/bin/codesign --force --deep --sign - "$app_dir"
 /usr/bin/codesign --verify --deep --strict "$app_dir"
 
 echo "$app_dir"
+echo "Bundled Node runtime: Contents/Resources/Runtime/node/bin/node"

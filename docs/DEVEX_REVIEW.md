@@ -1,28 +1,23 @@
-# Developer experience review
+# Developer-experience review
 
-Reconciled for the Gajendra repository's Gaja 0.3.1 local publication candidate on 2026-08-13.
+**Scope:** the 2026-08-18 Gajendra source-review candidate based on `53e9855`.
 
-## Contributor loop
+## Current source-level expectations
 
-`npm run check` produces type validation, 18 unit/integration tests, a single-file MCP UI, a bundled server, and plugin validation. Native work adds `npm run companion:test`, `companion:build`, and `companion:preview`.
+1. npm run check is the ordinary repository check; it includes TypeScript/plugin behavior and
+   script syntax checks.
+2. Companion build, validator, local bundle-readiness, E2E, and gauntlet are separate commands with
+   distinct evidence scopes.
+3. Source builds target macOS 13.5 and Node >=20. A bundle contract calls for a pinned Node v24.19.0
+   runtime and notices; it is not a statement that a new binary exists.
+4. The source is local-first: no provider database mutation, arbitrary shell discovery, or provider
+   content persistence.
+5. The release-ready tooling fails closed for missing distribution identity, Gatekeeper, notarization,
+   staple, archive, or checksum inputs. It performs none of those consequential actions.
 
-## Current friction
+## Current review boundary
 
-1. The canonical public clone URL is `https://github.com/siddath/Gajendra.git`; release state is tracked separately in `STATUS.md`.
-2. The full gauntlet requires macOS, Codex CLI, Node 20+, Swift tooling, and browser dependencies.
-3. Cursor live integration cannot be exercised without `cursor-agent`; parser fixtures remain the honest fallback.
-4. Claude’s local session catalog is sensitive even though Gaja extracts metadata only, so it stays opt-in.
-5. Public app downloads require signing/notarization infrastructure that source contributors do not need.
-6. Same-version local marketplace refreshes can cache stale output; `npm run install:local` verifies hashes and performs one bounded retry.
-
-## Recovery quality
-
-- One source failure leaves other ready sources usable and visible.
-- Refresh and mutations queue rather than silently drop.
-- The normal window, Dock, and menu bar recover from hidden overlays.
-- The standard inline MCP App remains when Codex’s global route is absent.
-- Uninstall and retained-state behavior are explicit.
-
-## Verdict
-
-The local contributor path is ready after the final 0.3 gauntlet. Public onboarding remains gated by the actual remote and first hosted clean-clone CI receipt; binary distribution remains a separate Apple signing task.
+This source candidate is prepared on `codex/gajendra-public-release`; exact commit, push, PR, and
+hosted-CI receipts are recorded only after they exist. One exact ad-hoc installed build has a
+launcher-only interaction receipt. It is not a merged tag, clean-Mac result, or distributable
+binary. The open gates are listed in [STATUS.md](../STATUS.md).

@@ -2,17 +2,20 @@
   "name": "gajendra-repository",
   "version": "0.3.1",
   "private": true,
-  "description": "Gaja, Elephant Focus for AI Power Users, from the open-source Gajendra repository.",
+  "description": "Gajendra — One clear focus across your AI tools. One NOW. One short queue. One click back to the exact thread.",
   "workspaces": [
     "plugins/gajendra"
   ],
   "scripts": {
     "build": "npm --workspace gajendra run build",
     "check": "npm run check:scripts && npm --workspace gajendra run check && npm run validate:plugin",
-    "check:scripts": "node --check scripts/host-preflight.mjs && node --check scripts/install-local.mjs && node --check scripts/live-mcp-probe.mjs && node --check scripts/run-gauntlet.mjs && node --check scripts/validate-companion.mjs && node --check scripts/validate-plugin.mjs",
+    "check:scripts": "node --check scripts/host-preflight.mjs && node --check scripts/install-local.mjs && node --check scripts/live-mcp-probe.mjs && node --check scripts/release-readiness.mjs && node --check scripts/release-readiness.test.mjs && node --check scripts/run-gauntlet.mjs && node --check scripts/validate-companion.mjs && node --check scripts/validate-plugin.mjs && npm run test:release-readiness",
     "companion:build": "zsh companion/macos/scripts/build-app.zsh",
+    "companion:bundle-readiness": "node scripts/release-readiness.mjs local",
     "companion:preview": "zsh companion/macos/scripts/render-preview.zsh",
     "companion:test": "swift run --package-path companion/macos GajendraSelfTest",
+    "companion:ui-test:build": "swift build --package-path companion/macos -c release --product GajendraUITest",
+    "companion:ui-test": "zsh companion/macos/scripts/test-ui.zsh",
     "companion:validate": "node scripts/validate-companion.mjs",
     "gauntlet": "node scripts/run-gauntlet.mjs",
     "host:preflight": "node scripts/host-preflight.mjs",
@@ -20,6 +23,8 @@
     "test": "npm --workspace gajendra run test",
     "test:e2e": "npm --workspace gajendra run test:e2e",
     "probe:live": "node scripts/live-mcp-probe.mjs",
+    "release:distribution-readiness": "node scripts/release-readiness.mjs distribution",
+    "test:release-readiness": "node scripts/release-readiness.test.mjs",
     "validate:plugin": "node scripts/validate-plugin.mjs"
   },
   "engines": {

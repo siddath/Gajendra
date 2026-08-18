@@ -1,44 +1,57 @@
-# Native macOS companion
+# macOS companion
 
-Gaja’s default surface is a bottom-right icon-only native utility whose elephant lifts its trunk to hold an open lotus and that can snap to six configured hotspots. Click the floating mark to show or hide the focus card; hover only highlights the launcher. The card remains interactive until another launcher click, an outside click, or Escape. In the header, the elephant-and-lotus mark stays on the left, the Gaja name and descriptor remain on the card's true centerline, and Organizer, Refresh, and Settings sit on the right. The trailing Settings gear owns theme, Auto/Light/Dark appearance, card size, and position without changing a choice merely by opening. Open the organizer for source controls and queue editing. Native Popover is the default theme; Focus Deck is selectable from Settings.
+Gajendra is intended to provide a quiet native macOS focus surface: one NOW, a short Focus queue,
+Important, provider-reported Running, and an explicit Ready for Review disclosure, with source
+opening retained in the source product.
 
-## Surfaces
+This page records the **source/build contract** and the narrow installed launcher receipt. On
+2026-08-18, `npm run companion:test`, `npm run companion:build`,
+`npm run companion:ui-test`, `npm run companion:validate`, and
+`npm run companion:bundle-readiness` passed; the aggregate source check passed 83/83 and E2E passed
+17/17. The exact ad-hoc build also passed the launcher UI journey after local installation. Those
+receipts do not establish a clean-Mac run, physical VoiceOver, login-item or drag behavior,
+Developer ID signing, notarization, or distribution readiness.
 
-- Pill: borderless nonactivating panel, 60 × 60 points, one of six snap anchors, all Spaces.
-- Card: separate adaptive Compact 560 × 570, Comfortable 660 × 610, or Expanded 760 × 680 keyboard-capable panel at the reference display, with click-pinned presentation, one vertically scrollable task body, an expandable inclusive Running section, and a persistent global-search footer.
-- Organizer: standard resizable 620 × 700 window, 520 × 620 minimum.
-- Menu bar: optional template icon and compact organizer fallback.
-- Dock/app menu: reopen, refresh (`⌘R`), open organizer (`⇧⌘O`), launch-at-login toggle, confirmed uninstall, quit.
-- Lotus position: choose Top Left, Top Right, Center, Bottom Left, Bottom Center, or Bottom Right from the trailing Settings gear or Gaja app menu. The selected display and hotspot persist.
-- Pill edit mode: double-click to enter or leave, then drag toward a hotspot or use the jiggling X to hide the mark. Movement under six points is ignored; an intentional drag snaps to the nearest hotspot. Only the mark artwork and X jiggle; the material background remains still. The card stays hidden during editing and does not reopen after a move. Center opens the card beside the launcher; edge positions open inward. Click outside or press Escape to leave edit mode without hiding it.
-- Context menu: secondary-click or Control-click the floating mark to show/hide the card, open Organizer, enter move/hide mode, or choose **Uninstall Gaja…**. Uninstall is destructive, placed last, and requires confirmation; it removes the app and Launch at Login registration while retaining priority metadata.
-- Organizer: drag recent or prioritized rows into Focus or Important; arrow and tier controls remain available for keyboard operation. Running is expandable, and search stays outside the organizer's scroll body.
-- Context: use the visible **Add label** control on a prioritized row to assign Design, Engineering, or Life; the label follows that entry into NOW, Focus, Important, and the hover card.
+## Source contract
 
-The utility does not inspect or inject into Codex, Claude, Cursor, or other app windows. It requests no Accessibility permission.
+- The visible name is **Gajendra**. The descriptor is **One clear focus across your AI tools.** and
+  the longer promise is **One NOW. One short queue. One click back to the exact thread.**
+- The compatibility executable, bundle/path naming, state path, and URL route remain `Gajendra`,
+  `dev.sid.gajendra`, `Application Support/Gajendra`, and `gajendra://`.
+- The native target floor is macOS **13.5**. Source builds use Node >=20; a bundle must include the
+  pinned Node **v24.19.0** runtime, checksum verification, and notices.
+- Launch at Login must change only after an explicit user action. Current local source/self-test and
+  bundle receipts do not make this an installed-app claim; physical login-item proof remains gated.
+- The native client consumes the same revision/CAS/idempotency mutation contract as the MCP app.
+  Queue reorder is one `move-before` operation, never a sequence of partially applied moves.
+- Open actions must revalidate the source-specific destination scheme immediately before launch.
+- A primary launcher action always exits move/hide mode before toggling the card. The drag
+  recognizer begins at the same 6-point movement threshold used by placement logic, so a natural
+  2 px tap is not consumed as a drag. The AppKit host exposes one real accessibility button with
+  the same recovery action.
+- Ready for Review sits below Running in the same single scroll body. Orange is paired with the
+  `checkmark.bubble` glyph, label, count, ready time, destination label, and accessibility copy.
+  The main review row opens the declared Review or Task destination; its provider badge separately
+  opens the owning task. Review metadata remains live-only and Running has overlap precedence.
 
-## Build and test
+## Local source build procedure
 
-```bash
+```sh
+npm run check
 npm run companion:test
 npm run companion:build
+npm run companion:ui-test
 npm run companion:validate
-npm run companion:preview
-open "build/Gajendra.app"
+npm run companion:bundle-readiness
 ```
 
-The local bundle is ad-hoc signed. Public binary distribution requires a separate Developer ID/notarization pipeline.
+The UI command launches the built app with a temporary empty store and disabled built-in sources;
+it drives the real 60×60 window with stationary, 2 px, edit-recovery, AX-press, and edge taps. It
+requires a logged-in Mac whose invoking test host may post pointer and accessibility events; hosted
+CI compiles the target but does not claim that physical journey. The last command is an
+inspection, not a release authorization: it checks source-controlled bundle requirements and reports
+ad-hoc signing honestly. Developer ID, notarization, Gatekeeper, archive, and distribution receipts
+are separate, fail-closed steps.
 
-## Install and removal
-
-```bash
-mkdir -p "$HOME/Applications"
-ditto "build/Gajendra.app" "$HOME/Applications/Gajendra.app"
-open "$HOME/Applications/Gajendra.app"
-```
-
-Launch at Login uses `SMAppService.mainApp` and is reversible from the app menu. **Uninstall Gaja…** unregisters it and moves the running app bundle to Trash only after explicit confirmation. Manual removal remains supported. Gaja intentionally retains priority metadata for rollback in its stable `Gajendra` compatibility path.
-
-## WidgetKit
-
-The companion is not a WidgetKit extension. WidgetKit cannot implement the required cross-app always-on-top interactive panel. A future glance-only widget may reuse the `gajendra://` route after a shared-container design and adoption proof.
+See [Host validation](HOST_VALIDATION.md), [release checklist](RELEASE_CHECKLIST.md), and
+[STATUS.md](../STATUS.md) for the pending proof sequence.

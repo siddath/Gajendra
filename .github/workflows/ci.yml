@@ -39,5 +39,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run companion:test
+      - run: npm run companion:ui-test:build
       - run: npm run companion:preview
       - run: npm run companion:build
+      - run: npm run companion:bundle-readiness
+      - run: npm run companion:validate

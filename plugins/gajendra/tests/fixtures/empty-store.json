@@ -1,0 +1,17 @@
+{
+  "version": 3,
+  "revision": 0,
+  "currentFocusThreadId": null,
+  "entries": [],
+  "collapsed": {
+    "focus": false,
+    "important": false
+  },
+  "sourcePreferences": {
+    "codex": false,
+    "claude": false,
+    "cursor": false,
+    "grok": false
+  },
+  "idempotency": []
+}

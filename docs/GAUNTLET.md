@@ -1,38 +1,40 @@
 # Release gauntlet
 
-Run from the repository root:
+The current Gajendra source-review candidate has a **passing local gauntlet receipt**:
+[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records 19 passing result
+records on 2026-08-18. The run covers repository scripts, static/behavior/build/plugin checks, live
+MCP, companion self-test/build/real-window launcher/live checks, browser UI, repeated reliability
+checks, final artifacts, and dependency audit.
 
-```bash
-npm run gauntlet
-```
+This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/drag,
+Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is
+the required rerun sequence if the candidate changes.
 
-The runner is fail-fast. Any failed hard gate stops the run and writes the partial receipt to `evidence/gauntlet/report.json`.
+After the passing run, a [privacy-reviewed synthetic image](../evidence/launch/README.md) and an
+evidence-bounded [local post draft](../worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) were created.
+They remain unapproved and unpublished, and do not extend the gauntlet's proof boundary.
 
-## Gates
+## Required sequence
 
-1. Repository script syntax.
-2. TypeScript static checking.
-3. Domain, bounded-context, store-privacy, source-adapter, and MCP tests.
-4. Deterministic web/server build.
-5. Plugin manifest, license, lotus, and artifact validation.
-6. Live MCP/real Codex app-server snapshot.
-7. Swift model, queue, placement, hover, refresh, and clean-launch/existing-user source-onboarding self-test.
-8. Signed native app build.
-9. Native bundle/service/state/privacy validation, including first-launch setup, replay paths, provider-boundary copy, source toggles, and accessibility identifiers.
-10. Browser user journeys, context assignment, accessibility, light/dark, reduced motion, forced colors, compact layout, and no-overlap controls.
-11. Five repeated unit suites.
-12. Five repeated browser journeys.
-13. Final post-UI artifact presence/manifest validation.
-14. Production dependency audit at high severity.
+1. Freeze all writers; capture the exact worktree/commit boundary.
+2. Run focused server/store/source tests, npm run check, and npm run test:e2e.
+3. Freeze native source, then run companion self-tests, build, isolated real-window launcher UI,
+   companion validator, and local bundle-readiness.
+4. Verify Gajendra visible copy, stable compatibility IDs, state privacy/recovery, A4 hostile-tail
+   boundary/kill switch, A5 navigation blocks, and source bounds.
+5. Produce only synthetic, privacy-reviewed images and a local, evidence-bounded post draft after
+   the earlier gates pass.
+6. For binary distribution, separately require explicit Developer ID/team, strict signature,
+   Gatekeeper, notarization/staple, archive, and checksum receipts. Do not run those actions without
+   authorization and inputs.
 
-## Proof boundaries
+## Claim rules
 
-- A green Codex live probe proves only Codex on the current machine.
-- Claude live proof requires enabling the source and observing a `ready` status without emitting private metadata.
-- Cursor live proof requires a locally installed `cursor-agent`; fixture/parser proof is labeled separately.
-- Synthetic screenshots prove rendering contracts, not subjective adoption.
-- Isolated onboarding state proves launch policy; the installed Accessibility receipt proves real window timing, source health, toggles, completion, and replay.
-- Ad-hoc signature verification is not Developer ID/notarization proof.
-- A local report is not hosted CI or a public release.
+A local source check does not prove an installed app. An ad-hoc signature does not prove Developer
+ID/notarization. Historical hosted CI does not prove the current branch. A preview does not prove
+physical VoiceOver, login-item, or drag interaction. A mobile plan does not authorize a listener or
+mobile product.
 
-The report contains gate IDs, trial numbers, status, duration, and timestamps. It intentionally excludes thread titles, IDs, prompts, transcripts, provider output, and private absolute paths.
+The execution worksheet holds the gate matrix and marks local evidence separately from external
+gates:
+[release, brand, and mobile execution](../worksheets/2026-08-18-gajendra-release-brand-mobile-execution.md).

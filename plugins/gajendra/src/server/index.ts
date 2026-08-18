@@ -7,21 +7,47 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import type { DeckMutation, DeckSnapshot } from "../shared/contracts.js";
+import {
+  MUTATION_PROTOCOL_VERSION,
+  type DeckMutation,
+  type DeckMutationRequest,
+  type DeckMutationResult,
+  type DeckSnapshot,
+} from "../shared/contracts.js";
 import { GajendraService } from "./service.js";
 
 export const RESOURCE_URI = "ui://gajendra/app-v1.html";
 
 type DeckService = Pick<GajendraService, "snapshot" | "mutate">;
 
+const mutationOptionsSchema = {
+  expectedRevision: z.number().int().nonnegative().optional(),
+  idempotencyKey: z.string().min(1).max(256).optional(),
+};
+
 const deckMutationSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("set-level"), threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable() }),
   z.object({ type: z.literal("set-current"), threadId: z.string().min(1) }),
   z.object({ type: z.literal("move"), threadId: z.string().min(1), direction: z.enum(["up", "down"]) }),
+  z.object({
+    type: z.literal("move-before"),
+    threadId: z.string().min(1),
+    level: z.enum(["focus", "important"]).nullable(),
+    beforeThreadId: z.string().min(1).nullable().optional(),
+    context: z.enum(["design", "engineering", "life"]).nullable().optional(),
+    isCurrent: z.boolean().optional(),
+    currentThreadId: z.string().min(1).nullable().optional(),
+  }),
   z.object({ type: z.literal("set-context"), threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable() }),
   z.object({ type: z.literal("set-collapsed"), level: z.enum(["focus", "important"]), collapsed: z.boolean() }),
   z.object({ type: z.literal("set-source-enabled"), sourceId: z.string().min(1), enabled: z.boolean() }),
 ]);
+
+const deckMutationRequestSchema = z.object({
+  protocolVersion: z.literal(MUTATION_PROTOCOL_VERSION).optional(),
+  mutation: deckMutationSchema,
+  ...mutationOptionsSchema,
+});
 
 export function createGajendraServer(service: DeckService = new GajendraService()): McpServer {
   const server = new McpServer({ name: "gajendra", version: "0.3.1" });
@@ -31,8 +57,8 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   }));
 
   registerAppTool(server, "gajendra_open", {
-    title: "Gaja, Elephant Focus for AI Power Users",
-    description: "Open one unified focus queue across configured AI-agent thread sources.",
+    title: "Gajendra",
+    description: "One clear focus across your AI tools.",
     inputSchema: {},
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
@@ -41,73 +67,126 @@ export function createGajendraServer(service: DeckService = new GajendraService(
       "openai/widgetAccessible": true,
       "openai/ui": { entrypoints: [{ type: "global" }] },
     },
-  }, async () => toolResult(await service.snapshot()));
+  }, async () => snapshotToolResult(await service.snapshot()));
 
   registerAppTool(server, "gajendra_set_level", {
     title: "Set thread priority",
-    description: "Add, move, or remove one agent thread in Gaja.",
-    inputSchema: { threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable() },
+    description: "Add, move, or remove one agent thread in Gajendra.",
+    inputSchema: { threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ threadId, level }: { threadId: string; level: "focus" | "important" | null }) =>
-    toolResult(await service.mutate({ type: "set-level", threadId, level })));
+  }, async ({ threadId, level, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-level", threadId, level }, expectedRevision, idempotencyKey,
+  ))));
 
   registerAppTool(server, "gajendra_set_current", {
     title: "Set current focus",
     description: "Make one thread from any configured source the single NOW item.",
-    inputSchema: { threadId: z.string().min(1) },
+    inputSchema: { threadId: z.string().min(1), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ threadId }: { threadId: string }) => toolResult(await service.mutate({ type: "set-current", threadId })));
+  }, async ({ threadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-current", threadId }, expectedRevision, idempotencyKey,
+  ))));
 
   registerAppTool(server, "gajendra_move", {
     title: "Move prioritized thread",
-    description: "Move one thread up or down within its Gaja section.",
-    inputSchema: { threadId: z.string().min(1), direction: z.enum(["up", "down"]) },
+    description: "Move one thread up or down within its Gajendra section.",
+    inputSchema: { threadId: z.string().min(1), direction: z.enum(["up", "down"]), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ threadId, direction }: { threadId: string; direction: "up" | "down" }) =>
-    toolResult(await service.mutate({ type: "move", threadId, direction })));
+  }, async ({ threadId, direction, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "move", threadId, direction }, expectedRevision, idempotencyKey,
+  ))));
+
+  registerAppTool(server, "gajendra_move_before", {
+    title: "Move thread before target",
+    description: "Atomically place, append, or remove a thread while preserving one Gajendra NOW item.",
+    inputSchema: {
+      threadId: z.string().min(1),
+      level: z.enum(["focus", "important"]).nullable(),
+      beforeThreadId: z.string().min(1).nullable().optional(),
+      context: z.enum(["design", "engineering", "life"]).nullable().optional(),
+      isCurrent: z.boolean().optional(),
+      currentThreadId: z.string().min(1).nullable().optional(),
+      ...mutationOptionsSchema,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } },
+  }, async ({ threadId, level, beforeThreadId, context, isCurrent, currentThreadId, expectedRevision, idempotencyKey }) => {
+    const mutation: Extract<DeckMutation, { type: "move-before" }> = {
+      type: "move-before",
+      threadId,
+      level,
+      ...(beforeThreadId === undefined ? {} : { beforeThreadId }),
+      ...(context === undefined ? {} : { context }),
+      ...(isCurrent === undefined ? {} : { isCurrent }),
+      ...(currentThreadId === undefined ? {} : { currentThreadId }),
+    };
+    return mutationToolResult(await service.mutate(requestFor(mutation, expectedRevision, idempotencyKey)));
+  });
 
   registerAppTool(server, "gajendra_set_context", {
     title: "Set thread context",
-    description: "Assign or clear one bounded Gaja context label on a prioritized thread.",
-    inputSchema: { threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable() },
+    description: "Assign or clear one bounded Gajendra context label on a prioritized thread.",
+    inputSchema: { threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ threadId, context }: { threadId: string; context: "design" | "engineering" | "life" | null }) =>
-    toolResult(await service.mutate({ type: "set-context", threadId, context })));
+  }, async ({ threadId, context, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-context", threadId, context }, expectedRevision, idempotencyKey,
+  ))));
 
   registerAppTool(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
-    description: "Persist whether a Gaja priority section is collapsed.",
-    inputSchema: { level: z.enum(["focus", "important"]), collapsed: z.boolean() },
+    description: "Persist whether a Gajendra priority section is collapsed.",
+    inputSchema: { level: z.enum(["focus", "important"]), collapsed: z.boolean(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ level, collapsed }: { level: "focus" | "important"; collapsed: boolean }) =>
-    toolResult(await service.mutate({ type: "set-collapsed", level, collapsed })));
+  }, async ({ level, collapsed, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-collapsed", level, collapsed }, expectedRevision, idempotencyKey,
+  ))));
 
   registerAppTool(server, "gajendra_set_source_enabled", {
     title: "Set thread source availability",
-    description: "Enable or disable a local Gaja thread source. Claude metadata discovery remains opt-in.",
-    inputSchema: { sourceId: z.string().min(1), enabled: z.boolean() },
+    description: "Enable or disable a local Gajendra thread source. Claude metadata discovery remains opt-in.",
+    inputSchema: { sourceId: z.string().min(1), enabled: z.boolean(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
-  }, async ({ sourceId, enabled }: { sourceId: string; enabled: boolean }) =>
-    toolResult(await service.mutate({ type: "set-source-enabled", sourceId, enabled })));
+  }, async ({ sourceId, enabled, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-source-enabled", sourceId, enabled }, expectedRevision, idempotencyKey,
+  ))));
 
   return server;
 }
 
-function toolResult(snapshot: DeckSnapshot) {
-  const readySources = snapshot.sources.filter((source) => source.state === "ready").length;
+function requestFor(mutation: DeckMutation, expectedRevision: number | undefined, idempotencyKey: string | undefined): DeckMutationRequest {
+  return {
+    protocolVersion: MUTATION_PROTOCOL_VERSION,
+    mutation,
+    ...(expectedRevision === undefined ? {} : { expectedRevision }),
+    ...(idempotencyKey === undefined ? {} : { idempotencyKey }),
+  };
+}
+
+function snapshotToolResult(snapshot: DeckSnapshot) {
   return {
     structuredContent: snapshot,
     content: [{
       type: "text" as const,
       text: snapshot.error
-        ? `Gaja could not read configured threads: ${snapshot.error}`
-        : `Gaja has ${snapshot.focus.length} focus threads and ${snapshot.important.length} important threads across ${readySources} ready sources.`,
+        ? `Gajendra could not read configured threads: ${snapshot.error}`
+        : `Gajendra has ${snapshot.focus.length} focus threads and ${snapshot.important.length} important threads across ${snapshot.sources.filter((source) => source.state === "ready").length} ready sources.`,
+    }],
+  };
+}
+
+function mutationToolResult(result: DeckMutationResult) {
+  return {
+    structuredContent: result,
+    content: [{
+      type: "text" as const,
+      text: result.error?.message
+        ?? `Gajendra applied a priority change at revision ${result.revision}.`,
     }],
   };
 }
@@ -126,13 +205,22 @@ async function loadUiHtml(): Promise<string> {
       if (!error || typeof error !== "object" || !("code" in error) || error.code !== "ENOENT") throw error;
     }
   }
-  throw new Error("Gaja UI bundle is missing. Run npm run build.");
+  throw new Error("Gajendra UI bundle is missing. Run npm run build.");
 }
 
-export async function runCompanionCommand(command: "snapshot" | "mutate", input: string, service: DeckService): Promise<DeckSnapshot> {
+export async function runCompanionCommand(
+  command: "snapshot" | "mutate",
+  input: string,
+  service: DeckService,
+): Promise<DeckSnapshot | DeckMutationResult> {
   if (command === "snapshot") return service.snapshot();
-  const mutation = deckMutationSchema.parse(JSON.parse(input) as unknown) as DeckMutation;
-  return service.mutate(mutation);
+  const parsed = JSON.parse(input) as unknown;
+  const request = deckMutationRequestSchema.safeParse(parsed);
+  if (request.success) return service.mutate(request.data as DeckMutationRequest);
+  const legacyMutation = deckMutationSchema.parse(parsed) as DeckMutation;
+  const result = await service.mutate(legacyMutation);
+  // Existing native clients decode a raw DeckSnapshot. New envelope callers receive the typed result.
+  return result.snapshot;
 }
 
 const companionCommand = process.argv.includes("--snapshot-json")
@@ -144,8 +232,8 @@ if (companionCommand) {
   try {
     const input = companionCommand === "mutate" ? await readStandardInput() : "";
     process.stdout.write(`${JSON.stringify(await runCompanionCommand(companionCommand, input, service))}\n`);
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : "Gajendra companion command failed."}\n`);
+  } catch {
+    process.stderr.write("Gajendra companion command was rejected.\n");
     process.exitCode = 1;
   } finally {
     await service.close();

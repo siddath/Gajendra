@@ -154,7 +154,7 @@ export function createDeckMotion(root: HTMLElement) {
     });
   }
 
-  function setBusy(isBusy: boolean, label = "Updating Gaja"): void {
+  function setBusy(isBusy: boolean, label = "Updating Gajendra"): void {
     if (isBusy) root.setAttribute("aria-busy", "true");
     else root.removeAttribute("aria-busy");
 
@@ -169,7 +169,7 @@ export function createDeckMotion(root: HTMLElement) {
     });
 
     const status = root.querySelector<HTMLElement>("[data-refresh-status]");
-    if (status) status.textContent = isBusy ? label : "Gaja is up to date";
+    if (status) status.textContent = isBusy ? label : "Gajendra is up to date";
     const refreshLabel = root.querySelector<HTMLElement>("[data-refresh-label]");
     if (refreshLabel) refreshLabel.textContent = isBusy ? "Refreshing" : "Refresh";
     const refreshIcon = root.querySelector<HTMLElement>(".refresh-icon");

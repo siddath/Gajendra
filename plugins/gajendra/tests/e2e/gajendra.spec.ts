@@ -14,7 +14,8 @@ test.beforeEach(async ({ page }) => {
 test("makes one current thread unmistakable and returns to its native provider destination", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-gaja-theme", "native");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.getByRole("heading", { name: "What deserves your attention now?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "One clear focus across your AI tools." })).toBeVisible();
+  await expect(page.locator(".lede")).toHaveText("One NOW. One short queue. One click back to the exact thread.");
   const now = page.locator(".now-card");
   await expect(now.getByText("NOW", { exact: true })).toBeVisible();
   const open = now.getByRole("link", { name: /Open thread/ });
@@ -30,7 +31,7 @@ test("makes one current thread unmistakable and returns to its native provider d
   ]);
 
   const contentBox = await now.locator(".now-content").boundingBox();
-  const titleBox = await now.getByRole("heading", { name: "Ship the Gaja source release" }).boundingBox();
+  const titleBox = await now.getByRole("heading", { name: "Ship the Gajendra source release" }).boundingBox();
   const openBox = await open.boundingBox();
   expect(contentBox).not.toBeNull();
   expect(titleBox).not.toBeNull();
@@ -51,7 +52,7 @@ test("makes one current thread unmistakable and returns to its native provider d
 });
 
 test("switches and persists exactly Native Popover and Focus Deck across light, dark, and auto", async ({ page }) => {
-  const settings = page.getByRole("button", { name: "Open Gaja settings" });
+  const settings = page.getByRole("button", { name: "Open Gajendra settings" });
   await settings.click();
   const native = page.getByRole("button", { name: "Native", exact: true });
   const focusDeck = page.getByRole("button", { name: "Focus Deck", exact: true });
@@ -106,6 +107,186 @@ test("provider badges resume the exact owning thread and counts stay beside labe
   expect(countBox!.x - (titleBox!.x + titleBox!.width)).toBeLessThan(12);
 });
 
+test("executes only allowlisted thread links at the click boundary", async ({ page }) => {
+  const root = page.locator("#app");
+  const initialUrl = page.url();
+  const navigations: string[] = [];
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) navigations.push(frame.url());
+  });
+  const unsafeDestinations = [
+    " javascript:alert(1)",
+    "JaVaScRiPt:alert(1)",
+    "jav%61script:alert(1)",
+    "unknown://thread/1",
+    "javascript:alert(1)",
+    "data:text/html,boom",
+    "file:///tmp/never-open",
+  ];
+  for (const destination of unsafeDestinations) {
+    const open = page.locator(".now-card .primary-action");
+    const permittedDestination = await open.getAttribute("data-open-thread");
+    await open.evaluate((element, value) => element.setAttribute("data-open-thread", value as string), destination);
+    await open.click();
+    await expect(page).toHaveURL(initialUrl);
+    await expect(root).not.toHaveAttribute("data-last-opened-thread");
+    await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+    // The guarded boundary follows the press animation. Wait for its error render to replace the
+    // dynamic anchor before moving to the next hostile payload, avoiding stale click handlers.
+    await expect(open).toHaveAttribute("data-open-thread", permittedDestination!);
+  }
+  expect(navigations).toEqual([]);
+
+  const safe = page.locator('.running-row[data-thread-id="windsurf:available-2"] a').first();
+  await expect(safe).toHaveAttribute("href", "https://example.invalid/thread/available-2");
+  await safe.click();
+  await expect(root).toHaveAttribute("data-last-opened-thread", "https://example.invalid/thread/available-2");
+});
+
+test("uses the real host openLink fallback and surfaces a failed native navigation", async ({ page }) => {
+  await page.addInitScript(() => {
+    const thread = {
+      id: "host:thread-1",
+      sourceId: "host",
+      sourceName: "Host mock",
+      title: "Host fallback thread",
+      project: "host-test",
+      updatedAt: 1_786_545_400,
+      status: "idle",
+      level: "focus",
+      isCurrent: true,
+      context: null,
+      deepLink: "https://allowed.example.test/thread-1",
+      allowedDeepLinkSchemes: ["https"],
+    };
+    const snapshot = {
+      generatedAt: "2026-08-18T00:00:00.000Z",
+      revision: 1,
+      current: thread,
+      focus: [thread],
+      important: [],
+      available: [],
+      collapsed: { focus: false, important: false },
+      focusGuide: 5,
+      focusOverGuide: false,
+      staleEntryCount: 0,
+      source: "gajendra-registry",
+      sources: [{ id: "host", name: "Host mock", kind: "configured", state: "ready", enabled: true, threadCount: 1, detail: null }],
+      error: null,
+    };
+    const state = {
+      openLinkMode: "is-error" as "is-error" | "throw",
+      throwAssign: false,
+      openLinks: [] as string[],
+      openLinkModes: [] as string[],
+      navigations: [] as string[],
+      navigationModes: [] as string[],
+    };
+    const testWindow = window as Window & {
+      __gajendraHostTest?: unknown;
+      __gajendraHostTestState?: typeof state;
+    };
+    testWindow.__gajendraHostTestState = state;
+    testWindow.__gajendraHostTest = {
+      createApp: () => ({
+        addEventListener: () => undefined,
+        connect: async () => undefined,
+        getHostContext: () => ({ theme: "light" }),
+        callServerTool: async (request: { name: string }) => ({
+          structuredContent: request.name === "gajendra_open" ? snapshot : snapshot,
+        }),
+        openLink: async ({ url }: { url: string }) => {
+          state.openLinks.push(url);
+          state.openLinkModes.push(state.openLinkMode);
+          if (state.openLinkMode === "throw") throw new Error("Host openLink failed.");
+          return { isError: true };
+        },
+      }),
+      navigate: (url: string) => {
+        state.navigations.push(url);
+        state.navigationModes.push(state.openLinkMode);
+        if (state.throwAssign) throw new Error("Native navigation failed.");
+      },
+    };
+  });
+  await page.goto("/gajendra.html?host-test=1");
+  const root = page.locator("#app");
+  const open = page.locator(".now-card .primary-action");
+  await expect(open).toHaveAttribute("href", "https://allowed.example.test/thread-1");
+
+  for (const unsafe of [
+    " javascript:alert(1)",
+    "JaVaScRiPt:alert(1)",
+    "jav%61script:alert(1)",
+    "unknown://thread/1",
+    "data:text/html,boom",
+    "file:///tmp/never-open",
+  ]) {
+    await open.evaluate((element, value) => element.setAttribute("data-open-thread", value as string), unsafe);
+    await open.click();
+    await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+    // Opening animates before the guarded boundary runs. Wait for its error render to rebuild
+    // this dynamic locator before issuing the next hostile click, rather than racing six stale
+    // handlers against the one permitted-fallback assertion below.
+    await expect(open).toHaveAttribute("data-open-thread", "https://allowed.example.test/thread-1");
+  }
+  await expect.poll(() => page.evaluate(() => {
+    const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
+    return testWindow.__gajendraHostTestState;
+  })).toMatchObject({ openLinks: [], navigations: [] });
+
+  await open.evaluate((element) => element.setAttribute("data-open-thread", "https://allowed.example.test/thread-1"));
+  await open.click();
+  await expect.poll(() => page.evaluate(() => {
+    const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
+    return testWindow.__gajendraHostTestState;
+  })).toMatchObject({
+    openLinks: ["https://allowed.example.test/thread-1"],
+    navigations: ["https://allowed.example.test/thread-1"],
+  });
+
+  await page.evaluate(() => {
+    const testWindow = window as Window & { __gajendraHostTestState?: { openLinkMode: "is-error" | "throw"; throwAssign: boolean } };
+    if (!testWindow.__gajendraHostTestState) throw new Error("Host test state is unavailable.");
+    testWindow.__gajendraHostTestState.openLinkMode = "throw";
+  });
+  await open.click();
+  await expect.poll(() => page.evaluate(() => {
+    const testWindow = window as Window & {
+      __gajendraHostTestState?: { openLinks: string[]; openLinkModes: string[]; navigations: string[]; navigationModes: string[] };
+    };
+    const state = testWindow.__gajendraHostTestState;
+    return state && {
+      openLinks: state.openLinks.length,
+      openLinkModes: state.openLinkModes,
+      navigations: state.navigations.length,
+      navigationModes: state.navigationModes,
+    };
+  })).toMatchObject({
+    openLinks: expect.any(Number),
+    openLinkModes: expect.arrayContaining(["is-error", "throw"]),
+    navigations: expect.any(Number),
+    navigationModes: expect.arrayContaining(["is-error", "throw"]),
+  });
+  const fallbackCounts = await page.evaluate(() => {
+    const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
+    return {
+      openLinks: testWindow.__gajendraHostTestState?.openLinks.length ?? 0,
+      navigations: testWindow.__gajendraHostTestState?.navigations.length ?? 0,
+    };
+  });
+  expect(fallbackCounts.openLinks).toBeGreaterThanOrEqual(2);
+  expect(fallbackCounts.navigations).toBeGreaterThanOrEqual(2);
+
+  await page.evaluate(() => {
+    const testWindow = window as Window & { __gajendraHostTestState?: { throwAssign: boolean } };
+    if (!testWindow.__gajendraHostTestState) throw new Error("Host test state is unavailable.");
+    testWindow.__gajendraHostTestState.throwAssign = true;
+  });
+  await open.click();
+  await expect(root.getByRole("alert")).toContainText("Native navigation failed.");
+});
+
 test("assigns bounded context labels without changing NOW or provider resume", async ({ page }) => {
   const row = page.locator('.thread-row[data-thread-id^="claude:"]');
   const provider = row.locator('.source-badge[data-source-id="claude"]');
@@ -128,7 +309,7 @@ test("includes prioritized and unprioritized active work while retaining priorit
   await expect(running.locator(".running-scope")).toContainText("All priority lanes");
   await expect(running.locator(".running-scope")).toHaveCSS("border-top-style", "solid");
   await expect(running.locator(".running-row")).toHaveCount(4);
-  await expect(running).toContainText("Ship the Gaja source release");
+  await expect(running).toContainText("Ship the Gajendra source release");
   await expect(running.locator('.running-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"] .placement-badge')).toHaveText("NOW");
   await expect(running).toContainText("Investigate the CI performance regression");
   await expect(page.locator('#available-list .available-row[data-thread-id="windsurf:available-2"]')).toBeHidden();
@@ -140,32 +321,85 @@ test("includes prioritized and unprioritized active work while retaining priorit
 
   const secondFocus = page.locator('.thread-row[data-thread-id^="claude:"]');
   const firstFocus = page.locator("#focus-list .thread-row").first();
-  await secondFocus.locator(".thread-main").dragTo(firstFocus.locator(".thread-main"));
+  await secondFocus.evaluate((source, targetId) => {
+    const target = document.querySelector<HTMLElement>(`.thread-row[data-thread-id="${targetId}"]`);
+    if (!target) throw new Error("Synthetic drag target is unavailable.");
+    const transfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: transfer }));
+  }, await firstFocus.getAttribute("data-thread-id"));
   await expect(page.locator("#focus-list .thread-row").first()).toContainText("Review the multi-agent adapter contract");
 
   const recent = page.locator('.available-row[data-thread-id="codex:available-1"]');
   await recent.getByRole("button", { name: "Important" }).click();
   await expect(page.locator("#important-list")).toContainText("Plan this week across projects");
   await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
-  await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
+  await expect(page.locator(".now-card")).toContainText("Ship the Gajendra source release");
 
   await runningToggle.click();
   await expect(page.locator("#running-list")).toBeVisible();
   const keyboardRunning = page.locator('.running-row[data-thread-id="windsurf:available-2"]');
-  const keyboardFocus = keyboardRunning.getByRole("button", { name: "Focus ✦✦" });
+  const keyboardFocus = keyboardRunning.getByRole("button", { name: "Focus" });
   await keyboardFocus.focus();
   await keyboardFocus.press("Enter");
   await expect(page.locator("#focus-list")).toContainText("Investigate the CI performance regression");
 });
 
+test("discloses provider-confirmed review work with Running precedence and exact destinations", async ({ page }) => {
+  const review = page.locator(".review-section");
+  const toggle = review.locator("[data-review-toggle]");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(review.locator(".review-scope")).toContainText("Needs your review");
+  await expect(review.locator(".review-row")).toHaveCount(3);
+  expect(await review.locator(".review-row").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-thread-id")))).toEqual([
+    "review-agent:focus-review",
+    "review-agent:important-review",
+    "review-agent:available-review",
+  ]);
+
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:focus-review"] .review-mark')).toBeVisible();
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:important-review"] .review-mark')).toBeVisible();
+  await expect(page.locator('.running-row[data-thread-id="windsurf:available-2"] .review-mark')).toHaveCount(0);
+  await expect(review.locator('.review-row[data-thread-id="review-agent:focus-review"] .placement-badge')).toHaveText("Focus");
+  await expect(review.locator('.review-row[data-thread-id="review-agent:important-review"] .placement-badge')).toHaveText("Important");
+
+  const reviewDestination = review.locator('.review-row[data-thread-id="review-agent:focus-review"] .review-primary');
+  await expect(reviewDestination).toHaveAttribute("href", "https://example.invalid/reviews/focus-review");
+  await reviewDestination.evaluate((element) => element.setAttribute("data-open-thread", "javascript:unsafe-review"));
+  await reviewDestination.click();
+  await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+  await expect(reviewDestination).toHaveAttribute("data-open-thread", "https://example.invalid/reviews/focus-review");
+  await reviewDestination.click();
+  await expect(page.locator("#app")).toHaveAttribute("data-last-opened-thread", "https://example.invalid/reviews/focus-review");
+
+  const owningTask = review.locator('.review-row[data-thread-id="review-agent:focus-review"] .source-badge');
+  await owningTask.click();
+  await expect(page.locator("#app")).toHaveAttribute("data-last-opened-thread", "review-agent://threads/focus-review");
+
+  const taskFallback = review.locator('.review-row[data-thread-id="review-agent:important-review"] .review-primary');
+  await expect(taskFallback).toContainText("Task");
+  await expect(taskFallback).toHaveAttribute("href", "review-agent://threads/important-review");
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator("#review-list")).toBeHidden();
+  await expect(page.locator(".thread-search-footer")).toBeVisible();
+
+  await page.locator("#task-search").fill("bounded catalog result");
+  await expect(page.locator('#available-list .available-row[data-thread-id="review-agent:available-review"]')).toBeVisible();
+  await expect(page.locator('#available-list .available-row[data-thread-id="review-agent:available-review"]')).toHaveCount(1);
+});
+
 test("collapses sections and promotes a recent task without losing the single NOW cue", async ({ page }) => {
-  const focusToggle = page.getByRole("button", { name: /Double-star focus/ });
+  const focusToggle = page.locator('button[data-collapse="focus"]');
   await focusToggle.click();
   await expect(focusToggle).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#focus-list")).toBeHidden();
   await focusToggle.click();
 
-  await page.locator(".available-row", { hasText: "Plan this week across projects" }).getByRole("button", { name: "Focus ✦✦" }).click();
+  await page.locator(".available-row", { hasText: "Plan this week across projects" }).getByRole("button", { name: "Focus" }).click();
   await expect(page.locator("#focus-list")).toContainText("Plan this week across projects");
   await expect(page.locator(".now-card .now-label strong")).toHaveText("NOW");
   await expect(page.locator("#focus-list .thread-row.is-current .now-pill")).toHaveCount(1);
@@ -181,20 +415,34 @@ test("moves the same task between Focus and Important while preserving one NOW",
   await importantRow.getByRole("button", { name: "Focus" }).click();
   await expect(page.locator(`#focus-list .thread-row[data-thread-id="${threadId}"]`)).toContainText("Review the multi-agent adapter contract");
   await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
-  await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
+  await expect(page.locator(".now-card")).toContainText("Ship the Gajendra source release");
+});
+
+test("treats a row dropped onto itself as an atomic no-op", async ({ page }) => {
+  const target = page.locator('#focus-list .thread-row[data-thread-id^="claude:"]');
+  const orderBefore = await page.locator("#focus-list .thread-row").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-thread-id")));
+
+  await target.evaluate((element) => {
+    const transfer = new DataTransfer();
+    transfer.setData("text/plain", (element as HTMLElement).dataset.threadId ?? "");
+    element.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: transfer }));
+  });
+
+  await expect.poll(async () => page.locator("#focus-list .thread-row").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-thread-id")))).toEqual(orderBefore);
+  await expect(page.locator("#app")).toHaveAttribute("data-motion-state", "idle");
 });
 
 test("animates row ordering and refreshes without replacing the visible deck", async ({ page }) => {
   await expect(page.locator("#app")).toHaveAttribute("data-motion", "enabled");
   const focusRows = page.locator("#focus-list .thread-row");
-  await expect(focusRows.first()).toContainText("Ship the Gaja source release");
+  await expect(focusRows.first()).toContainText("Ship the Gajendra source release");
   await focusRows.filter({ hasText: "Review the multi-agent adapter contract" }).getByRole("button", { name: "Move task up" }).click();
   await expect(focusRows.first()).toContainText("Review the multi-agent adapter contract");
   await expect(page.locator("#app")).toHaveAttribute("data-motion-state", "idle");
 
-  const refresh = page.getByRole("button", { name: "Refresh Gaja" });
+  const refresh = page.getByRole("button", { name: "Refresh Gajendra" });
   await refresh.click();
-  await expect(page.getByRole("heading", { name: "What deserves your attention now?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "One clear focus across your AI tools." })).toBeVisible();
   await expect(refresh).toContainText("Refresh");
   await expect(page.locator("#app")).not.toHaveAttribute("aria-busy", "true");
 });
@@ -210,9 +458,9 @@ test("removes motion when the system requests reduced motion", async ({ page }) 
 
 test("searches every thread and exposes organizer actions by keyboard", async ({ page }) => {
   const searchFooter = page.locator(".thread-search-footer");
-  const search = page.getByRole("searchbox", { name: "Search all 8 threads" });
+  const search = page.getByRole("searchbox", { name: "Search all 11 threads" });
   await expect(searchFooter).toBeVisible();
-  await expect(search).toHaveAttribute("placeholder", "Search all 8 threads");
+  await expect(search).toHaveAttribute("placeholder", "Search all 11 threads");
   const initialBorder = await searchFooter.evaluate((element) => getComputedStyle(element).borderColor);
   await searchFooter.hover();
   const hoverBorder = await searchFooter.evaluate((element) => getComputedStyle(element).borderColor);
@@ -225,7 +473,7 @@ test("searches every thread and exposes organizer actions by keyboard", async ({
   expect(Math.abs(footerBeforeScroll!.y - footerAfterScroll!.y)).toBeLessThan(2);
   await searchFooter.click({ position: { x: 6, y: 6 } });
   await expect(search).toBeFocused();
-  await page.keyboard.type("gaja codex active");
+  await page.keyboard.type("gajendra codex active");
   await expect(page.locator("[data-search-status]")).toHaveText("1 match");
   await search.blur();
   await searchFooter.click({ position: { x: 6, y: 6 } });
@@ -233,7 +481,7 @@ test("searches every thread and exposes organizer actions by keyboard", async ({
   await expect.poll(() => search.evaluate((element) => {
     const input = element as HTMLInputElement;
     return [input.selectionStart, input.selectionEnd];
-  })).toEqual([0, 17]);
+  })).toEqual([0, 21]);
   const prioritizedMatch = page.locator('#available-list .available-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"]');
   await expect(prioritizedMatch).toBeVisible();
   await expect(prioritizedMatch.locator(".placement-badge")).toHaveText("NOW");
@@ -250,8 +498,8 @@ test("keeps one selected NOW task after sequential Codex-style selections", asyn
 
   await page.locator('.thread-row[data-thread-id^="codex:"]').getByRole("button", { name: "Make Now" }).click();
   await expect(page.locator("#focus-list .thread-row.is-current")).toHaveCount(1);
-  await expect(page.locator("#focus-list .thread-row.is-current")).toContainText("Ship the Gaja source release");
-  await expect(page.locator(".now-card")).toContainText("Ship the Gaja source release");
+  await expect(page.locator("#focus-list .thread-row.is-current")).toContainText("Ship the Gajendra source release");
+  await expect(page.locator(".now-card")).toContainText("Ship the Gajendra source release");
 });
 
 test("passes automated accessibility checks in expanded and collapsed states", async ({ page }) => {
@@ -264,7 +512,7 @@ test("passes automated accessibility checks in expanded and collapsed states", a
   const collapsed = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
   expect(collapsed.violations.filter((violation) => ["critical", "serious"].includes(violation.impact ?? ""))).toEqual([]);
 
-  await page.getByRole("button", { name: "Open Gaja settings" }).click();
+  await page.getByRole("button", { name: "Open Gajendra settings" }).click();
   for (const [theme, appearance] of [["Native", "Light"], ["Native", "Dark"], ["Focus Deck", "Light"], ["Focus Deck", "Dark"]] as const) {
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("button", { name: appearance, exact: true }).click();
@@ -282,7 +530,7 @@ test("reflows without horizontal overflow and records light, dark, and forced-co
   await expect(page.locator(".thread-heading-line > a").first()).toHaveCSS("color", "rgb(245, 245, 247)");
   await page.screenshot({ path: path.join(evidenceDirectory, "gajendra-dark-reduced-motion.png"), fullPage: true });
 
-  await page.getByRole("button", { name: "Open Gaja settings" }).click();
+  await page.getByRole("button", { name: "Open Gajendra settings" }).click();
   await page.getByRole("button", { name: "Focus Deck", exact: true }).click();
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page.screenshot({ path: path.join(evidenceDirectory, "gajendra-focus-deck-dark.png"), fullPage: true });

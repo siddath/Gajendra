@@ -1,45 +1,53 @@
-# Security and privacy
+# Security policy
 
-## Supported versions
-
-Security fixes are provided for the latest published `0.3.x` source release. Older development identities and untagged commits are not supported release channels.
+Gajendra is local-first. This document describes the current **source contract** for the dirty,
+local candidate, not installed-app or distribution proof.
 
 ## Data boundary
 
-Gaja is local-first and declares `openWorldHint: false`. Its own services make no third-party network request.
+The private state contains canonical thread IDs, NOW/Focus/Important order, the bounded
+`design`/`engineering`/`life` context enum, preferences, monotonic revision, and bounded SHA-256
+idempotency receipts. It does not contain titles, prompts, transcript bodies, previews, source
+files, review signals or destinations, tokens, credentials, free-text labels, or arbitrary provider responses.
 
-The v2 state file contains only canonical thread IDs, Focus/Important order, one NOW ID, an optional `design`/`engineering`/`life` context enum, collapse preferences, and source enablement. Context is assigned by the user inside Gaja; providers cannot inject it. Live titles, project basenames, and free-text labels are never persisted. The state directory is owner-only (`0700`), the file is owner-only (`0600`), and writes use an atomic temporary-file rename.
+The default state directory and recovery material are owner-private (`0700` directory, `0600`
+files). Writes use a private cross-process lock and atomic replacement. Store validation precedes
+normalization: corrupt, oversized, unknown-version, or structurally invalid primary state is
+quarantined. Recovery may resume only from a structurally valid private primary or last-known-good
+copy; otherwise it fails closed. `GAJENDRA_DATA_DIR` isolates a test/custom store from legacy
+`~/.codex` candidates unless migration is explicitly requested.
 
-Gaja does not persist prompts, previews, transcript bodies, source files, tokens, credentials, or arbitrary provider responses. Compatible Aadi and Priority Deck metadata is copied only when no v2 state exists; legacy files remain intact.
+## Sources and execution
 
-## Source trust boundaries
+- Gajendra does not mutate provider databases, signed applications, rollouts, prompts, or
+  transcripts. Claude Code discovery is opt-in.
+- Configured sources are explicit, bounded catalogs. IDs must be unique and cannot use built-in or
+  reserved namespaces. Configured process capture has byte, deadline, process-group termination,
+  and close-settlement bounds.
+- Source URLs use per-source safe schemes. `javascript:`, `data:`, `file:`, malformed, encoded,
+  whitespace-padded, and unallowlisted destinations are rejected at input and execution boundaries.
+- Configured review readiness is an optional validated live signal with a structured Task or URL
+  destination. It does not authorize remote access, credential storage, provider-content capture,
+  or persistence; built-in providers are not inferred ready from idle/resumable states.
+- Codex app-server activity enrichment is disabled by
+  `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off`. When enabled on macOS it is the A4 bounded
+  metadata-only tail inspection described in [README.md](README.md#codex-rollout-tail-boundary-a4),
+  not transcript inspection.
 
-- **Codex:** invokes `codex app-server --stdio` and uses `thread/list`; it does not inspect Codex SQLite, rollout JSONL, Electron storage, or the signed app bundle.
-- **Claude Code:** disabled by default. When enabled, reads at most the newest 200 documented session JSONL files and at most 512 KiB from each, extracting only `sessionId`, `cwd`, `timestamp`, `aiTitle`, and `slug`. Conversation bodies are neither used nor stored.
-- **Cursor:** invokes the resolved `cursor-agent ls` process with a 10-second timeout and 2 MiB output cap. Resume uses the official session ID argument.
-- **Grok Build:** disabled by default. When enabled, reads at most the newest 200 documented `summary.json` metadata files and at most 128 KiB from each, extracting only the session ID, working directory, generated title, and activity timestamps. It does not read `updates.jsonl`, `chat_history.jsonl`, plans, prompts, responses, tool calls, or file snapshots. Resume uses the official session ID argument.
-- **Configured agents:** reads only catalogs explicitly named in `sources.json`, capped at 2 MiB and 2,000 entries. A configured resume command is user-authored executable authority; review it like a local script.
+## Host and native boundaries
 
-Executable overrides are explicit: `GAJENDRA_CODEX_BIN`, `GAJENDRA_CLAUDE_BIN`, `GAJENDRA_CURSOR_BIN`, `GAJENDRA_GROK_BIN`, and `GAJENDRA_NODE_BIN`. Legacy Aadi/Priority Deck environment names are accepted only for migration compatibility.
+The MCP app runs in its declared host sandbox and calls only declared Gajendra tools/links. The
+standard inline MCP app remains supported independently of any experimental global host entry.
+Native source code is expected to use the registered `gajendra://` route and temporary,
+owner-private, shell-quoted CLI resume artifacts; it never evaluates catalog-provided shell text.
 
-## Resume boundary
+The source/build contract targets macOS 13.5 and a bundled, pinned Node v24.19.0 runtime. That is
+not a statement about an installed app, Developer ID signing, notarization, Gatekeeper acceptance,
+or public binary availability. Those require separate evidence.
 
-Codex uses its registered URL scheme. CLI-owned sessions use a temporary `.command` file in the system temporary directory. Every executable, argument, and working directory is single-quoted before launch; the file and directory use `0700`; the file is removed after a bounded delay. Gaja never runs catalog-provided shell text through `eval`.
+## Reporting
 
-## Native and web boundaries
-
-- Native panels request no Accessibility automation, screen recording, App Group, listener, or local network server.
-- The MCP UI runs in the host sandbox and can call only the declared Gaja tools and open declared links.
-- Native `UserDefaults` persists only validated visual-theme, appearance, bounded hover-card-size, pill-visibility, pill-position values, and one source-onboarding completion boolean. Source choices remain in the owner-only v2 metadata store. MCP browser storage persists only the validated visual-theme and appearance enum strings; storage failures are non-fatal. No thread IDs, titles, projects, source results, or content enter either visual/onboarding preference store.
-- The native app and plugin bundle the byte-identical service artifact.
-- No updater daemon, LaunchAgent, or Codex-process monitor is installed. Launch at Login is an `SMAppService` main-app registration that the user can disable.
-
-## Distribution and artwork
-
-Local bundles are ad-hoc signed. A downloadable public binary requires Developer ID signing, notarization, stapling, and clean-machine Gatekeeper verification. Signing credentials must never enter the repository.
-
-Runtime artwork is original SVG/SwiftUI geometry. External reference images are not bundled or redistributed.
-
-## Reporting a vulnerability
-
-Use synthetic thread metadata and omit tokens, prompts, transcripts, and absolute private paths. Report vulnerabilities privately through [GitHub Security Advisories](https://github.com/siddath/Gajendra/security/advisories/new); do not open a public issue for an undisclosed vulnerability.
+Use synthetic identifiers and omit prompts, transcripts, tokens, and private paths from reports.
+Report undisclosed vulnerabilities through
+[GitHub Security Advisories](https://github.com/siddath/Gajendra/security/advisories/new), not a
+public issue. See [SUPPORT.md](SUPPORT.md) for non-security help.

@@ -3,7 +3,7 @@
   "version": "0.3.1",
   "private": true,
   "type": "module",
-  "description": "Gaja: one local focus layer for threads across configured AI agents.",
+  "description": "Gajendra: one clear focus across your AI tools.",
   "scripts": {
     "build": "npm run build:ui && npm run build:server",
     "build:ui": "cross-env GAJENDRA_ENTRY=gajendra.html vite build && node scripts/normalize-build.mjs dist/gajendra.html",

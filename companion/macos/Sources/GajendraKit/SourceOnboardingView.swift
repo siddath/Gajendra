@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 public final class GajendraSourceOnboardingState {
     public static let completionKey = "gajendra.onboarding.sources.completed.v1"
+    public static let seenKey = "gajendra.onboarding.sources.seen.v1"
 
     private let defaults: UserDefaults
 
@@ -15,6 +16,10 @@ public final class GajendraSourceOnboardingState {
         defaults.bool(forKey: Self.completionKey)
     }
 
+    public var wasSeen: Bool {
+        defaults.bool(forKey: Self.seenKey)
+    }
+
     public func shouldPresentOnLaunch(hasPriorNativeState: Bool) -> Bool {
         if defaults.object(forKey: Self.completionKey) != nil {
             return !isCompleted
@@ -23,11 +28,16 @@ public final class GajendraSourceOnboardingState {
             markCompleted()
             return false
         }
+        // Establish an explicit deferred state before the first window is shown. Closing or
+        // choosing Not now leaves completion false, so a later relaunch presents again.
+        defaults.set(false, forKey: Self.completionKey)
+        defaults.set(true, forKey: Self.seenKey)
         return true
     }
 
     public func markCompleted() {
         defaults.set(true, forKey: Self.completionKey)
+        defaults.set(true, forKey: Self.seenKey)
     }
 }
 
@@ -72,14 +82,11 @@ public enum GajendraSourceOnboardingCopy {
         if source.state == "ready" {
             return source.threadCount == 1 ? "1 thread available" : "\(source.threadCount) threads available"
         }
-        if let detail = source.detail, !detail.isEmpty {
-            return detail
-        }
         switch source.state {
-        case "disabled": return "Turn on to include this tool when Gaja refreshes."
+        case "disabled": return "Turn on to include this tool when Gajendra refreshes."
         case "not-installed": return "Install the supported local CLI, then rescan."
         case "not-configured": return "Complete this tool's local source setup, then rescan."
-        case "error": return "Gaja could not read this source's metadata contract."
+        case "error": return "Gajendra could not read this source's metadata contract."
         default: return "Local source status is unavailable."
         }
     }
@@ -122,9 +129,9 @@ public struct GajendraSourceOnboardingView: View {
                 .frame(width: 74, height: 74)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Connect your AI tools")
+                Text("Choose your AI tools")
                     .font(.system(size: 27, weight: .semibold))
-                Text("Bring supported local threads into one focused view, so your NOW stays clear across tools.")
+                Text("Gajendra reads local metadata only and requires no sign-in or cloud account.")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +149,7 @@ public struct GajendraSourceOnboardingView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("Local metadata only")
                     .font(.system(size: 13, weight: .semibold))
-                Text("No account sign-in or cloud sync. Gaja never stores prompts, transcripts, tokens, credentials, or provider databases.")
+                Text("Gajendra reads local metadata only. It does not store prompts, transcripts, tokens, credentials, or provider databases.")
                     .font(.system(size: 12.5))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -162,7 +169,7 @@ public struct GajendraSourceOnboardingView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .tracking(0.7)
-                    Text("Gaja refreshes selected sources without changing their sessions.")
+                    Text("Gajendra refreshes selected sources without changing their sessions.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -211,7 +218,7 @@ public struct GajendraSourceOnboardingView: View {
                         Image(systemName: "exclamationmark.arrow.triangle.2.circlepath")
                             .font(.title2)
                             .foregroundStyle(.secondary)
-                        Text("Gaja could not scan local tools.")
+                        Text("Gajendra could not scan local tools.")
                             .font(.headline)
                         Button("Try Again") { model.refresh() }
                     }
@@ -290,9 +297,9 @@ public struct GajendraSourceOnboardingView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                     .disabled(model.isLoading)
-                    .accessibilityLabel("Use \(source.name) in Gaja")
+                    .accessibilityLabel("Use \(source.name) in Gajendra")
                     .accessibilityValue(source.enabled ? "On" : "Off")
-                    .accessibilityHint("Includes only supported local metadata when Gaja refreshes")
+                    .accessibilityHint("Includes only supported local metadata when Gajendra refreshes")
                     .accessibilityIdentifier("gajendra-source-toggle-\(source.id)")
                 }
             }
@@ -318,7 +325,7 @@ public struct GajendraSourceOnboardingView: View {
     private var footer: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Change sources anytime from Settings → Connect AI Tools.")
+                Text("Change tools anytime from Settings → Manage AI tools…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("Refresh reads the latest local metadata; it does not copy conversations.")
@@ -326,16 +333,16 @@ public struct GajendraSourceOnboardingView: View {
                     .foregroundStyle(.tertiary)
             }
             Spacer()
-            Button("Skip for now", action: onSkip)
+            Button("Not now", action: onSkip)
                 .keyboardShortcut(.cancelAction)
-                .accessibilityLabel("Skip AI tool setup")
-                .accessibilityHint("Closes setup and keeps the current source choices")
+                .accessibilityLabel("Not now")
+                .accessibilityHint("Closes setup without marking onboarding complete")
                 .accessibilityIdentifier("gajendra-source-onboarding-skip")
-            Button("Finish setup", action: onFinish)
+            Button("Done", action: onFinish)
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
-                .accessibilityLabel("Finish AI tool setup")
-                .accessibilityHint("Saves completion and closes setup")
+                .accessibilityLabel("Done")
+                .accessibilityHint("Marks onboarding complete and closes setup")
                 .accessibilityIdentifier("gajendra-source-onboarding-finish")
         }
     }

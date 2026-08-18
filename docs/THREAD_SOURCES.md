@@ -1,77 +1,80 @@
-# Thread source configuration
+# Thread sources
 
-Current Gaja source includes four built-in adapters and a conservative JSON-catalog adapter for other AI agents. Gajendra names remain in configuration paths and environment variables for compatibility.
+Gajendra uses explicit, bounded, local adapters. It does not scrape provider databases or mutate
+provider state. The source registry returns normalized metadata and never turns content into
+priority state.
 
-The Running view is deliberately conservative and inclusive. A thread enters it only when its source emits an explicit active/running-equivalent status, and it remains visible there even when it is also NOW, Focus, or Important. The current Claude Code and Grok Build metadata adapters emit `resumable`, so Gaja does not claim those sessions are running. Cursor JSON and configured catalogs can participate when they supply an explicit status.
+## Built-ins and configured catalogs
 
-Codex app-server reports desktop-owned threads as `notLoaded` to a separate client. On macOS, Gaja therefore performs a best-effort metadata-only enrichment: it finds held files in `~/.codex/thread-writer-locks`, validates the matching rollout path remains under `~/.codex/sessions`, reads at most the final 256 KiB, and treats a lifecycle tail after the last `task_complete` marker as active. It never emits or persists rollout content. If the lock, path, lifecycle marker, or `/usr/sbin/lsof` probe is unavailable, Gaja keeps the app-server status rather than guessing from recency.
+Codex, Claude Code, Cursor, and Grok Build are built-in adapters. Claude Code scanning remains
+opt-in. Configured sources use an explicit JSON catalog or bounded process capture; they are not an
+arbitrary filesystem or shell-discovery mechanism.
 
-## Built-in sources
+Configured IDs must be unique and cannot be `codex`, `claude`, `cursor`, `grok`, or
+`configured-sources`. Catalogs, summaries, process output, row counts, and source selection all
+have hard bounds. Process collection stops retaining stdout after its cap/timeout and uses bounded
+TERM-to-KILL/close settlement for an uncooperative child. A provider failure leaves the safe base
+status instead of exposing partial/private data.
 
-- Codex is enabled by default and uses the local app-server.
-- Cursor is enabled by default; an absent `cursor-agent` is reported as `not-installed`.
-- Claude Code is disabled by default because enabling it reads local session metadata. Enable or disable any source during clean first-launch setup, from **Settings → Connect AI Tools…**, or from the organizer’s source chips.
-- Grok Build is disabled by default because enabling it reads only the documented local `summary.json` metadata under `~/.grok/sessions`; it never reads Grok prompts, responses, tool calls, or file snapshots. An absent `grok` CLI is reported as `not-installed`.
+Source preference generation is part of a collection result. The service verifies that generation
+before returning or mutating a snapshot; under sustained change it uses a bounded retry/deadline
+and returns a typed safe busy/error response instead of a stale success.
 
-The setup screen and its **Rescan** action use this same local registry. They do not create provider accounts, transmit credentials, or broaden discovery beyond these built-ins and explicitly configured catalogs. A valid entry added to `sources.json` appears automatically as another setup row.
+## Running
 
-Executable overrides are optional:
+Running is an explicit provider status. It is shown across NOW, Focus, Important, and unprioritized
+work without creating a new persisted tier. `resumable` does not mean Running. The registry retains
+explicit active rows when applying background/result caps.
 
-```bash
-export GAJENDRA_CODEX_BIN="/absolute/path/to/codex"
-export GAJENDRA_CLAUDE_BIN="/absolute/path/to/claude"
-export GAJENDRA_CURSOR_BIN="/absolute/path/to/cursor-agent"
-export GAJENDRA_GROK_BIN="/absolute/path/to/grok"
-```
+## Ready for Review
 
-Grok discovery and resume follow xAI’s official [session storage](https://docs.x.ai/build/features/sessions) and [CLI resume](https://docs.x.ai/build/cli/reference) contracts. `GAJENDRA_GROK_CONFIG_DIR` may point at an isolated Grok configuration directory for testing.
+Ready for Review is also derived live metadata, not a priority tier. A thread appears only when an
+enabled adapter supplies the bounded `review.state = "ready"` structure, a supported kind, a valid
+timestamp, a single-line provider status, and a structured Task or Review destination. Running
+takes precedence if a stale source reports both states. The projection is ordered by the review
+timestamp and retained outside the ordinary 200-row background cap.
 
-## Configure another agent
+The first supported adapter path is an explicitly configured catalog; see
+[the synthetic catalog](../examples/review-catalog.json). The configured source's declared safe
+schemes are checked when the catalog is read and again when the destination opens. A URL destination
+is labeled **Review**; a thread fallback is labeled **Task**, while the provider badge continues to
+open the owning task.
 
-Create `~/Library/Application Support/Gajendra/sources.json`:
+Built-in Codex, Claude Code, Cursor, and Grok adapters do not currently emit review readiness.
+Gajendra does not translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review
+signal. Remote provider APIs, tokens, and network access remain outside this local implementation.
+Review signals, provider statuses, destinations, results, diffs, and PR content are never written to
+`gajendra.v2.json`.
 
-```json
-{
-  "version": 1,
-  "sources": [
-    {
-      "id": "my-agent",
-      "name": "My Agent",
-      "catalog": "~/Library/Application Support/My Agent/gajendra-threads.json",
-      "enabled": true
-    }
-  ]
-}
-```
+## Codex activity enrichment
 
-The referenced catalog is versioned and size-bounded:
+The app-server may report a desktop-owned thread as not loaded. On macOS only, Gajendra can perform
+optional, best-effort, metadata-only enrichment:
 
-```json
-{
-  "version": 1,
-  "threads": [
-    {
-      "id": "thread-123",
-      "title": "Finish release audit",
-      "project": "gajendra",
-      "updatedAt": "2026-08-12T12:00:00Z",
-      "status": "idle",
-      "deepLink": "my-agent://threads/thread-123"
-    }
-  ]
-}
-```
+1. Find a held writer lock beneath `~/.codex/thread-writer-locks`.
+2. Realpath-confine its rollout beneath `~/.codex/sessions`, reject symlink escape, and open the
+   same handle without following links.
+3. Read no more than the final 256 KiB from that opened handle.
+4. Examine only allow-listed lifecycle markers after the last `task_complete` marker.
 
-Every catalog thread must declare at least one resumable destination. Instead of a deep link, it may declare a structured resume command:
+Raw rollout content, messages, response items, and coordination payloads are not returned or
+persisted. Set `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable the feature. If any condition
+cannot be safely established, Gajendra preserves the app-server status.
 
-```json
-{
-  "executable": "/absolute/path/to/my-agent",
-  "args": ["resume", "thread-123"],
-  "cwd": "/absolute/project/path"
-}
-```
+App-server page count, total rows, activity-enrichment workers, each operation, and the overall
+enrichment pass have source-defined bounds. A slow/unavailable provider preserves base status rather
+than blocking the entire snapshot.
 
-Use `resumeCommand` as that field name inside the thread object. There is no shell-string or `eval` field. Review catalog commands before enabling the source: the user who configures them is granting execution authority to that executable and argument list.
+Codex app-server JSON-RPC stdout is bounded at a **512 KiB default** per response line. That default
+was selected after a measured `thread/list limit=100` response of 383,665 bytes; configuration may
+reduce or raise it only to the fixed **1 MiB hard maximum**. An oversized or unterminated line fails
+generically, triggers bounded child cleanup, and never returns or persists response content.
 
-Set `GAJENDRA_SOURCES_CONFIG` to test a different configuration file. Catalogs are capped at 2 MiB and 2,000 threads. A snapshot retains the 200 most recent non-running threads per source plus every thread with an explicit running status.
+## Safe destinations
+
+Every source has an allow-listed scheme set. Gajendra rejects unknown, malformed, encoded,
+whitespace-padded, `javascript:`, `data:`, and `file:` destinations at catalog parse and again when
+the host/native client opens a link. A source catalog cannot bypass this execution check.
+
+These are source contracts for the current local candidate. Final provider and installed-app proof
+remains governed by [Status](../STATUS.md) and [Gauntlet](GAUNTLET.md).

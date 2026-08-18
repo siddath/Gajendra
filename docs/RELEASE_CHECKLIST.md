@@ -1,30 +1,31 @@
-# Open-source release checklist
+# Release checklist
 
-## Source release
+Checked items have a current 2026-08-18 candidate receipt. They are not a binary-release claim.
 
-- [ ] Review `git diff --check`, rename state, and untracked files; exclude private content and machine-only artifacts.
-- [ ] Confirm example catalogs contain synthetic data only.
-- [ ] Run `npm ci` and `npm run gauntlet` from a clean clone.
-- [ ] Install Gaja locally from `Gajendra.app`; verify hover does not open, click toggles the focus card, outside click/Escape dismiss, search accepts typing, the organizer resizes, and source health is accurate.
-- [ ] In isolated preferences, verify a clean first launch opens source setup once, Skip/Finish prevent a second automatic display, an existing-user upgrade does not interrupt, and Settings plus the application menu replay the screen.
-- [ ] Verify Codex live; label Claude/Cursor proof exactly as observed.
-- [ ] Set the actual clone URL in `README.md` only after the remote exists.
-- [ ] Create/push the public repository, then confirm hosted GitHub Actions.
-- [ ] Enable private security advisories and choose issue/discussion policy.
-- [ ] Tag 0.3.1 only after the release commit and hosted checks pass.
+## Frozen local candidate
 
-## macOS binary release — separate
+- [x] Freeze writers and record exact candidate state.
+- [x] Run focused source suites, npm run check, and npm run test:e2e.
+- [x] Confirm visible Gajendra name, descriptor **One clear focus across your AI tools.**, promise
+  **One NOW. One short queue. One click back to the exact thread.**, and plain NOW/Focus/Important/
+  Running labels.
+- [x] Confirm compatibility identifiers remain gajendra, gajendra://, dev.sid.gajendra, Gajendra,
+  and the Gajendra state path.
+- [x] Verify A1–A6 source behavior, including isolated state, atomic move, strict recovery, A4
+  256 KiB/kill-switch boundary, safe open execution, and bounded catalogs.
+- [x] Run companion self-test/build/process-level UI/validator and local bundle-readiness after
+  native source freezes.
+- [x] Check macOS 13.5 target, bundled Node v24.19.0 checksum/notices, service parity, and the
+  honest local signing result.
 
-- [ ] Configure a Developer ID Application identity outside the repository.
-- [ ] Archive, sign, notarize, staple, and verify Gatekeeper on a clean account/machine.
-- [ ] Re-prove Launch at Login on the final signed bundle.
-- [ ] Publish checksums and the minimum macOS version.
+## Separately authorized external gates
 
-## Truth gates
+- [ ] Clean-Mac and remaining physical VoiceOver/login/drag/system-toggle proof. The installed
+  launcher tap/AX/edge subset has a current receipt.
+- [ ] Developer ID identity/team, strict signing, Gatekeeper, notarization/staple, archive, and
+  checksum receipt.
+- [ ] Binary distribution and LinkedIn publication. Public source review is tracked separately.
+- [ ] Mobile D01–D07 and D11 approvals; no mobile listener/client exists before them.
 
-- Do not call the floating utility a WidgetKit extension.
-- Do not advertise Codex’s experimental global destination as stable.
-- Do not imply Gaja changes native pins or owns provider sessions.
-- Do not claim live Cursor compatibility without a real CLI receipt.
-- Do not distribute external reference images or private conversation metadata.
-- Keep local, public, hosted-CI, signed, notarized, and released states distinct.
+Do not infer a checked box from historical CI, an old installed artifact, a source build, an ad-hoc
+signature, or a documentation plan.

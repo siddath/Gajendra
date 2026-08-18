@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "task-123",
+      "title": "Synthetic configured review task",
+      "project": "example-project",
+      "updatedAt": "2026-08-18T12:00:00Z",
+      "status": "idle",
+      "deepLink": "my-agent://threads/task-123",
+      "review": {
+        "state": "ready",
+        "kind": "pull-request",
+        "updatedAt": "2026-08-18T12:05:00Z",
+        "destination": {
+          "type": "url",
+          "url": "my-agent://reviews/task-123"
+        },
+        "providerStatus": "FINISHED"
+      }
+    }
+  ]
+}

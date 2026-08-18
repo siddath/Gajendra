@@ -5,7 +5,8 @@
       "id": "my-agent",
       "name": "My Agent",
       "catalog": "~/Library/Application Support/My Agent/gajendra-threads.json",
-      "enabled": true
+      "enabled": true,
+      "deepLinkSchemes": ["my-agent"]
     }
   ]
 }
