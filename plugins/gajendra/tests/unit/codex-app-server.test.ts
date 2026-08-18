@@ -339,7 +339,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     const fakeCodex = path.join(directory, "fake-codex");
     const parentPidPath = path.join(directory, "close-parent.pid");
     const descendantPidPath = path.join(directory, "close-descendant.pid");
-    const descendant = "const fs = require('node:fs'); fs.writeFileSync(process.env.GAJENDRA_TEST_CLOSE_DESCENDANT_PID_PATH, String(process.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1_000);";
+    const descendant = "const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(process.env.GAJENDRA_TEST_CLOSE_DESCENDANT_PID_PATH, String(process.pid)); setInterval(() => {}, 1_000);";
     let client: CodexAppServerClient | null = null;
     try {
       await writeFile(fakeCodex, `#!${process.execPath}
@@ -357,7 +357,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
 });
 `);
       await chmod(fakeCodex, 0o700);
-      client = new CodexAppServerClient(1_000, {
+      client = new CodexAppServerClient(5_000, {
         ...process.env,
         GAJENDRA_CODEX_BIN: fakeCodex,
         GAJENDRA_TEST_CLOSE_PARENT_PID_PATH: parentPidPath,
@@ -388,7 +388,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     const statePath = path.join(directory, "starts");
     const parentPidPath = path.join(directory, "race-parent.pid");
     const descendantPidPath = path.join(directory, "race-descendant.pid");
-    const descendant = "const fs = require('node:fs'); fs.writeFileSync(process.env.GAJENDRA_TEST_RACE_DESCENDANT_PID_PATH, String(process.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1_000);";
+    const descendant = "const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(process.env.GAJENDRA_TEST_RACE_DESCENDANT_PID_PATH, String(process.pid)); setInterval(() => {}, 1_000);";
     let client: CodexAppServerClient | null = null;
     try {
       await writeFile(fakeCodex, `#!${process.execPath}
@@ -419,7 +419,7 @@ if (starts === 0) {
 }
 `);
       await chmod(fakeCodex, 0o700);
-      client = new CodexAppServerClient(1_000, {
+      client = new CodexAppServerClient(5_000, {
         ...process.env,
         GAJENDRA_CODEX_BIN: fakeCodex,
         GAJENDRA_CODEX_APP_SERVER_MAX_LINE_BYTES: "64",
@@ -427,6 +427,7 @@ if (starts === 0) {
         GAJENDRA_TEST_RACE_PARENT_PID_PATH: parentPidPath,
         GAJENDRA_TEST_RACE_DESCENDANT_PID_PATH: descendantPidPath,
       });
+      const overflowStartedAt = Date.now();
       const overflow = client.listThreads().then(
         () => new Error("The over-limit child unexpectedly returned threads."),
         (reason: unknown) => reason,
@@ -437,6 +438,7 @@ if (starts === 0) {
       ])).map(Number);
       const overflowError = await overflow;
       expect((overflowError as Error).message).toBe("Codex app-server protocol output exceeded the safe limit.");
+      expect(Date.now() - overflowStartedAt).toBeLessThan(3_000);
       // Let the rejected initial ready promise clear before installing the retry behind teardown.
       await Promise.resolve();
       const retry = client.listThreads().then(
