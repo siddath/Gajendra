@@ -548,8 +548,10 @@ const ready = setInterval(() => {
       expect((error as Error).message).toBe("lsof did not close its output streams.");
       expect(Date.now() - startedAt).toBeLessThan(2_000);
       // This is immediately after the watchdog's rejection, not merely after scheduling KILL.
+      // Linux may retain an orphaned descendant briefly as a non-running zombie until PID 1
+      // reaps it, so distinguish that state from a process that can still execute.
       expect(() => process.kill(parentPid!, 0)).toThrow();
-      expect(() => process.kill(descendantPid!, 0)).toThrow();
+      await expectProcessTerminated(descendantPid!);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
@@ -641,4 +643,29 @@ async function readFileWhenAvailable(filePath: string, timeoutMs = 1_500): Promi
       await delay(10);
     }
   }
+}
+
+async function expectProcessTerminated(pid: number, timeoutMs = 1_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+
+    if (process.platform === "linux") {
+      try {
+        const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+        const commandEnd = stat.lastIndexOf(")");
+        if (commandEnd >= 0 && stat.slice(commandEnd + 2).startsWith("Z")) return;
+      } catch {
+        return;
+      }
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new Error(`Process ${pid} remained runnable after ${timeoutMs}ms.`);
 }
