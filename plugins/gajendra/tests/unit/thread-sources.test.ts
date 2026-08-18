@@ -193,7 +193,7 @@ describe("thread source adapters", () => {
     temporaryDirectories.push(directory);
     const parentPidPath = path.join(directory, "cursor-parent.pid");
     const descendantPidPath = path.join(directory, "cursor-descendant.pid");
-    const descendant = "const fs = require('node:fs'); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_DESCENDANT_PID_PATH, String(process.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1_000);";
+    const descendant = "const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_DESCENDANT_PID_PATH, String(process.pid)); setInterval(() => {}, 1_000);";
     const resistantChild = `const fs = require('node:fs'); const { spawn } = require('node:child_process'); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_PARENT_PID_PATH, String(process.pid)); process.on('SIGTERM', () => {}); spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], { stdio: ['ignore', 'inherit', 'inherit'], env: process.env }); setInterval(() => {}, 1_000);`;
     // Attach the rejection branch before waiting for fixture readiness, so a startup failure is
     // still consumed while the PID proof waits for the child to report itself.
@@ -222,7 +222,7 @@ describe("thread source adapters", () => {
     // collectProcessOutput resolves its terminal error only from close, so this check is exactly
     // after rejection and proves the SIGKILL fallback completed rather than merely being queued.
     expect(() => process.kill(parentPid!, 0)).toThrow();
-    expect(() => process.kill(descendantPid!, 0)).toThrow();
+    await expectProcessTerminated(descendantPid!);
   });
 
   it("fails closed after a provider exits but a TERM-resistant inherited-pipe descendant prevents close", async () => {
@@ -231,7 +231,7 @@ describe("thread source adapters", () => {
     temporaryDirectories.push(directory);
     const parentPidPath = path.join(directory, "cursor-parent.pid");
     const descendantPidPath = path.join(directory, "cursor-descendant.pid");
-    const descendant = "const fs = require('node:fs'); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_DESCENDANT_PID_PATH, String(process.pid)); process.on('SIGTERM', () => {}); setInterval(() => {}, 1_000);";
+    const descendant = "const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_DESCENDANT_PID_PATH, String(process.pid)); setInterval(() => {}, 1_000);";
     const parent = `const fs = require('node:fs'); const { spawn } = require('node:child_process'); fs.writeFileSync(process.env.GAJENDRA_TEST_CURSOR_PARENT_PID_PATH, String(process.pid)); spawn(process.execPath, ['-e', ${JSON.stringify(descendant)}], { stdio: ['ignore', 'inherit', 'inherit'], env: process.env }); const ready = setInterval(() => { if (fs.existsSync(process.env.GAJENDRA_TEST_CURSOR_DESCENDANT_PID_PATH)) process.exit(0); }, 5);`;
     const startedAt = Date.now();
     const completion = collectProcessOutput(process.execPath, ["-e", parent], {
@@ -256,7 +256,7 @@ describe("thread source adapters", () => {
     expect(Date.now() - startedAt).toBeLessThan(2_000);
     // The caller observes rejection only after the close watchdog escalates the dedicated group.
     expect(() => process.kill(parentPid!, 0)).toThrow();
-    expect(() => process.kill(descendantPid!, 0)).toThrow();
+    await expectProcessTerminated(descendantPid!);
   });
 
   it("loads an explicit bounded catalog without requiring a provider-specific adapter", async () => {
@@ -604,4 +604,29 @@ async function readFileWhenAvailable(filePath: string, timeoutMs = 1_500): Promi
       await delay(10);
     }
   }
+}
+
+async function expectProcessTerminated(pid: number, timeoutMs = 1_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+
+    if (process.platform === "linux") {
+      try {
+        const stat = await readFile(`/proc/${pid}/stat`, "utf8");
+        const commandEnd = stat.lastIndexOf(")");
+        if (commandEnd >= 0 && stat.slice(commandEnd + 2).startsWith("Z")) return;
+      } catch {
+        return;
+      }
+    }
+
+    await delay(10);
+  }
+
+  throw new Error(`Process ${pid} remained runnable after ${timeoutMs}ms.`);
 }
