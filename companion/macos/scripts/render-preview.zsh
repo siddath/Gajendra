@@ -21,6 +21,11 @@ expanded_card_destination="$repo_root/evidence/companion/gajendra-hover-card-exp
 search_card_destination="$repo_root/evidence/companion/gajendra-hover-card-search.png"
 onboarding_destination="$repo_root/evidence/companion/gajendra-source-onboarding.png"
 dark_onboarding_destination="$repo_root/evidence/companion/gajendra-source-onboarding-dark.png"
+queue_editing_destination="$repo_root/evidence/companion/gajendra-hover-card-queue-editing.png"
+busy_card_destination="$repo_root/evidence/companion/gajendra-hover-card-busy.png"
+one_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-one.png"
+empty_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-empty.png"
+ten_review_destination="$repo_root/evidence/companion/gajendra-hover-card-review-ten-dark-static.png"
 
 mkdir -p "${destination:h}"
 swift run --package-path "$package_root" -c release GajendraPreview \
@@ -29,7 +34,9 @@ swift run --package-path "$package_root" -c release GajendraPreview \
   "$focus_destination" "$focus_card_destination" "$focus_pill_destination" \
   "$focus_dark_destination" "$focus_dark_card_destination" "$focus_dark_pill_destination" \
   "$compact_card_destination" "$expanded_card_destination" "$search_card_destination" \
-  "$onboarding_destination" "$dark_onboarding_destination"
+  "$onboarding_destination" "$dark_onboarding_destination" "$queue_editing_destination" \
+  "$busy_card_destination" "$one_review_destination" "$empty_review_destination" \
+  "$ten_review_destination"
 echo "$destination"
 echo "$card_destination"
 echo "$pill_destination"
@@ -47,3 +54,8 @@ echo "$expanded_card_destination"
 echo "$search_card_destination"
 echo "$onboarding_destination"
 echo "$dark_onboarding_destination"
+echo "$queue_editing_destination"
+echo "$busy_card_destination"
+echo "$one_review_destination"
+echo "$empty_review_destination"
+echo "$ten_review_destination"

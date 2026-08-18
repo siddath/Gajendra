@@ -11,7 +11,10 @@ public struct DeckContentView: View {
     @State private var isSearchHovered = false
     @State private var isRunningHeaderHovered = false
     @State private var isRunningExpanded = true
+    @State private var isReviewHeaderHovered = false
+    @State private var isReviewExpanded = true
     @State private var searchFocused = false
+    @StateObject private var dragRegistry = GajendraQueueDragRegistry()
     private let usesScrollView: Bool
     private let isPreview: Bool
     private let onManageSources: () -> Void
@@ -66,7 +69,7 @@ public struct DeckContentView: View {
                     GajendraMark(size: 34)
                         .font(.largeTitle)
                         .foregroundStyle(.secondary)
-                    Text("Gaja is unavailable")
+                    Text("Gajendra is unavailable")
                         .font(.headline)
                     Text("Refresh to read your configured local thread sources.")
                         .font(.caption)
@@ -79,7 +82,6 @@ public struct DeckContentView: View {
         .padding(16)
         .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650, alignment: .topLeading)
         .background(organizerSurface)
-        .animation(deckAnimation, value: model.snapshot)
         .animation(deckAnimation, value: model.errorMessage)
         .task {
             model.refresh()
@@ -92,12 +94,13 @@ public struct DeckContentView: View {
 
     private func deckSections(_ snapshot: DeckSnapshot) -> some View {
         let running = snapshot.runningThreads
-        let recent = snapshot.available.filter { !$0.isRunning }
+        let reviewReady = snapshot.reviewReadyThreads
+        let recent = snapshot.available.filter { !$0.isRunning && !$0.isReadyForReview }
         return VStack(alignment: .leading, spacing: 12) {
             sourceStrip(snapshot.sources)
             nowCard(snapshot.current)
             prioritySection(
-                title: "Double-star Focus",
+                title: "Focus",
                 level: .focus,
                 threads: snapshot.focus,
                 collapsed: snapshot.collapsed.focus
@@ -109,6 +112,7 @@ public struct DeckContentView: View {
                 collapsed: snapshot.collapsed.important
             )
             runningSection(running)
+            reviewSection(reviewReady)
             availableSection(snapshot: snapshot, recent: recent)
                 .id("gajendra-organizer-search-results")
         }
@@ -117,9 +121,9 @@ public struct DeckContentView: View {
     private var header: some View {
         ZStack(alignment: .center) {
             VStack(alignment: .center, spacing: 1) {
-                Text("Gaja")
+                Text(GajendraBrandCopy.name)
                     .font(.headline)
-                Text("Elephant Focus for AI Power Users")
+                Text(GajendraBrandCopy.descriptor)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -134,10 +138,23 @@ public struct DeckContentView: View {
                 Spacer(minLength: 12)
 
                 HStack(spacing: 5) {
-                    if model.isLoading {
+                    if model.isMutating {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text("Saving…")
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Saving priority change")
+                        .accessibilityValue("Busy")
+                    } else if model.isLoading {
                         Text("Refreshing")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("Refreshing Gajendra")
+                            .accessibilityValue("Busy")
                     }
                     refreshButton
                     if isPreview {
@@ -157,7 +174,7 @@ public struct DeckContentView: View {
             Button {
                 onManageSources()
             } label: {
-                Label("Connect AI Tools…", systemImage: "point.3.connected.trianglepath.dotted")
+                Label("Manage AI tools…", systemImage: "point.3.connected.trianglepath.dotted")
             }
             Divider()
             Picker("Theme", selection: $visualSettings.theme) {
@@ -189,9 +206,9 @@ public struct DeckContentView: View {
         .menuIndicator(.hidden)
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("Gaja settings")
-        .accessibilityLabel("Open Gaja settings")
-        .accessibilityHint("Connect AI tools or choose theme, appearance, card size, and lotus position")
+        .help("Gajendra settings")
+        .accessibilityLabel("Open Gajendra settings")
+        .accessibilityHint("Manage AI tools or choose theme, appearance, card size, and lotus position")
     }
 
     private var settingsIcon: some View {
@@ -222,7 +239,7 @@ public struct DeckContentView: View {
                         .buttonStyle(.plain)
                         .opacity(source.enabled ? 1 : 0.58)
                         .disabled(model.isLoading)
-                        .help(source.detail ?? (source.enabled ? "Disable \(source.name)" : "Enable \(source.name)"))
+                        .help(source.sanitizedDetail)
                         .accessibilityLabel("\(source.name), \(source.state), \(source.threadCount) threads")
                     }
                 }
@@ -274,7 +291,7 @@ public struct DeckContentView: View {
             .buttonStyle(.borderless)
             .disabled(model.isLoading)
             .help(model.isLoading ? "Refreshing" : "Refresh")
-            .accessibilityLabel(model.isLoading ? "Refreshing Gaja" : "Refresh Gaja")
+            .accessibilityLabel(model.isLoading ? "Refreshing Gajendra" : "Refresh Gajendra")
         }
     }
 
@@ -294,11 +311,16 @@ public struct DeckContentView: View {
             if let current {
                 HStack(alignment: .center, spacing: 16) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(current.title)
-                            .font(.title3.weight(.semibold))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Text(current.title)
+                                .font(.title3.weight(.semibold))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            if current.isReadyForReview {
+                                GajendraReviewStatusMark()
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         HStack(spacing: 6) {
                             Text(current.project)
                                 .font(.caption)
@@ -363,13 +385,23 @@ public struct DeckContentView: View {
 
     private func executionSignal(_ thread: DeckThread) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: thread.isRunning ? "waveform" : "clock")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(thread.isRunning ? Color.green : Color.secondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(thread.isRunning ? "Running now" : "Ready to resume")
+            if thread.isRunning {
+                GajendraLiveActivityMark()
+            } else if thread.isReadyForReview {
+                GajendraReviewStatusMark()
+            } else {
+                Image(systemName: "clock")
                     .font(.caption.weight(.semibold))
-                Text(isPreview ? "Updated recently" : relativeUpdateText(thread.updatedAt))
+                    .foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(thread.isRunning ? "Running now" : thread.isReadyForReview ? "Ready for Review" : "Ready to resume")
+                    .font(.caption.weight(.semibold))
+                Text(isPreview
+                     ? (thread.isReadyForReview ? "Ready recently" : "Updated recently")
+                     : thread.isReadyForReview
+                        ? relativeReviewText(thread.review?.updatedAt ?? 0)
+                        : relativeUpdateText(thread.updatedAt))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -379,7 +411,12 @@ public struct DeckContentView: View {
         .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(thread.isRunning ? Color.green.opacity(0.3) : Color.secondary.opacity(0.16), lineWidth: 0.75)
+                .stroke(
+                    thread.isRunning
+                        ? Color.green.opacity(0.3)
+                        : thread.isReadyForReview ? Color.orange.opacity(0.34) : Color.secondary.opacity(0.16),
+                    lineWidth: 0.75
+                )
         )
         .fixedSize()
         .help("Provider status: \(thread.status)")
@@ -445,6 +482,7 @@ public struct DeckContentView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(sectionBorderColor(level), lineWidth: 1)
         )
+        .animation(deckAnimation, value: threads.map(\.id))
         return priorityDropSection(sectionContent, level: level)
     }
 
@@ -459,6 +497,11 @@ public struct DeckContentView: View {
                             Text("NOW")
                                 .font(.caption2.bold())
                                 .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                        }
+                        if thread.isRunning {
+                            GajendraLiveActivityMark()
+                        } else if thread.isReadyForReview {
+                            GajendraReviewStatusMark()
                         }
                         Text(thread.title)
                             .lineLimit(1)
@@ -480,7 +523,7 @@ public struct DeckContentView: View {
 
             if level == .focus && !thread.isCurrent {
                 Button("Make NOW") {
-                    model.apply(.setCurrent(threadId: thread.id))
+                    model.makeNow(threadId: thread.id)
                 }
                 .controlSize(.small)
                 .disabled(model.isLoading)
@@ -509,15 +552,15 @@ public struct DeckContentView: View {
                 Menu {
                     if level == .focus {
                         Button("Move to Important") {
-                            model.apply(.setLevel(threadId: thread.id, level: .important))
+                            model.moveToLevel(threadId: thread.id, level: .important)
                         }
                     } else {
                         Button("Move to Focus") {
-                            model.apply(.setLevel(threadId: thread.id, level: .focus))
+                            model.moveToLevel(threadId: thread.id, level: .focus)
                         }
                     }
                     Button("Remove", role: .destructive) {
-                        model.apply(.setLevel(threadId: thread.id, level: nil))
+                        model.moveToLevel(threadId: thread.id, level: nil)
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -592,7 +635,7 @@ public struct DeckContentView: View {
     }
 
     private func runningSection(_ threads: [DeckThread]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        LazyVStack(alignment: .leading, spacing: 0) {
             if threads.isEmpty {
                 runningSectionHeader(count: 0, expanded: false)
             } else {
@@ -680,6 +723,7 @@ public struct DeckContentView: View {
 
     private func runningRow(_ thread: DeckThread) -> some View {
         HStack(spacing: 8) {
+            GajendraLiveActivityMark(animated: true)
             Button {
                 model.open(thread)
             } label: {
@@ -705,25 +749,147 @@ public struct DeckContentView: View {
 
             if !thread.isCurrent {
                 Button("Make NOW") {
-                    model.apply(.setCurrent(threadId: thread.id))
+                    model.makeNow(threadId: thread.id)
                 }
                 .controlSize(.small)
                 .disabled(model.isLoading)
             }
             if thread.level != .important {
                 Button("Important") {
-                    model.apply(.setLevel(threadId: thread.id, level: .important))
+                    model.moveToLevel(threadId: thread.id, level: .important)
                 }
                 .controlSize(.small)
                 .disabled(model.isLoading)
             }
             if thread.level != .focus {
-                Button("Focus ✦✦") {
-                    model.apply(.setLevel(threadId: thread.id, level: .focus))
+                Button("Focus") {
+                    model.moveToLevel(threadId: thread.id, level: .focus)
                 }
                 .controlSize(.small)
                 .disabled(model.isLoading)
             }
+        }
+        .padding(10)
+    }
+
+    private func reviewSection(_ threads: [DeckThread]) -> some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            if threads.isEmpty {
+                reviewSectionHeader(count: 0, expanded: false)
+            } else {
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+                        isReviewExpanded.toggle()
+                    }
+                } label: {
+                    reviewSectionHeader(count: threads.count, expanded: isReviewExpanded)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(
+                    isReviewHeaderHovered ? Color.orange.opacity(colorScheme == .dark ? 0.12 : 0.08) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .onHover { isReviewHeaderHovered = $0 }
+                .accessibilityLabel("Ready for Review, \(threads.count) threads")
+                .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
+                .accessibilityHint(isReviewExpanded ? "Collapse the review-ready thread list" : "Expand the review-ready thread list")
+            }
+
+            Divider()
+
+            if threads.isEmpty {
+                Text("No provider reports work ready for review.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+            } else if isReviewExpanded {
+                ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
+                    reviewRow(thread)
+                    if index < threads.count - 1 { Divider() }
+                }
+            } else {
+                Text("\(threads.count) threads need your review")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(10)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.orange.opacity(colorScheme == .dark ? 0.075 : 0.045))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.orange.opacity(0.28), lineWidth: 1)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Ready for Review, \(threads.count) threads needing human attention")
+    }
+
+    private func reviewSectionHeader(count: Int, expanded: Bool) -> some View {
+        HStack(spacing: 7) {
+            GajendraReviewStatusMark()
+            Text("Ready for Review")
+                .font(.subheadline.weight(.semibold))
+            Text("\(count)")
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 5) {
+                Text("Needs your review")
+                    .lineLimit(1)
+                if count > 0 {
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.bold))
+                        .rotationEffect(.degrees(expanded ? 0 : -90))
+                        .accessibilityHidden(true)
+                }
+            }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(count > 0 ? reviewControlColor : Color.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Color.orange.opacity(count > 0 ? 0.11 : 0.04), in: Capsule())
+            .overlay(Capsule().stroke(Color.orange.opacity(count > 0 ? 0.34 : 0.14), lineWidth: 0.75))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+    }
+
+    private func reviewRow(_ thread: DeckThread) -> some View {
+        HStack(spacing: 8) {
+            GajendraReviewStatusMark()
+            Button {
+                model.openReview(thread)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(thread.title)
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(isPreview ? "Ready recently" : relativeReviewText(thread.review?.updatedAt ?? 0))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if let placement = thread.placementLabel {
+                            Text(placement)
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                        }
+                        Text(thread.review?.destination.actionLabel ?? "Review")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(reviewControlColor)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open \(thread.review?.destination.actionLabel.lowercased() ?? "review") for \(thread.title)")
+            .accessibilityLabel("\(thread.title), Ready for Review, \(thread.review?.destination.actionLabel ?? "Review") destination")
+
+            Button { model.open(thread) } label: { sourceBadge(thread) }
+                .buttonStyle(.plain)
+                .help("Open the owning task in \(thread.sourceName)")
         }
         .padding(10)
     }
@@ -759,28 +925,28 @@ public struct DeckContentView: View {
                     Spacer()
                     if !thread.isCurrent {
                         Button("Make NOW") {
-                            model.apply(.setCurrent(threadId: thread.id))
+                            model.makeNow(threadId: thread.id)
                         }
                         .controlSize(.small)
                         .disabled(model.isLoading)
                     }
                     if thread.level != .important {
                         Button("Important") {
-                            model.apply(.setLevel(threadId: thread.id, level: .important))
+                            model.moveToLevel(threadId: thread.id, level: .important)
                         }
                         .controlSize(.small)
                         .disabled(model.isLoading)
                     }
                     if thread.level != .focus {
-                        Button("Focus ✦✦") {
-                            model.apply(.setLevel(threadId: thread.id, level: .focus))
+                        Button("Focus") {
+                            model.moveToLevel(threadId: thread.id, level: .focus)
                         }
                         .controlSize(.small)
                         .disabled(model.isLoading)
                     }
                     if thread.level != nil {
                         Button("Remove") {
-                            model.apply(.setLevel(threadId: thread.id, level: nil))
+                            model.moveToLevel(threadId: thread.id, level: nil)
                         }
                         .controlSize(.small)
                         .disabled(model.isLoading)
@@ -887,7 +1053,7 @@ public struct DeckContentView: View {
         .padding(10)
         .background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Gaja error: \(error)")
+        .accessibilityLabel("Gajendra error: \(error)")
     }
 
     private func relativeUpdateText(_ timestamp: Double) -> String {
@@ -897,6 +1063,10 @@ public struct DeckContentView: View {
         if elapsed < 3_600 { return "Updated \(Int(elapsed / 60))m ago" }
         if elapsed < 86_400 { return "Updated \(Int(elapsed / 3_600))h ago" }
         return "Updated \(Int(elapsed / 86_400))d ago"
+    }
+
+    private func relativeReviewText(_ timestamp: Double) -> String {
+        relativeUpdateText(timestamp).replacingOccurrences(of: "Updated", with: "Ready")
     }
 
     private func sourceBadge(_ thread: DeckThread) -> some View {
@@ -963,6 +1133,12 @@ public struct DeckContentView: View {
             : Color(red: 0.04, green: 0.39, blue: 0.16)
     }
 
+    private var reviewControlColor: Color {
+        colorScheme == .dark
+            ? Color(red: 1, green: 0.67, blue: 0.24)
+            : Color(red: 0.63, green: 0.29, blue: 0.02)
+    }
+
     private var nowSurfaceColor: Color {
         if visualSettings.theme == .focusDeck {
             return colorScheme == .dark
@@ -991,34 +1167,20 @@ public struct DeckContentView: View {
         return Color.secondary.opacity(0.22)
     }
 
-    private func moveDroppedThread(_ threadId: String, to level: PriorityLevel, before targetId: String?) -> Bool {
-        guard !model.isLoading, let snapshot = model.snapshot else { return false }
-        let allThreads = snapshot.focus + snapshot.important + snapshot.available
-        guard let thread = allThreads.first(where: { $0.id == threadId }) else { return false }
-        let targetThreads = level == .focus ? snapshot.focus : snapshot.important
-
-        if thread.level != level {
-            model.apply(.setLevel(threadId: threadId, level: level))
-            guard let targetId, let targetIndex = targetThreads.firstIndex(where: { $0.id == targetId }) else { return true }
-            for _ in 0..<(targetThreads.count - targetIndex) {
-                model.apply(.move(threadId: threadId, direction: .up))
-            }
-            return true
-        }
-
-        guard let sourceIndex = targetThreads.firstIndex(where: { $0.id == threadId }),
-              let targetId,
-              targetId != threadId,
-              let targetIndex = targetThreads.firstIndex(where: { $0.id == targetId }) else { return true }
-        if sourceIndex > targetIndex {
-            for _ in 0..<(sourceIndex - targetIndex) {
-                model.apply(.move(threadId: threadId, direction: .up))
-            }
-        } else {
-            for _ in 0..<max(0, targetIndex - sourceIndex - 1) {
-                model.apply(.move(threadId: threadId, direction: .down))
-            }
-        }
+    private func moveDroppedThread(_ payload: GajendraQueueDragPayload, to level: PriorityLevel, before targetId: String?) -> Bool {
+        guard let threadId = dragRegistry.resolve(payload) else { return false }
+        if threadId == targetId { return true }
+        guard !model.isLoading,
+              let snapshot = model.snapshot,
+              !(targetId == nil
+                && snapshot.allThreads.first(where: { $0.id == threadId })?.level == level
+                && GajendraQueueMovePlanner.lane(for: level, snapshot: snapshot).last?.id == threadId) else { return false }
+        model.moveToLevel(
+            threadId: threadId,
+            level: level,
+            beforeThreadId: targetId,
+            actionName: "Move priority"
+        )
         return true
     }
 
@@ -1027,9 +1189,9 @@ public struct DeckContentView: View {
         if isPreview {
             content
         } else {
-            content.dropDestination(for: String.self) { identifiers, _ in
-                guard let threadId = identifiers.first else { return false }
-                return moveDroppedThread(threadId, to: level, before: nil)
+            content.dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
+                guard let payload = payloads.first else { return false }
+                return moveDroppedThread(payload, to: level, before: nil)
             }
         }
     }
@@ -1045,10 +1207,10 @@ public struct DeckContentView: View {
             content
         } else {
             content
-                .draggable(threadId)
-                .dropDestination(for: String.self) { identifiers, _ in
-                    guard let droppedId = identifiers.first else { return false }
-                    return moveDroppedThread(droppedId, to: level, before: targetId)
+                .draggable(dragRegistry.issue(threadId: threadId))
+                .dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
+                    guard let payload = payloads.first else { return false }
+                    return moveDroppedThread(payload, to: level, before: targetId)
                 }
         }
     }
@@ -1058,15 +1220,21 @@ public struct DeckContentView: View {
         if isPreview {
             content
         } else {
-            content.draggable(threadId)
+            content.draggable(dragRegistry.issue(threadId: threadId))
         }
     }
 
     private var footer: some View {
         HStack {
-            Text("Local metadata only")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(GajendraBrandCopy.promise)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Text("Local metadata only")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
             Spacer()
             if isPreview {
                 Text("Quit")

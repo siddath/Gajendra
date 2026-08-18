@@ -2,8 +2,12 @@ import { App } from "@modelcontextprotocol/ext-apps";
 
 import {
   allDeckThreads,
+  isDeckMutationResult,
+  isPermittedDeepLink,
   isRunningThreadStatus,
+  MUTATION_PROTOCOL_VERSION,
   normalizeDeckSelection,
+  reviewReadyDeckThreads,
   runningDeckThreads,
   type DeckSnapshot,
   type DeckThread,
@@ -15,13 +19,17 @@ import { createDeckMotion, type DeckLayoutState, type RenderReason } from "./mot
 import "./styles.css";
 
 const queriedRoot = document.querySelector<HTMLDivElement>("#app");
-if (!queriedRoot) throw new Error("Gaja root was not found.");
+if (!queriedRoot) throw new Error("Gajendra root was not found.");
 const root: HTMLDivElement = queriedRoot;
 const motion = createDeckMotion(root);
 
 type VisualTheme = "native" | "focus-deck";
 type AppearancePreference = "auto" | "light" | "dark";
 type ResolvedAppearance = "light" | "dark";
+type HostTestHooks = {
+  createApp?: () => App;
+  navigate?: (url: string) => void;
+};
 
 const themeStorageKey = "gajendra.ui.theme.v1";
 const appearanceStorageKey = "gajendra.ui.appearance.v1";
@@ -35,6 +43,7 @@ let snapshot: DeckSnapshot | null = null;
 let app: App | null = null;
 let busy = false;
 let runningExpanded = true;
+let reviewExpanded = true;
 const fixtureNow = new Date("2026-08-11T15:00:00.000Z").valueOf();
 
 applyVisualPreferences();
@@ -54,7 +63,7 @@ async function start(): Promise<void> {
     return;
   }
 
-  app = new App({ name: "Gaja, Elephant Focus for AI Power Users", version: "0.3.1" });
+  app = hostTestHooks()?.createApp?.() ?? new App({ name: "Gajendra", version: "0.3.1" });
   app.addEventListener("hostcontextchanged", (context) => {
     const changedAppearance = normalizeAppearance(context.theme);
     if (!changedAppearance) return;
@@ -81,10 +90,28 @@ async function start(): Promise<void> {
 }
 
 function shouldUseFixture(): boolean {
-  return new URLSearchParams(window.location.search).has("fixture") || window.parent === window;
+  const parameters = new URLSearchParams(window.location.search);
+  return parameters.has("fixture") || (window.parent === window && !parameters.has("host-test"));
+}
+
+/**
+ * The host-test query only enables a Playwright-injected test double; normal standalone pages
+ * retain fixture mode and embedded MCP Apps always instantiate the real App transport.
+ */
+function hostTestHooks(): HostTestHooks | null {
+  if (!new URLSearchParams(window.location.search).has("host-test")) return null;
+  return (window as Window & { __gajendraHostTest?: HostTestHooks }).__gajendraHostTest ?? null;
 }
 
 function acceptSnapshot(value: unknown, reason: RenderReason, layoutState: DeckLayoutState | null = motion.captureLayout()): void {
+  if (isDeckMutationResult(value)) {
+    snapshot = normalizeDeckSelection({
+      ...value.snapshot,
+      error: value.error?.message ?? value.snapshot.error,
+    });
+    render(reason, layoutState);
+    return;
+  }
   if (!value || typeof value !== "object" || !("focus" in value)) return;
   snapshot = normalizeDeckSelection(value as DeckSnapshot);
   render(reason, layoutState);
@@ -93,31 +120,33 @@ function acceptSnapshot(value: unknown, reason: RenderReason, layoutState: DeckL
 function render(reason: RenderReason = "external", layoutState: DeckLayoutState | null = null): void {
   if (!snapshot) return renderLoading();
   const running = runningDeckThreads(snapshot);
-  const recent = snapshot.available.filter((thread) => !isRunningThreadStatus(thread.status));
+  const reviewReady = reviewReadyDeckThreads(snapshot);
+  const recent = snapshot.available.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready");
   root.innerHTML = `
-    <div class="deck-scroll-surface" aria-label="Scrollable Gaja task overview">
+    <div class="deck-scroll-surface" aria-label="Scrollable Gajendra task overview">
       <header class="deck-header">
         <div class="deck-header-top">
           <div class="brand-lockup">
             ${brandMark()}
             <div class="brand-copy">
-              <p class="eyebrow">Gaja</p>
-              <h1>What deserves your attention now?</h1>
-              <p class="lede">One source of truth across Codex, Claude, Cursor, Grok Build, and the agents you connect.</p>
+              <p class="eyebrow">Gajendra</p>
+              <h1>One clear focus across your AI tools.</h1>
+              <p class="lede">One NOW. One short queue. One click back to the exact thread.</p>
             </div>
           </div>
-          <button class="refresh-action" type="button" data-action="refresh" aria-label="Refresh Gaja">
+          <button class="refresh-action" type="button" data-action="refresh" aria-label="Refresh Gajendra">
             <span class="refresh-icon" aria-hidden="true">↻</span><span data-refresh-label>Refresh</span>
           </button>
         </div>
-        <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gaja is up to date</span>
+        <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gajendra is up to date</span>
       </header>
       ${snapshot.error ? errorPanel(snapshot.error) : ""}
       ${sourcesPanel(snapshot.sources)}
       ${currentPanel(snapshot.current)}
-      ${section("focus", "Double-star focus", "The short queue you have deliberately chosen.", snapshot.focus)}
+      ${section("focus", "Focus", "The short queue you have deliberately chosen.", snapshot.focus)}
       ${section("important", "Important", "Worth returning to after the focus queue.", snapshot.important)}
       ${runningSection(running)}
+      ${reviewSection(reviewReady)}
       ${availableSection(snapshot, recent)}
       <footer class="deck-footer">
         <span>${snapshot.focus.length} focus · ${snapshot.important.length} important</span>
@@ -141,9 +170,9 @@ function currentPanel(current: DeckThread | null): string {
   return `<section class="now-card" aria-labelledby="now-heading">
     <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p></div>
     <div class="now-content">
-      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
+      <div><h2 id="now-heading">${escapeHtml(current.title)} ${reviewMark(current)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
       <div class="now-actions" aria-label="Current task actions">
-        <a class="primary-action" href="${escapeAttribute(current.deepLink)}" data-open-thread="${escapeAttribute(current.deepLink)}" aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
+        <a class="primary-action" ${openThreadAttributes(current)} aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
         ${activitySignal(current)}
         ${sourceBadge(current)}
       </div>
@@ -181,7 +210,8 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
     <div class="thread-main">
       <div class="thread-heading-line">
         ${thread.isCurrent ? '<span class="now-pill">NOW</span>' : ""}
-        <a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a>
+        ${reviewMark(thread)}
+        <a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a>
       </div>
       <p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${contextBadge(thread)} ${sourceBadge(thread)}</p>
     </div>
@@ -210,7 +240,28 @@ function runningSection(threads: DeckThread[]): string {
 
 function runningRow(thread: DeckThread): string {
   return `<li class="available-row running-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="running-${escapeAttribute(thread.id)}">
-    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div><a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div class="available-actions">${threadActions(thread)}</div>
+  </li>`;
+}
+
+function reviewSection(threads: DeckThread[]): string {
+  return `<section class="review-section deck-section" aria-labelledby="review-heading">
+    <button class="running-heading review-heading" type="button" data-review-toggle aria-expanded="${String(reviewExpanded)}" aria-controls="review-list" ${threads.length ? "" : "disabled"}>
+      <span><span class="running-title review-title"><span class="review-symbol" aria-hidden="true">✓</span><span id="review-heading">Ready for Review</span><span class="section-count">${threads.length}</span></span>
+      <span class="running-description">Provider-confirmed work where human attention is useful.</span></span>
+      <span class="running-scope review-scope"><span>Needs your review</span>${threads.length ? '<span class="review-chevron chevron" aria-hidden="true">⌄</span>' : ""}</span>
+    </button>
+    <ul class="running-list review-list thread-list" id="review-list" ${reviewExpanded ? "" : "hidden"}>
+      ${threads.length ? threads.map(reviewRow).join("") : '<li class="empty-row">No provider reports work ready for review.</li>'}
+    </ul>
+  </section>`;
+}
+
+function reviewRow(thread: DeckThread): string {
+  const action = thread.review?.destination.type === "thread" ? "Task" : "Review";
+  return `<li class="available-row review-row" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="review-${escapeAttribute(thread.id)}">
+    <div class="review-row-main"><a class="review-primary" ${openReviewAttributes(thread)}><span class="review-mark" aria-hidden="true">✓</span><span><strong>${escapeHtml(thread.title)}</strong><small>${relativeDate(thread.review?.updatedAt ?? 0)}</small></span><span class="review-destination-label">${action}</span></a><p class="thread-meta">${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
 }
@@ -237,7 +288,7 @@ function threadSearchFooter(deck: DeckSnapshot, visibleCount: number): string {
 
 function availableRow(thread: DeckThread, isRecent: boolean): string {
   return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName} ${thread.sourceId} ${thread.id} ${thread.status}`.toLowerCase())}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
-    <div><a href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}">${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div><a ${openThreadAttributes(thread)}>${reviewMark(thread)}${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
 }
@@ -247,11 +298,17 @@ function placementBadge(thread: DeckThread): string {
   return placement ? `<span class="placement-badge">${placement}</span>` : "";
 }
 
+function reviewMark(thread: DeckThread): string {
+  return thread.review?.state === "ready" && !isRunningThreadStatus(thread.status)
+    ? '<span class="review-mark" aria-label="Ready for Review" title="Provider reports work ready for review">✓</span>'
+    : "";
+}
+
 function threadActions(thread: DeckThread): string {
   return [
     thread.isCurrent ? "" : actionButton("Make Now", "current", thread.id),
     thread.level === "important" ? "" : actionButton("Important", "level-important", thread.id),
-    thread.level === "focus" ? "" : actionButton("Focus ✦✦", "level-focus", thread.id, true),
+    thread.level === "focus" ? "" : actionButton("Focus", "level-focus", thread.id, true),
     thread.level ? actionButton("Remove", "level-none", thread.id) : "",
   ].join("");
 }
@@ -280,7 +337,22 @@ function sourcesPanel(sources: DeckSnapshot["sources"]): string {
 }
 
 function sourceBadge(thread: DeckThread): string {
-  return `<a class="source-badge" href="${escapeAttribute(thread.deepLink)}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-source-id="${escapeAttribute(thread.sourceId)}" aria-label="Open ${escapeAttribute(thread.title)} in ${escapeAttribute(thread.sourceName)}">${escapeHtml(thread.sourceName)}</a>`;
+  return `<a class="source-badge" ${openThreadAttributes(thread)} data-source-id="${escapeAttribute(thread.sourceId)}" aria-label="Open ${escapeAttribute(thread.title)} in ${escapeAttribute(thread.sourceName)}">${escapeHtml(thread.sourceName)}</a>`;
+}
+
+function openThreadAttributes(thread: DeckThread): string {
+  const permitted = isPermittedDeepLink(thread.deepLink, thread.allowedDeepLinkSchemes ?? []);
+  return `href="${permitted ? escapeAttribute(thread.deepLink) : "#"}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-open-thread-id="${escapeAttribute(thread.id)}"${permitted ? "" : ' aria-disabled="true"'}`;
+}
+
+function openReviewAttributes(thread: DeckThread): string {
+  const destination = thread.review?.destination.type === "thread"
+    ? thread.review.destination.deepLink
+    : thread.review?.destination.url ?? "";
+  const permitted = thread.review?.state === "ready"
+    && !isRunningThreadStatus(thread.status)
+    && isPermittedDeepLink(destination, thread.allowedDeepLinkSchemes ?? []);
+  return `href="${permitted ? escapeAttribute(destination) : "#"}" data-open-thread="${escapeAttribute(destination)}" data-open-thread-id="${escapeAttribute(thread.id)}"${permitted ? "" : ' aria-disabled="true"'}`;
 }
 
 function contextBadge(thread: DeckThread): string {
@@ -303,7 +375,7 @@ function contextTitle(context: ThreadContext): string {
 }
 
 function visualPreferenceControls(): string {
-  return `<div class="visual-controls" aria-label="Gaja visual preferences">
+  return `<div class="visual-controls" aria-label="Gajendra visual preferences">
     <span class="visual-control-label">Theme</span>
     <div class="segmented-control" role="group" aria-label="Theme">
       <button type="button" data-action="theme-native" aria-pressed="${String(visualTheme === "native")}">Native</button>
@@ -339,6 +411,14 @@ function bindInteractions(): void {
     button.setAttribute("aria-expanded", String(runningExpanded));
     const list = root.querySelector<HTMLElement>("#running-list");
     if (list) list.hidden = !runningExpanded;
+  });
+
+  root.querySelector<HTMLButtonElement>("button[data-review-toggle]")?.addEventListener("click", (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    reviewExpanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(reviewExpanded));
+    const list = root.querySelector<HTMLElement>("#review-list");
+    if (list) list.hidden = !reviewExpanded;
   });
 
   const search = root.querySelector<HTMLInputElement>("#task-search");
@@ -378,7 +458,7 @@ function bindInteractions(): void {
       const url = anchor.dataset.openThread;
       if (url) {
         await motion.acknowledgeOpen(anchor);
-        await openThreadLink(url);
+        await openThreadLink(url, threadForOpenLink(anchor.dataset.openThreadId));
       }
     });
   });
@@ -389,7 +469,7 @@ function bindInteractions(): void {
   root.querySelector<HTMLElement>(".now-card")?.addEventListener("dblclick", (event) => {
     if ((event.target as HTMLElement).closest("a, button, input")) return;
     const current = snapshot?.current;
-    if (current) void openThreadLink(current.deepLink);
+    if (current) void openThreadLink(current.deepLink, current);
   });
 }
 
@@ -448,27 +528,13 @@ function clearDragState(): void {
 }
 
 async function moveDroppedThread(threadId: string, level: PriorityLevel, beforeId?: string): Promise<void> {
-  if (!snapshot || busy) return;
-  const allThreads = [...snapshot.focus, ...snapshot.important, ...snapshot.available];
-  const thread = allThreads.find((candidate) => candidate.id === threadId);
-  if (!thread) return;
-
-  if (thread.level !== level) await mutate("gajendra_set_level", { threadId, level });
-  if (!snapshot || !beforeId || beforeId === threadId) return;
-
-  const targetThreads = level === "focus" ? snapshot.focus : snapshot.important;
-  let sourceIndex = targetThreads.findIndex((candidate) => candidate.id === threadId);
-  const targetIndex = targetThreads.findIndex((candidate) => candidate.id === beforeId);
-  if (sourceIndex < 0 || targetIndex < 0) return;
-
-  while (sourceIndex > targetIndex) {
-    await mutate("gajendra_move", { threadId, direction: "up" });
-    sourceIndex -= 1;
-  }
-  while (sourceIndex < targetIndex - 1) {
-    await mutate("gajendra_move", { threadId, direction: "down" });
-    sourceIndex += 1;
-  }
+  if (!snapshot || busy || !allDeckThreads(snapshot).some((candidate) => candidate.id === threadId)) return;
+  if (beforeId === threadId) return;
+  await mutate("gajendra_move_before", {
+    threadId,
+    level,
+    beforeThreadId: beforeId ?? null,
+  });
 }
 
 async function handleCollapse(button: HTMLButtonElement): Promise<void> {
@@ -526,7 +592,7 @@ async function mutate(
   if (busy) return;
   const layoutState = motion.captureLayout();
   busy = true;
-  motion.setBusy(true, "Updating Gaja");
+  motion.setBusy(true, "Updating Gajendra");
   try {
     if (!app) {
       fixtureMutation?.();
@@ -534,7 +600,15 @@ async function mutate(
       render(reason, layoutState);
       return;
     }
-    const result = await app.callServerTool({ name: tool, arguments: args });
+    const result = await app.callServerTool({
+      name: tool,
+      arguments: {
+        ...args,
+        protocolVersion: MUTATION_PROTOCOL_VERSION,
+        ...(snapshot ? { expectedRevision: snapshot.revision } : {}),
+        idempotencyKey: mutationKey(),
+      },
+    });
     acceptSnapshot(result.structuredContent, reason, layoutState);
   } catch (error) {
     renderRecoverableError(error, layoutState);
@@ -552,16 +626,21 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
       source.enabled = Boolean(args.enabled);
       source.state = source.enabled ? "ready" : "disabled";
     }
+    snapshot.revision += 1;
     return;
   }
   const id = String(args.threadId ?? "");
   const all = [...snapshot.focus, ...snapshot.important, ...snapshot.available];
   const target = all.find((thread) => thread.id === id);
-  if (tool === "gajendra_set_collapsed") return;
+  if (tool === "gajendra_set_collapsed") {
+    snapshot.revision += 1;
+    return;
+  }
   if (!target) return;
   if (tool === "gajendra_set_context") {
     const value = args.context;
     target.context = value === "design" || value === "engineering" || value === "life" ? value : null;
+    snapshot.revision += 1;
     return;
   }
   if (tool === "gajendra_move") {
@@ -570,6 +649,45 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
     const offset = args.direction === "up" ? -1 : 1;
     const to = Math.max(0, Math.min(list.length - 1, from + offset));
     if (from >= 0 && from !== to) [list[from], list[to]] = [list[to]!, list[from]!];
+    snapshot.revision += 1;
+    return;
+  }
+  if (tool === "gajendra_move_before") {
+    const level = args.level === "focus" || args.level === "important" ? args.level : null;
+    const beforeId = typeof args.beforeThreadId === "string" ? args.beforeThreadId : null;
+    snapshot.focus = snapshot.focus.filter((thread) => thread.id !== id);
+    snapshot.important = snapshot.important.filter((thread) => thread.id !== id);
+    snapshot.available = snapshot.available.filter((thread) => thread.id !== id);
+    target.isCurrent = false;
+    if (!level) {
+      if (snapshot.current?.id === id) snapshot.current = snapshot.focus[0] ?? null;
+      if (snapshot.current) snapshot.current.isCurrent = true;
+      snapshot.revision += 1;
+      return;
+    }
+    target.level = level;
+    const list = level === "focus" ? snapshot.focus : snapshot.important;
+    const beforeIndex = beforeId ? list.findIndex((thread) => thread.id === beforeId) : -1;
+    if (beforeIndex >= 0) list.splice(beforeIndex, 0, target);
+    else list.push(target);
+    if (Object.hasOwn(args, "currentThreadId")) {
+      const requestedCurrentId = typeof args.currentThreadId === "string" ? args.currentThreadId : null;
+      const nextCurrent = requestedCurrentId
+        ? snapshot.focus.find((thread) => thread.id === requestedCurrentId) ?? null
+        : snapshot.focus[0] ?? null;
+      snapshot.focus.forEach((thread) => (thread.isCurrent = thread.id === nextCurrent?.id));
+      snapshot.important.forEach((thread) => (thread.isCurrent = false));
+      snapshot.current = nextCurrent;
+    } else if (args.isCurrent === true) {
+      snapshot.focus.forEach((thread) => (thread.isCurrent = false));
+      target.isCurrent = true;
+      snapshot.current = target;
+    } else if (snapshot.current?.id === id && level !== "focus") {
+      snapshot.current = snapshot.focus[0] ?? null;
+      if (snapshot.current) snapshot.current.isCurrent = true;
+    }
+    snapshot.revision += 1;
+    snapshot.focusOverGuide = snapshot.focus.length > snapshot.focusGuide;
     return;
   }
   snapshot.focus = snapshot.focus.filter((thread) => thread.id !== id);
@@ -593,13 +711,14 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
     }
   }
   snapshot.focusOverGuide = snapshot.focus.length > snapshot.focusGuide;
+  snapshot.revision += 1;
 }
 
 async function refresh(): Promise<void> {
   if (busy) return;
   const layoutState = motion.captureLayout();
   busy = true;
-  motion.setBusy(true, "Refreshing Gaja");
+  motion.setBusy(true, "Refreshing Gajendra");
   try {
     if (!app) {
       render("refresh", layoutState);
@@ -615,7 +734,22 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function openThreadLink(url: string): Promise<void> {
+function threadForOpenLink(threadId: string | undefined): DeckThread | null {
+  if (!snapshot || !threadId) return null;
+  return allDeckThreads(snapshot).find((thread) => thread.id === threadId) ?? null;
+}
+
+function mutationKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `gaja-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function openThreadLink(url: string, thread: DeckThread | null): Promise<void> {
+  if (!thread || !isPermittedDeepLink(url, thread.allowedDeepLinkSchemes ?? ["https"])) {
+    const layoutState = motion.captureLayout();
+    renderRecoverableError(new Error("Gajendra blocked an unsafe thread destination."), layoutState);
+    return;
+  }
   if (!app && shouldUseFixture()) {
     root.dataset.lastOpenedThread = url;
     return;
@@ -629,16 +763,22 @@ async function openThreadLink(url: string): Promise<void> {
       // Fall through to the native URI navigation attempt.
     }
   }
-  window.location.assign(url);
+  try {
+    const navigate = hostTestHooks()?.navigate;
+    if (navigate) navigate(url);
+    else window.location.assign(url);
+  } catch (error) {
+    renderRecoverableError(error, motion.captureLayout());
+  }
 }
 
 function renderLoading(): void {
-  root.innerHTML = `<section class="loading-state" role="status">${brandMark()}<h1>Loading Gaja…</h1><p>Reading metadata from your enabled thread sources.</p></section>`;
+  root.innerHTML = `<section class="loading-state" role="status">${brandMark()}<h1>Loading Gajendra…</h1><p>Reading metadata from your enabled thread sources.</p></section>`;
 }
 
 function renderConnectionError(error: unknown): void {
   const message = error instanceof Error ? error.message : "The MCP App connection failed.";
-  root.innerHTML = `<section class="loading-state error" role="alert">${brandMark()}<h1>Gaja could not open</h1><p>${escapeHtml(message)}</p><button type="button" data-action="retry">Try again</button></section>`;
+  root.innerHTML = `<section class="loading-state error" role="alert">${brandMark()}<h1>Gajendra could not open</h1><p>${escapeHtml(message)}</p><button type="button" data-action="retry">Try again</button></section>`;
   root.querySelector<HTMLButtonElement>("[data-action=retry]")?.addEventListener("click", () => void refresh());
 }
 
@@ -731,7 +871,7 @@ function escapeAttribute(value: string): string {
 
 function brandMark(): string {
   return `<details class="visual-settings">
-    <summary class="brand-mark" role="button" aria-label="Open Gaja settings" aria-expanded="false" aria-controls="gaja-visual-settings" aria-haspopup="true" title="Gaja settings"><svg class="gaja-mark" viewBox="0 0 128 128" focusable="false" aria-hidden="true">
+    <summary class="brand-mark" role="button" aria-label="Open Gajendra settings" aria-expanded="false" aria-controls="gaja-visual-settings" aria-haspopup="true" title="Gajendra settings"><svg class="gaja-mark" viewBox="0 0 128 128" focusable="false" aria-hidden="true">
     <g class="gaja-mark-main">
       <path d="M37 42C29 40 23 45 18 54C18 63 23 70 30 75C34 79 35 86 39 89C44 92 49 86 48 78C47 69 47 60 45 52C43 46 40 43 37 42Z"/>
       <path d="M20 54C25 55 29 49 34 46C39 44 43 47 45 51C40 53 36 58 33 64"/>
@@ -760,7 +900,7 @@ function brandMark(): string {
     <div class="visual-settings-popover" id="gaja-visual-settings">
       <p class="settings-title">Appearance settings</p>
       ${visualPreferenceControls()}
-      <p class="settings-note">Card size and lotus position are available in the native Gaja app.</p>
+      <p class="settings-note">Card size and lotus position are available in the native Gajendra app.</p>
     </div>
   </details>`;
 }

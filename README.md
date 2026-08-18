@@ -1,137 +1,138 @@
 # Gajendra
 
 <p align="center">
-  <img src="plugins/gajendra/assets/gajendra.svg" alt="Gaja elephant holding a lotus" width="112" />
+  <img src="plugins/gajendra/assets/gajendra.svg" alt="Gajendra elephant holding a lotus" width="112" />
 </p>
 
-<p align="center">
-  <a href="https://github.com/siddath/Gajendra/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/siddath/Gajendra/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
-  <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-black.svg" />
-</p>
+<p align="center"><strong>One clear focus across your AI tools.</strong><br />
+One NOW. One short queue. One click back to the exact thread.</p>
 
-**Gaja, Elephant Focus for AI Power Users** is an open-source, local-first macOS focus utility for AI-agent threads. It gives Codex, Claude Code, Cursor, Grok Build, and explicitly configured agents one shared priority layer: one **NOW**, an ordered Focus queue, and an Important tier.
+Gajendra is a local-first macOS focus utility for AI-agent threads. It keeps one global NOW and
+short Focus and Important queues across supported sources; the source product continues to own the
+thread, its content, and its credentials.
 
-The repository and compatibility identity is **Gajendra** (`gajendra` in packages, plugin IDs, URLs, bundle identifiers, and state paths). The user-facing product is **Gaja**. Keeping that boundary avoids breaking existing installations and priority state.
+`Gajendra` is the visible product name. The lower-case compatibility identifiers remain unchanged:
+`gajendra` packages and plugin IDs, `gajendra://` URLs, `dev.sid.gajendra`, the executable name,
+and the `Application Support/Gajendra` state path.
 
-The daily surface is an icon-only outline of an elephant lifting its trunk to hold a lotus, defaulting to the bottom right. Click it to show or hide the current thread, its explicit provider activity state, the short priority lanes, and every thread a provider reports as running - even when that thread is also NOW, Focus, or Important. Hover only highlights the launcher, so incidental pointer crossings never open the card. The card stays open for interaction until another launcher click, an outside click, or Escape. Running expands into a complete active-thread list inside one vertically scrollable card body, so Compact remains useful with several simultaneous tasks. A full-width search capsule stays pinned below that body and finds or reprioritizes any loaded thread without leaving the card. Choose **Open** or the provider badge to resume that exact thread in the owning agent.
+## Current candidate boundary
 
-Choose Top Left, Top Right, Center, Bottom Left, Bottom Center, or Bottom Right from the trailing Settings gear or from the app menu. Settings also owns source connection, theme, Auto/Light/Dark appearance, and Compact/Comfortable/Expanded card size; opening it never changes a preference. Double-click the floating mark to enter or leave edit mode, then drag it toward a hotspot or use the jiggling X to hide it. Micro-drags are ignored, an intentional drag snaps to the nearest hotspot, and the card closes while the mark moves. The card opens inward above, below, or beside the launcher instead of covering it. Secondary-click or Control-click the floating mark for its contextual menu, including a confirmed **Uninstall Gaja…** command that retains local priority metadata. A resizable drag-and-drop organizer remains available from the card, Dock, menu bar, or `⇧⌘O`.
+This branch is a **source-review candidate** based on `53e9855`, not a binary release. Source
+publication on GitHub does not imply that an app bundle is Developer ID signed, notarized,
+Gatekeeper-approved, or safe to distribute. Exact commit, pull-request, and hosted-CI receipts are
+recorded in [STATUS.md](STATUS.md) after they exist.
 
-> “Widget” describes the compact experience. The current release is a native AppKit/SwiftUI floating utility, not a WidgetKit extension. WidgetKit cannot implement this cross-application, always-on-top interactive card.
+The release evidence ledger and the remaining gates are in [STATUS.md](STATUS.md) and
+[the execution worksheet](worksheets/2026-08-18-gajendra-release-brand-mobile-execution.md).
 
-![Gaja hover card](evidence/companion/gajendra-hover-card.png)
+The current local receipts recorded on 2026-08-18 are `npm run check` (**83/83** tests),
+`npm run test:e2e` (**17/17**), `npm run companion:test`, `npm run companion:build`,
+`npm run companion:ui-test`, `npm run companion:validate`, and
+`npm run companion:bundle-readiness`. The real-window UI journey uses an isolated empty store and
+source catalog; it covers stationary and 2 px taps, recovery from move/hide mode, an actual macOS
+accessibility press, and the launcher edge target. The exact ad-hoc build also passed that launcher
+journey after local installation without changing the private state-file hash or modes. This is not
+a clean-Mac, physical VoiceOver, login-item, drag, Developer ID, notarization, or distribution
+receipt.
 
-## First launch: connect local tools
+The current [local gauntlet receipt](evidence/gauntlet/report.json) passed on 2026-08-18 with 19
+passing result records. It covers repository/static/behavior/build/plugin/live MCP, companion,
+real-window launcher UI, browser UI, reliability, final-artifact, and dependency-audit checks; it
+is not a clean-Mac or external-release receipt.
 
-On a clean first launch, Gaja opens one skippable **Connect your AI tools** screen. It scans the source contracts Gaja actually supports, shows whether each local integration is ready, missing, off, or needs setup, and lets the user opt sources in or out. Codex and Cursor retain their documented defaults; Claude Code and Grok Build remain explicit opt-ins. **Rescan** refreshes local availability and metadata—it is not account authentication or cloud sync. Existing native installations do not receive an unsolicited upgrade popup, and the same screen remains available from the trailing Settings gear or **Connect AI Tools…** in the application menu.
+## Product and privacy contract
 
-![Gaja local source setup](evidence/companion/gajendra-source-onboarding.png)
+- **NOW** is global and is always a member of **Focus**. **Focus** and **Important** retain their
+  full ordered queues; compact surfaces show at most five entries per lane and link to Organizer
+  for the remainder. **Running** is a provider-reported status, not a persisted priority tier or a
+  recency guess. **Ready for Review** is a second derived disclosure populated only by an explicit
+  provider signal; Running takes precedence when a stale source reports both.
+- Canonical IDs are `source-id:provider-thread-id`. Gajendra stores only IDs, priority order, the
+  bounded Design/Engineering/Life context enum, preferences, a monotonic revision, and bounded
+  hashed idempotency receipts. It never persists titles, prompts, transcript bodies, source files,
+  credentials, tokens, or arbitrary provider responses.
+- Sources are explicit and bounded. Claude Code metadata remains opt-in; configured sources are
+  bounded catalogs with validated unique source IDs, not arbitrary directory or command discovery.
+  A configured catalog may declare a validated live-only `review` signal as shown in
+  [the synthetic example](examples/review-catalog.json); Gajendra never infers review readiness from
+  `idle`, `resumable`, or recency.
+- Gajendra opens an allowed source destination only after source-specific URL validation. Unsafe
+  `javascript:`, `data:`, and `file:` destinations fail both when catalog data is read and when an
+  open is attempted.
 
-## Why Gaja
+Read [Architecture](docs/ARCHITECTURE.md), [thread-source boundaries](docs/THREAD_SOURCES.md),
+[security](SECURITY.md), and [compatibility](docs/COMPATIBILITY.md) before changing these rules.
 
-AI tools own their sessions; Gaja owns only the decision about what matters next. It does not replace the source apps, copy conversations into a new task system, or modify their private databases.
+## A1–A6 source contract
 
-- Exactly one global NOW, and it must be in Focus.
-- One resume action back to Codex, Claude Code, Cursor, Grok Build, or a configured agent.
-- A derived Running view across every priority lane for threads whose provider explicitly reports active work; placement labels disambiguate duplicates, while resumable or recent metadata is never promoted by inference.
-- Optional Design, Engineering, or Life context on prioritized threads, visible at a glance and editable without copying provider content.
-- First-launch source discovery plus replayable source health and opt-in controls in Settings and the organizer.
-- Owner-only, metadata-only local persistence.
-- Native light/dark appearance, Reduce Motion support, keyboard commands, and VoiceOver labels.
+| Gate | Current source contract | Evidence boundary |
+| --- | --- | --- |
+| A1 | One private store authority serializes cross-process mutations with revision/CAS, SHA-256 idempotency receipts, and typed stale conflicts. `GAJENDRA_DATA_DIR` does not inherit legacy `~/.codex` state unless migration is explicitly requested. | Current source coverage and the local gauntlet are recorded; external proof remains open. |
+| A2 | `move-before` is one atomic mutation for reorder, lane move, append, NOW repair, and context retention. Duplicate keys replay exactly once; an absent target rejects before mutation. | Current domain/service fault and replay coverage plus the local gauntlet are recorded; physical/installed proof remains open. |
+| A3 | Launch at Login is source-controlled only after explicit user action. | Native source, self-test, companion validator, build, and local bundle-readiness are recorded; no installed login-item claim is made. |
+| A4 | Codex activity enrichment is optional, bounded, metadata-only, and never persists rollout content. | Current adapter/persistence coverage, companion-validator boundary checks, and the local gauntlet are recorded; installed-provider proof remains open. |
+| A5 | Per-source safe schemes are enforced at catalog parsing and again at web/native opening. | Current local TypeScript/web coverage is a source receipt; installed/native interaction proof remains open. |
+| A6 | Unknown IDs fail closed; store/catalog reads are bounded; corrupt state is quarantined and only a structurally valid private last-known-good copy can recover it. | Current recovery coverage and the local gauntlet are recorded; external/installed proof remains open. |
 
-## Thread sources
+### Codex rollout-tail boundary (A4)
 
-| Source | Discovery | Resume | Default | Current proof |
-| --- | --- | --- | --- | --- |
-| Codex | Local `codex app-server` | Native `codex://threads/...` link | On | Live local integration |
-| Claude Code | Documented local session JSONL metadata | `claude --resume <session-id>` in Terminal | Off, explicit opt-in | Parser tests and local adapter validation |
-| Cursor | Official `cursor-agent ls` | `cursor-agent --resume=<chat-id>` | On | Parser/fixture tested; live CLI proof requires Cursor Agent installed |
-| Grok Build | Documented local `summary.json` metadata | `grok --resume <session-id>` in Terminal | Off, explicit opt-in | Parser/fixture tested; live CLI proof requires Grok Build installed |
-| Other agents | Size-bounded JSON catalogs | Declared deep link or explicit resume command | Per configuration | Schema and fixture tested |
+On macOS only, Gajendra may enrich an app-server status by inspecting a held Codex writer-lock path
+under `~/.codex/thread-writer-locks`. It realpath-confines the matching rollout under
+`~/.codex/sessions`, opens it without following links, reads no more than the final **256 KiB**, and
+considers only allow-listed lifecycle markers after the last `task_complete` marker. Response items,
+messages, coordination payloads, and raw rollout content are neither returned nor persisted.
 
-Gaja never persists titles, prompts, transcript bodies, previews, source files, tokens, or credentials. The native setup screen stores only its completion flag; source choices remain in the private Gaja metadata store. Claude Code scanning is disabled until the user enables it.
+Set `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable this optional enrichment. If a lock, path,
+open, bounded read, lifecycle marker, or local probe fails, the app-server status is retained rather
+than inferred from file age or content.
 
-See [thread source configuration](docs/THREAD_SOURCES.md) for the generic adapter.
+Codex app-server JSON-RPC stdout accepts one response line up to a **512 KiB default**, selected
+after a measured `thread/list limit=100` response of 383,665 bytes. An environment override can
+lower or raise that value only to a fixed **1 MiB hard maximum**. Oversized or unterminated output
+fails generically, is cleaned up, and is neither exposed nor persisted.
 
-## macOS design
+## Build from source
 
-On macOS 26 and later, native surfaces use SwiftUI Liquid Glass. macOS 13–15 use semantic system material as a compatible fallback. Glass is limited to the navigation/overlay layer; list rows and controls remain standard SwiftUI components. The minimal elephant-and-lotus mark stays outline-only and adapts to light and dark appearances.
+The source-build contract is macOS **13.5 or later**, Xcode/Swift, and Node **20 or later** for
+development. It is distinct from a binary distribution: a built app is expected to contain the
+pinned Node **v24.19.0** runtime, checksum-verified during extraction, with its notices. One exact
+ad-hoc local build has an installed launcher-interaction receipt; no downloadable or
+distribution-ready binary is claimed.
 
-The settings menu offers two production themes: **Native Popover** (default) and **Focus Deck**. Both support Auto, Light, and Dark across the native companion and portable MCP App. Command Capsule is intentionally excluded.
-
-The native focus card adapts to the active display and offers **Compact**, **Comfortable**, and **Expanded** sizes from the trailing Settings menu. Comfortable is tuned for the 1512 × 949-point usable frame of the 14-inch MacBook Pro reference display. The six-position Lotus Position picker lives in that menu and the app menu. The header keeps the elephant-and-lotus mark on the left, centers **Gaja** and **Elephant Focus for AI Power Users** on the card's true centerline, and places Organizer, Refresh, then Settings on the right. Each Focus and Important lane shows up to five queued threads; a bottom-edge **Show more in Organizer** shortcut opens the full queue without changing priority state. Running is an expandable vertical section that exposes the complete active set and labels threads already in NOW, Focus, or Important. Its **All priority lanes** capsule makes the disclosure action and inclusive scope visible. The card body is the only vertical scroll owner. The keyboard-capable search capsule remains visible as a non-overlapping footer, focuses from any click on the capsule, selects existing text on entry, returns up to five actionable metadata matches, supports multi-term search, and routes longer result sets to the Organizer. NOW presents **Open → Running/Ready → Provider** as one aligned action group, while NOW and search highlight their complete rounded surfaces on hover and keyboard focus.
-
-The implementation follows Apple’s guidance on [Liquid Glass](https://developer.apple.com/documentation/technologyoverviews/liquid-glass), [materials](https://developer.apple.com/design/human-interface-guidelines/materials), [macOS design](https://developer.apple.com/design/human-interface-guidelines/designing-for-macos/), [scroll views](https://developer.apple.com/design/human-interface-guidelines/scroll-views), and [widgets](https://developer.apple.com/design/human-interface-guidelines/widgets/). See [Apple design compliance](docs/APPLE_DESIGN_COMPLIANCE.md).
-
-## Install from source
-
-Prerequisites: macOS 13 or later, Node.js 20 or later, and Codex CLI. Claude Code, Cursor Agent, and Grok Build are optional source integrations.
-
-```bash
+```sh
 git clone https://github.com/siddath/Gajendra.git gajendra
 cd gajendra
 npm ci
 npm run check
 npm run companion:build
-npm run install:local
-mkdir -p "$HOME/Applications"
-ditto "build/Gajendra.app" "$HOME/Applications/Gajendra.app"
-open "$HOME/Applications/Gajendra.app"
+npm run companion:ui-test
 ```
 
-Restart Codex once after installing or updating the plugin. The native snap-anchored utility works independently of Codex’s experimental global MCP App route. Any host that ignores the global entry-point hint retains the normal inline MCP App.
+`npm run companion:bundle-readiness` is a local, fail-closed inspection of an existing bundle. It
+reports ad-hoc signing honestly; it does not sign, notarize, publish, or make an artifact
+distribution-ready. The separate distribution-readiness mode requires explicit Developer ID,
+Gatekeeper, notarization/staple, archive, and checksum inputs and intentionally fails closed when
+they are absent.
 
-## Daily loop
+## State and support
 
-1. Click the lotus at your chosen hotspot.
-2. Open the one NOW thread in its owning agent.
-3. Open the organizer only when the queue needs to change.
-4. Keep Focus short; five is guidance, not a hard limit.
-
-The menu-bar control is a fallback and may be hidden by a notch or crowded menu bar. Launch at Login is reversible from the Gaja application menu.
-
-## Privacy, state, and migration
-
-The canonical macOS state is:
+The default macOS state location is:
 
 ```text
 ~/Library/Application Support/Gajendra/gajendra.v2.json
 ```
 
-It stores canonical source/thread IDs, tier/order, the NOW ID, an optional bounded Design/Engineering/Life context enum, collapse preferences, and source enablement. It never stores free-text labels or provider content. The directory is `0700`, the file is `0600`, and writes are atomic. Compatible Aadi and Priority Deck state is copied only when no v2 state exists; legacy files are retained for recovery.
+State is private (`0700` directory and `0600` files), bounded, atomically replaced, and backed by
+a private last-known-good copy. Aadi/Priority Deck migration is copy-only; legacy files are never
+moved or deleted by migration.
 
-## Development and validation
+Use [GitHub Discussions](https://github.com/siddath/Gajendra/discussions) for support and
+[private security reporting](https://github.com/siddath/Gajendra/security/advisories/new) for
+vulnerabilities. See [SUPPORT.md](SUPPORT.md) and [SECURITY.md](SECURITY.md).
 
-```bash
-npm run check
-npm run companion:test
-npm run companion:build
-npm run companion:validate
-npm run companion:preview
-npm run gauntlet
-npm run --silent host:preflight
-```
+## Mobile planning boundary
 
-The fail-fast gauntlet covers domain/store invariants, source adapters, MCP contracts, the live Codex catalog, browser journeys, accessibility, themes, reduced motion, reliability repetitions, dependency audit, Swift behavior, bundle signing, and bundled-service integrity. See [Gauntlet](docs/GAUNTLET.md) and [Engineering audit](docs/ENGINEERING_AUDIT.md).
-
-## Distribution status
-
-The public repository is [siddath/Gajendra](https://github.com/siddath/Gajendra). Source tags and hosted CI are distinct from downloadable macOS binaries: local app builds are ad-hoc signed, and public binary distribution still requires Developer ID signing and notarization.
-
-## Uninstall
-
-```bash
-codex plugin remove gajendra
-codex plugin marketplace remove gajendra
-```
-
-Turn off **Launch Gaja at Login**, quit the app, and move `~/Applications/Gajendra.app` to Trash. State is intentionally retained unless the user explicitly deletes it.
-
-## Artwork and license
-
-The shipped elephant-trunk-and-lotus mark is original project artwork implemented as deterministic SVG and SwiftUI paths. External references informed anatomy and botanical detail, but none is bundled or mechanically traced into the shipped geometry.
-
-The Gajendra repository is licensed under the [MIT License](LICENSE). Dependency notices are in [THIRD_PARTY_NOTICES.md](plugins/gajendra/THIRD_PARTY_NOTICES.md).
-
-See [Contributing](CONTRIBUTING.md), [Support](SUPPORT.md), the [Code of Conduct](CODE_OF_CONDUCT.md), and the [Security Policy](SECURITY.md) before opening a report or contribution.
+The retained mobile pack is an **E0 documentation-only protocol and security amendment**. It does
+not create a listener, relay, mobile app, credentials, dependency, branch, signing, or app-store
+claim. D01–D07 and D11 remain explicit approvals; see
+[the mobile plan](worksheets/GAJENDRA_MOBILE_APP_PLAN.md).

@@ -1,39 +1,23 @@
-# Implementation and adoption plan
+# Implementation plan
 
-## Decision enabled
+The current delivery order is constrained by one source authority and one evidence ledger.
 
-The project decides whether one local focus layer across AI-agent sessions changes what the user opens next.
+1. **Integrity and source safety:** revision/CAS/idempotency, atomic move-before, strict store
+   recovery, isolated state, bounded source collection, safe destination schemes, and A4 enrichment
+   privacy.
+2. **Native source:** explicit Login choice, accessibility/interaction contracts, source build and
+   bundle runtime requirements. The native source has 2026-08-18 self-test, build, isolated
+   real-window launcher, validator, bundle-readiness, and exact-installed launcher receipts;
+   remaining physical/clean-Mac proof stays separately gated.
+3. **Canon and validation:** the current docs and companion validator reflect the frozen source
+   contract; source evidence remains distinct from installed or release claims and must be reopened
+   if its inputs change.
+4. **Integrated local proof:** the check/E2E/companion/UI/validator/bundle gauntlet has a passing
+   current candidate receipt; preserve it and rerun if its inputs change. It does not close
+   clean-Mac, remaining physical, signing, notarization, binary distribution, or LinkedIn gates.
+5. **External decisions:** require separate authorization for Developer ID, notarization,
+   binary distribution, clean-Mac testing, LinkedIn publication, and every mobile D01–D07/D11
+   decision.
 
-- Product/adoption owner: the user.
-- Implementation owner: repository maintainers.
-- Publication owner: the user.
-- Deadline: none supplied.
-- Local stop condition: the 0.3 gauntlet, installation, provider status, installed UI, and documentation reconciliation pass.
-- Adoption stop condition: three deliberate uses during a reversible 14-day trial, including one NOW change that changes the next opened thread.
-
-## Delivery phases
-
-| Phase | Outcome | State |
-| --- | --- | --- |
-| Contract | One global NOW, metadata-only state including bounded context, source-owned sessions | Complete |
-| Registry | Codex, Claude, Cursor, Grok Build, and configured catalog adapters | Complete locally |
-| Native UX | Click-presented snap-anchored utility and resizable organizer | Complete locally |
-| Apple alignment | Liquid Glass gate, material fallback, standard controls, accessibility | Complete locally |
-| Portable UI | Inline MCP App plus experimental global metadata hint | Complete locally |
-| Gauntlet/install | Fail-fast verification and installed-build proof | Final run pending |
-| Source publication | Public remote and contribution workflow active; release tag pending | Complete for source |
-| Binary publication | Developer ID, notarization, Gatekeeper proof | Separate future gate |
-
-## Adoption experiment
-
-Success requires:
-
-1. three deliberate returns through the lotus;
-2. one NOW change that alters the next resumed session;
-3. at least two source apps used without duplicating priorities elsewhere.
-
-Kill the trial if the utility becomes visual noise, opens without deliberate activation, source metadata is materially stale, resume repeatedly fails, or queue upkeep duplicates work.
-
-## Deferred WidgetKit surface
-
-A WidgetKit extension becomes eligible only when users identify a passive desktop/Notification Center moment that the floating utility does not serve. It must open `gajendra://thread/...`, use an explicitly designed shared container, and never create a second priority store.
+Mobile remains E0 documentation-only. No relay, listener, mobile client, credential, dependency, or
+branch is created by this plan.

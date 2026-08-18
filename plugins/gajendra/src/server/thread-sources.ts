@@ -1,19 +1,25 @@
-import { constants } from "node:fs";
-import { access, open, readdir, readFile, stat } from "node:fs/promises";
-import { spawn } from "node:child_process";
+import { constants, type Dirent } from "node:fs";
+import { access, open, opendir, stat } from "node:fs/promises";
+import { spawn, type ChildProcess } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import type { Readable } from "node:stream";
 
 import { z } from "zod";
 
 import type {
   AgentThread,
   CodexThread,
+  ReviewSignal,
   ResumeCommand,
   SourceState,
   ThreadSourceStatus,
 } from "../shared/contracts.js";
-import { isRunningThreadStatus } from "../shared/contracts.js";
+import {
+  DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES,
+  isPermittedDeepLink,
+  isRunningThreadStatus,
+} from "../shared/contracts.js";
 import { canonicalThreadId } from "./domain.js";
 import { CodexAppServerClient } from "./codex-app-server.js";
 
@@ -22,13 +28,55 @@ const MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 const MAX_GROK_METADATA_BYTES = 128 * 1024;
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 const MAX_CURSOR_OUTPUT_BYTES = 2 * 1024 * 1024;
+const CURSOR_LIST_TIMEOUT_MS = 10_000;
+const PROCESS_KILL_GRACE_MS = 250;
+const PROCESS_CLOSE_GRACE_MS = PROCESS_KILL_GRACE_MS;
+const DEFAULT_MAX_SOURCES_CONFIG_BYTES = 128 * 1024;
+const MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES = 2 * 1024 * 1024;
+type OutputChildProcess = Pick<ChildProcess, "pid" | "kill"> & {
+  stdout: Readable;
+  stderr: Readable;
+};
+export const MAX_DISCOVERY_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE * 10;
+/** Limits concurrent provider/catalog reads; each configured catalog can itself be up to 2 MiB. */
+export const DEFAULT_SOURCE_COLLECTION_CONCURRENCY = 4;
+export const MAX_SOURCE_COLLECTION_CONCURRENCY = 8;
 
-type SourceAdapter = {
+export type DiscoveryMeasurement = {
+  directoriesRead: number;
+  candidateFiles: number;
+  metadataStats: number;
+};
+
+export type DiscoveryOptions = {
+  candidateLimit?: number;
+  directoryEntryLimit?: number;
+  measurement?: DiscoveryMeasurement;
+};
+
+export type ProcessCaptureOptions = {
+  outputLimitBytes?: number;
+  timeoutMs?: number;
+  killGraceMs?: number;
+  closeGraceMs?: number;
+};
+
+export type GrokReadOptions = {
+  /** Deterministic post-open replacement hook used only by the handle-TOCTOU regression. */
+  onOpened?: () => Promise<void> | void;
+};
+
+export type SourceAdapter = {
   id: string;
   name: string;
   kind: "builtin" | "configured";
   enabledByDefault: boolean;
   listThreads(): Promise<AgentThread[]>;
+};
+
+export type SourceAdapterOutcome = {
+  threads: AgentThread[];
+  status: ThreadSourceStatus;
 };
 
 export type SourceCollection = {
@@ -39,12 +87,14 @@ export type SourceCollection = {
 
 export class ThreadSourceRegistry {
   private readonly codex: CodexAppServerClient;
+  private readonly sourceCollectionConcurrency: number;
 
   constructor(
     codex = new CodexAppServerClient(),
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {
     this.codex = codex;
+    this.sourceCollectionConcurrency = boundedSourceConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
 
   async collect(preferences: Record<string, boolean>): Promise<SourceCollection> {
@@ -56,23 +106,7 @@ export class ThreadSourceRegistry {
       new GrokThreadSource(this.env),
       ...configured.adapters,
     ];
-    const outcomes = await Promise.all(adapters.map(async (adapter) => {
-      const enabled = preferences[adapter.id] ?? adapter.enabledByDefault;
-      if (!enabled) return {
-        threads: [] as AgentThread[],
-        status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads."),
-      };
-      try {
-        const threads = selectSourceThreads(await adapter.listThreads());
-        return { threads, status: statusFor(adapter, "ready", true, threads.length, null) };
-      } catch (error) {
-        const state = error instanceof SourceUnavailableError ? error.state : "error";
-        return {
-          threads: [] as AgentThread[],
-          status: statusFor(adapter, state, true, 0, readableError(error)),
-        };
-      }
-    }));
+    const outcomes = await collectSourceAdapters(adapters, preferences, this.sourceCollectionConcurrency);
 
     const sources = outcomes.map(({ status }) => status);
     if (configured.issue) {
@@ -96,6 +130,53 @@ export class ThreadSourceRegistry {
 
   close(): Promise<void> {
     return this.codex.close();
+  }
+}
+
+/**
+ * Keep provider discovery bounded even when a user configures all supported catalogs. Results
+ * retain adapter order so source badges and error rows remain deterministic.
+ */
+export async function collectSourceAdapters(
+  adapters: SourceAdapter[],
+  preferences: Record<string, boolean>,
+  maxConcurrency = DEFAULT_SOURCE_COLLECTION_CONCURRENCY,
+): Promise<SourceAdapterOutcome[]> {
+  const concurrency = Math.min(boundedSourceConcurrency(maxConcurrency), adapters.length);
+  const outcomes: SourceAdapterOutcome[] = new Array(adapters.length);
+  let nextAdapter = 0;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = nextAdapter++;
+      const adapter = adapters[index];
+      if (!adapter) return;
+      outcomes[index] = await collectSourceAdapter(adapter, preferences);
+    }
+  };
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  return outcomes;
+}
+
+async function collectSourceAdapter(
+  adapter: SourceAdapter,
+  preferences: Record<string, boolean>,
+): Promise<SourceAdapterOutcome> {
+  const enabled = preferences[adapter.id] ?? adapter.enabledByDefault;
+  if (!enabled) {
+    return {
+      threads: [],
+      status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads."),
+    };
+  }
+  try {
+    const threads = selectSourceThreads(await adapter.listThreads());
+    return { threads, status: statusFor(adapter, "ready", true, threads.length, null) };
+  } catch (error) {
+    const state = error instanceof SourceUnavailableError ? error.state : "error";
+    return {
+      threads: [],
+      status: statusFor(adapter, state, true, 0, readableError(error)),
+    };
   }
 }
 
@@ -184,20 +265,45 @@ class CatalogThreadSource implements SourceAdapter {
     readonly name: string,
     private readonly catalogPath: string,
     enabled: boolean,
+    private readonly deepLinkSchemes: string[],
   ) {
     this.enabledByDefault = enabled;
   }
 
   async listThreads(): Promise<AgentThread[]> {
-    const catalogStat = await stat(this.catalogPath).catch((error: unknown) => {
-      if (isMissing(error)) throw new SourceUnavailableError("not-configured", `Catalog not found: ${this.catalogPath}`);
+    let rawCatalog: string;
+    try {
+      rawCatalog = await readBoundedRegularFile(this.catalogPath, MAX_CATALOG_BYTES);
+    } catch (error) {
+      if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Configured agent catalog is not available.");
       throw error;
-    });
-    if (catalogStat.size > MAX_CATALOG_BYTES) throw new Error(`Catalog exceeds ${MAX_CATALOG_BYTES} bytes.`);
-    const catalog = threadCatalogSchema.parse(JSON.parse(await readFile(this.catalogPath, "utf8")) as unknown);
+    }
+    const catalog = threadCatalogSchema.parse(JSON.parse(rawCatalog) as unknown);
     return catalog.threads.map((thread) => {
+      if (thread.deepLink && !isPermittedDeepLink(thread.deepLink, this.deepLinkSchemes)) {
+        throw new Error("Configured agent catalog contains a disallowed deep link.");
+      }
+      const reviewDestination = thread.review
+        ? thread.review.destination.type === "thread"
+          ? thread.review.destination.deepLink
+          : thread.review.destination.url
+        : null;
+      if (reviewDestination && !isPermittedDeepLink(reviewDestination, this.deepLinkSchemes)) {
+        throw new Error("Configured agent catalog contains a disallowed review destination.");
+      }
       const id = canonicalThreadId(this.id, thread.id);
       const resumeCommand = thread.resumeCommand ? normalizeResumeCommand(thread.resumeCommand) : undefined;
+      const review: ReviewSignal | undefined = thread.review ? {
+        state: "ready",
+        kind: thread.review.kind,
+        updatedAt: normalizeTimestamp(thread.review.updatedAt),
+        destination: thread.review.destination,
+        providerStatus: thread.review.providerStatus,
+      } : undefined;
+      const allowedDeepLinkSchemes = [...new Set([
+        ...(thread.deepLink ? this.deepLinkSchemes : ["gajendra"]),
+        ...(review ? this.deepLinkSchemes : []),
+      ])];
       return {
         id,
         sourceId: this.id,
@@ -207,7 +313,9 @@ class CatalogThreadSource implements SourceAdapter {
         updatedAt: normalizeTimestamp(thread.updatedAt),
         status: cleanTitle(thread.status) || "unknown",
         deepLink: thread.deepLink || (resumeCommand ? gajendraThreadLink(id) : ""),
+        allowedDeepLinkSchemes,
         ...(resumeCommand ? { resumeCommand } : {}),
+        ...(review ? { review } : {}),
       };
     });
   }
@@ -236,16 +344,20 @@ export function parseCursorSessionList(output: string, executable = "cursor-agen
       updatedAt: parseTimestampFromText(line),
       status: "resumable",
       deepLink: gajendraThreadLink(canonicalId),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: [`--resume=${id}`] },
     });
   }
   return rows;
 }
 
-async function recentClaudeSessionFiles(projectsDirectory: string): Promise<string[]> {
+export async function recentClaudeSessionFiles(projectsDirectory: string, options: DiscoveryOptions = {}): Promise<string[]> {
+  const candidateLimit = positiveCandidateLimit(options.candidateLimit);
+  const measurement = options.measurement;
+  const directoryBudget = { remaining: positiveDirectoryEntryLimit(options.directoryEntryLimit) };
   let projects;
   try {
-    projects = await readdir(projectsDirectory, { withFileTypes: true });
+    projects = await boundedDirectoryEntries(projectsDirectory, directoryBudget);
   } catch (error) {
     if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Claude Code has no local session directory yet.");
     throw error;
@@ -254,40 +366,52 @@ async function recentClaudeSessionFiles(projectsDirectory: string): Promise<stri
   for (const project of projects) {
     if (!project.isDirectory()) continue;
     const directory = path.join(projectsDirectory, project.name);
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (measurement) measurement.directoriesRead += 1;
+    for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      if (measurement) measurement.candidateFiles += 1;
+      if (files.length >= candidateLimit) {
+        throw new Error("Claude Code has too many session files to inspect safely.");
+      }
       const filePath = path.join(directory, entry.name);
       const fileStat = await stat(filePath);
+      if (measurement) measurement.metadataStats += 1;
       files.push({ path: filePath, modifiedAt: fileStat.mtimeMs });
     }
   }
   return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((file) => file.path);
 }
 
-async function recentGrokSummaryFiles(sessionsDirectory: string): Promise<string[]> {
+export async function recentGrokSummaryFiles(sessionsDirectory: string, options: DiscoveryOptions = {}): Promise<string[]> {
+  const candidateLimit = positiveCandidateLimit(options.candidateLimit);
+  const measurement = options.measurement;
+  const directoryBudget = { remaining: positiveDirectoryEntryLimit(options.directoryEntryLimit) };
   let workspaces;
   try {
-    workspaces = await readdir(sessionsDirectory, { withFileTypes: true });
+    workspaces = await boundedDirectoryEntries(sessionsDirectory, directoryBudget);
   } catch (error) {
     if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
     throw error;
   }
-  const workspaceDirectories = await Promise.all(workspaces
-    .filter((entry) => entry.isDirectory())
-    .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE)
-    .map(async (entry) => {
-      const directory = path.join(sessionsDirectory, entry.name);
-      const directoryStat = await stat(directory);
-      return { directory, modifiedAt: directoryStat.mtimeMs };
-    }));
   const summaries: Array<{ path: string; modifiedAt: number }> = [];
-  for (const workspace of workspaceDirectories.sort((left, right) => right.modifiedAt - left.modifiedAt)) {
-    for (const entry of await readdir(workspace.directory, { withFileTypes: true })) {
+  for (const workspace of workspaces) {
+    if (!workspace.isDirectory()) continue;
+    const directory = path.join(sessionsDirectory, workspace.name);
+    if (measurement) measurement.directoriesRead += 1;
+    for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isDirectory()) continue;
-      const summaryPath = path.join(workspace.directory, entry.name, "summary.json");
+      const summaryPath = path.join(directory, entry.name, "summary.json");
       try {
         const summaryStat = await stat(summaryPath);
-        if (summaryStat.isFile()) summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
+        if (!summaryStat.isFile()) continue;
+        if (measurement) {
+          measurement.candidateFiles += 1;
+          measurement.metadataStats += 1;
+        }
+        if (summaries.length >= candidateLimit) {
+          throw new Error("Grok Build has too many session summaries to inspect safely.");
+        }
+        summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
       } catch (error) {
         if (!isMissing(error)) throw error;
       }
@@ -336,6 +460,7 @@ export async function readClaudeThreadMetadata(filePath: string, executable: str
       updatedAt: timestamp,
       status: "resumable",
       deepLink: gajendraThreadLink(id),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: ["--resume", sessionId], ...(cwd ? { cwd } : {}) },
     };
   } finally {
@@ -343,12 +468,16 @@ export async function readClaudeThreadMetadata(filePath: string, executable: str
   }
 }
 
-export async function readGrokThreadMetadata(filePath: string, executable: string): Promise<AgentThread | null> {
-  const fileStat = await stat(filePath);
-  if (fileStat.size > MAX_GROK_METADATA_BYTES) return null;
+export async function readGrokThreadMetadata(
+  filePath: string,
+  executable: string,
+  options: GrokReadOptions = {},
+): Promise<AgentThread | null> {
+  const summary = await readBoundedGrokSummary(filePath, options.onOpened);
+  if (!summary) return null;
   let value: Record<string, unknown>;
   try {
-    value = JSON.parse(await readFile(filePath, "utf8")) as Record<string, unknown>;
+    value = JSON.parse(summary.contents) as Record<string, unknown>;
   } catch {
     return null;
   }
@@ -369,11 +498,37 @@ export async function readGrokThreadMetadata(filePath: string, executable: strin
     sourceName: "Grok Build",
     title: cleanTitle(generatedTitle || sessionSummary) || `Grok session ${sessionId.slice(0, 8)}`,
     project: cleanProject(cwd),
-    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || fileStat.mtimeMs / 1000,
+    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || summary.modifiedAt / 1000,
     status: "resumable",
     deepLink: gajendraThreadLink(id),
+    allowedDeepLinkSchemes: ["gajendra"],
     resumeCommand: { executable, args: ["--resume", sessionId], ...(cwd ? { cwd } : {}) },
   };
+}
+
+async function readBoundedGrokSummary(
+  filePath: string,
+  onOpened: (() => Promise<void> | void) | undefined,
+): Promise<{ contents: string; modifiedAt: number } | null> {
+  const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    // Use fstat from the opened descriptor, not a path stat followed by readFile. The bounded
+    // buffer below remains a hard ceiling even if the original inode grows after fstat.
+    const metadata = await file.stat();
+    if (!metadata.isFile() || metadata.size > MAX_GROK_METADATA_BYTES) return null;
+    await onOpened?.();
+    const buffer = Buffer.alloc(MAX_GROK_METADATA_BYTES + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await file.read(buffer, offset, buffer.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > MAX_GROK_METADATA_BYTES) return null;
+    return { contents: buffer.subarray(0, offset).toString("utf8"), modifiedAt: metadata.mtimeMs };
+  } finally {
+    await file.close();
+  }
 }
 
 function codexThread(thread: CodexThread): AgentThread {
@@ -387,6 +542,7 @@ function codexThread(thread: CodexThread): AgentThread {
     updatedAt: thread.recencyAt ?? thread.updatedAt ?? 0,
     status: typeof thread.status === "string" ? thread.status : thread.status?.type ?? "unknown",
     deepLink: `codex://threads/${encodeURIComponent(thread.id)}`,
+    allowedDeepLinkSchemes: ["codex"],
   };
 }
 
@@ -418,6 +574,7 @@ function parseCursorJson(output: string, executable: string): AgentThread[] | nu
       updatedAt: normalizeTimestamp(row.updatedAt ?? row.createdAt),
       status: cleanTitle(typeof row.status === "string" ? row.status : "resumable") || "resumable",
       deepLink: gajendraThreadLink(id),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: [`--resume=${threadId}`], ...(typeof row.cwd === "string" ? { cwd: row.cwd } : {}) },
     }];
   });
@@ -427,9 +584,11 @@ async function loadConfiguredSources(env: NodeJS.ProcessEnv): Promise<{ adapters
   const configPath = resolveSourcesConfigPath(env);
   let raw: string;
   try {
-    raw = await readFile(configPath, "utf8");
+    raw = await readBoundedSourcesConfig(configPath, sourcesConfigByteLimit(env));
   } catch (error) {
-    return isMissing(error) ? { adapters: [], issue: null } : { adapters: [], issue: readableError(error) };
+    return isMissing(error)
+      ? { adapters: [], issue: null }
+      : { adapters: [], issue: "Configured source configuration is unavailable." };
   }
   try {
     const config = sourcesConfigSchema.parse(JSON.parse(raw) as unknown);
@@ -438,11 +597,47 @@ async function loadConfiguredSources(env: NodeJS.ProcessEnv): Promise<{ adapters
       source.name,
       expandHome(source.catalog),
       source.enabled,
+      source.deepLinkSchemes ?? [...DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES],
     ));
     return { adapters, issue: null };
   } catch (error) {
-    return { adapters: [], issue: `Invalid source configuration at ${configPath}: ${readableError(error)}` };
+    return { adapters: [], issue: "Configured source configuration is invalid." };
   }
+}
+
+async function readBoundedSourcesConfig(configPath: string, maxBytes: number): Promise<string> {
+  return readBoundedRegularFile(configPath, maxBytes);
+}
+
+async function readBoundedRegularFile(filePath: string, maxBytes: number): Promise<string> {
+  const file = await open(filePath, "r");
+  try {
+    const metadata = await file.stat();
+    if (!metadata.isFile()) throw new Error("Configured source metadata is unavailable.");
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await file.read(buffer, offset, buffer.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > maxBytes) throw new Error("Configured source metadata exceeds its limit.");
+    return buffer.subarray(0, offset).toString("utf8");
+  } finally {
+    await file.close();
+  }
+}
+
+function sourcesConfigByteLimit(env: NodeJS.ProcessEnv): number {
+  const requested = Number(env.GAJENDRA_SOURCES_CONFIG_MAX_BYTES);
+  if (!Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MAX_SOURCES_CONFIG_BYTES;
+  return Math.min(requested, MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES);
+}
+
+function boundedSourceConcurrency(value: number | string | undefined): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return DEFAULT_SOURCE_COLLECTION_CONCURRENCY;
+  return Math.min(parsed, MAX_SOURCE_COLLECTION_CONCURRENCY);
 }
 
 export function resolveSourcesConfigPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -475,38 +670,174 @@ async function resolveExecutable(explicit: string | undefined, candidates: strin
   return null;
 }
 
-function collectProcessOutput(executable: string, args: string[], env: NodeJS.ProcessEnv): Promise<string> {
+export function collectProcessOutput(
+  executable: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  options: ProcessCaptureOptions = {},
+): Promise<string> {
+  const outputLimitBytes = positiveProcessBound(options.outputLimitBytes, MAX_CURSOR_OUTPUT_BYTES);
+  const timeoutMs = positiveProcessBound(options.timeoutMs, CURSOR_LIST_TIMEOUT_MS);
+  const killGraceMs = positiveProcessBound(options.killGraceMs, PROCESS_KILL_GRACE_MS);
+  const closeGraceMs = positiveProcessBound(options.closeGraceMs, PROCESS_CLOSE_GRACE_MS);
   return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], env });
-    let stdout = "";
-    let stderr = "";
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`${path.basename(executable)} ${args.join(" ")} timed out.`));
-    }, 10_000);
+    const child = spawn(executable, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+      // On POSIX this gives the provider and every inherited-pipe descendant its own process
+      // group, so a timeout cannot leave a grandchild holding stdout/stderr open forever.
+      detached: supportsProcessGroupSignals(),
+    });
+    const chunks: Buffer[] = [];
+    let capturedBytes = 0;
+    let captureOpen = true;
+    let settled = false;
+    let exited = false;
+    let terminationError: Error | null = null;
+    let timeout: NodeJS.Timeout | null = null;
+    let killTimer: NodeJS.Timeout | null = null;
+    let closeTimer: NodeJS.Timeout | null = null;
+    let postKillCloseTimer: NodeJS.Timeout | null = null;
+    let onStdout: (chunk: Buffer | string) => void = () => undefined;
+    const clearTimers = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      if (closeTimer) clearTimeout(closeTimer);
+      closeTimer = null;
+      if (postKillCloseTimer) clearTimeout(postKillCloseTimer);
+      postKillCloseTimer = null;
+    };
+    const stopCapture = () => {
+      if (!captureOpen) return;
+      captureOpen = false;
+      child.stdout.off("data", onStdout);
+      child.stdout.resume();
+      child.stderr.resume();
+    };
+    const settle = (error: Error | null, value = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      stopCapture();
+      if (error) reject(error);
+      else resolve(value);
+    };
+    const terminate = (error: Error) => {
+      if (settled || terminationError) return;
+      terminationError = error;
+      stopCapture();
+      signalProcessGroup(child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        if (exited) return;
+        signalProcessGroup(child, "SIGKILL");
+      }, killGraceMs);
+      killTimer.unref();
+    };
+    const startCloseWatchdog = () => {
+      if (settled || closeTimer) return;
+      closeTimer = setTimeout(() => {
+        const error = terminationError ?? new Error("Cursor session listing did not close its output streams.");
+        terminationError = error;
+        // The direct child may already have exited while a descendant still owns its inherited
+        // pipes. Kill the group once more, then give close the existing kill grace to report
+        // final pipe teardown before resorting to local-handle destruction.
+        signalProcessGroup(child, "SIGKILL");
+        closeTimer = null;
+        postKillCloseTimer = setTimeout(() => {
+          // A platform or hostile descendant may still retain an inherited descriptor after the
+          // bounded group-KILL grace. Never let that keep the caller pending indefinitely.
+          stopCapture();
+          destroyLocalPipes(child);
+          settle(error);
+        }, killGraceMs);
+        postKillCloseTimer.unref();
+      }, closeGraceMs);
+      closeTimer.unref();
+    };
+    onStdout = (chunk: Buffer | string) => {
+      if (!captureOpen) return;
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = outputLimitBytes - capturedBytes;
+      if (bytes.length > remaining) {
+        if (remaining > 0) {
+          chunks.push(bytes.subarray(0, remaining));
+          capturedBytes += remaining;
+        }
+        terminate(new Error("Cursor session catalog exceeded the output limit."));
+        return;
+      }
+      chunks.push(bytes);
+      capturedBytes += bytes.length;
+    };
+    timeout = setTimeout(() => terminate(new Error("Cursor session listing timed out.")), timeoutMs);
     timeout.unref();
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdout += chunk;
-      if (Buffer.byteLength(stdout) > MAX_CURSOR_OUTPUT_BYTES) child.kill("SIGTERM");
-    });
-    child.stderr.on("data", (chunk: string) => { stderr = `${stderr}${chunk}`.slice(-2000); });
+    child.stdout.on("data", onStdout);
+    // Drain provider stderr without retaining or exposing provider-controlled content.
+    child.stderr.on("data", () => undefined);
     child.once("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
+      if (!terminationError) terminationError = error;
+      clearTimers();
+      startCloseWatchdog();
     });
-    child.once("exit", (code, signal) => {
-      clearTimeout(timeout);
-      if (Buffer.byteLength(stdout) > MAX_CURSOR_OUTPUT_BYTES) {
-        reject(new Error("Cursor session catalog exceeded the output limit."));
+    child.once("exit", () => {
+      exited = true;
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      // A direct child can exit while a forked descendant retains inherited stdout/stderr. Give
+      // close a bounded grace period, then tear down local pipes and return a safe failure. The
+      // dedicated POSIX group gets TERM now and KILL from the watchdog if it still owns a pipe.
+      signalProcessGroup(child, "SIGTERM");
+      startCloseWatchdog();
+    });
+    // exit only says the child stopped running. close follows after both pipes are closed, so it
+    // is the first point at which final stdout is complete and a TERM-resistant child is gone.
+    child.once("close", (code, signal) => {
+      if (terminationError) {
+        settle(terminationError);
       } else if (code === 0) {
-        resolve(stdout);
+        settle(null, Buffer.concat(chunks, capturedBytes).toString("utf8"));
       } else {
-        reject(new Error(`Cursor session listing failed (${signal ?? code ?? "unknown"})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
+        settle(new Error(`Cursor session listing failed (${signal ?? code ?? "unknown"}).`));
       }
     });
   });
+}
+
+function positiveProcessBound(value: number | undefined, fallback: number): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+
+/** Windows has no portable negative-PID process-group signal equivalent. The pipe watchdog below
+ * still bounds the caller there; POSIX additionally reaps descendants which inherited our pipes. */
+function supportsProcessGroupSignals(): boolean {
+  return process.platform !== "win32";
+}
+
+function signalProcessGroup(child: OutputChildProcess, signal: NodeJS.Signals): void {
+  if (supportsProcessGroupSignals() && child.pid !== undefined) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+      // The group leader may have exited already. Fall through to the direct child where present.
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+    // Exit/close or the watchdog settle the operation safely.
+  }
+}
+
+function destroyLocalPipes(child: OutputChildProcess): void {
+  child.stdout.destroy();
+  child.stderr.destroy();
 }
 
 function cleanTitle(value: string | null | undefined): string {
@@ -560,14 +891,16 @@ function deduplicate(threads: AgentThread[]): AgentThread[] {
 export function selectSourceThreads(threads: AgentThread[]): AgentThread[] {
   const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
   const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
+  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state === "ready");
   const background = ordered
-    .filter((thread) => !isRunningThreadStatus(thread.status))
+    .filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready")
     .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
-  return [...running, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
+  return [...running, ...reviewReady, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
 function readableError(error: unknown): string {
-  return error instanceof Error ? error.message : "Thread source failed.";
+  if (error instanceof SourceUnavailableError) return error.message;
+  return "Thread source could not be read. Review its local setup and try again.";
 }
 
 function isMissing(error: unknown): boolean {
@@ -590,6 +923,31 @@ const resumeCommandSchema = z.object({
   cwd: z.string().min(1).optional(),
 });
 
+const reviewDestinationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("thread"),
+    deepLink: z.string().min(1).max(2_048).url(),
+  }).strict(),
+  z.object({
+    type: z.literal("url"),
+    url: z.string().min(1).max(2_048).url(),
+  }).strict(),
+]);
+
+const reviewSignalSchema = z.object({
+  state: z.literal("ready"),
+  kind: z.enum(["result", "diff", "pull-request"]),
+  updatedAt: z.union([z.number().positive().finite(), z.string().min(1)]).refine(
+    (value) => normalizeTimestamp(value) > 0,
+    "Review updatedAt must be a valid timestamp.",
+  ),
+  destination: reviewDestinationSchema,
+  providerStatus: z.string().min(1).max(80).refine(
+    (value) => cleanTitle(value) === value,
+    "Review providerStatus must be one bounded line.",
+  ),
+}).strict();
+
 const catalogThreadSchema = z.object({
   id: z.string().min(1).max(300),
   title: z.string().max(500),
@@ -598,6 +956,7 @@ const catalogThreadSchema = z.object({
   status: z.string().max(80).default("unknown"),
   deepLink: z.string().url().optional(),
   resumeCommand: resumeCommandSchema.optional(),
+  review: reviewSignalSchema.optional(),
 }).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
   message: "A configured thread must declare deepLink or resumeCommand.",
 });
@@ -607,12 +966,53 @@ const threadCatalogSchema = z.object({
   threads: z.array(catalogThreadSchema).max(2_000),
 });
 
+const RESERVED_SOURCE_IDS = new Set(["codex", "claude", "cursor", "grok", "configured-sources"]);
+const configuredSourceSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,48}$/u),
+  name: z.string().min(1).max(80),
+  catalog: z.string().min(1),
+  enabled: z.boolean().default(true),
+  deepLinkSchemes: z.array(z.string().regex(/^[a-z][a-z0-9+.-]{0,31}$/iu).refine(
+    (scheme) => !["javascript", "data", "file"].includes(scheme.toLowerCase()),
+    "Unsafe deep-link scheme.",
+  )).min(1).max(8).optional(),
+});
+
 const sourcesConfigSchema = z.object({
   version: z.literal(1),
-  sources: z.array(z.object({
-    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,48}$/u),
-    name: z.string().min(1).max(80),
-    catalog: z.string().min(1),
-    enabled: z.boolean().default(true),
-  })).max(32),
+  sources: z.array(configuredSourceSchema).max(32),
+}).superRefine((config, context) => {
+  const seen = new Set<string>();
+  config.sources.forEach((source, index) => {
+    if (RESERVED_SOURCE_IDS.has(source.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["sources", index, "id"], message: "Configured source ID is reserved." });
+    }
+    if (seen.has(source.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["sources", index, "id"], message: "Configured source IDs must be unique." });
+    }
+    seen.add(source.id);
+  });
 });
+
+function positiveCandidateLimit(value: number | undefined): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : MAX_DISCOVERY_CANDIDATES;
+}
+
+function positiveDirectoryEntryLimit(value: number | undefined): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : MAX_DISCOVERY_CANDIDATES;
+}
+
+async function boundedDirectoryEntries(directoryPath: string, budget: { remaining: number }) {
+  const entries: Dirent[] = [];
+  const directory = await opendir(directoryPath);
+  for await (const entry of directory) {
+    if (budget.remaining <= 0) throw new Error("Thread source directory catalog exceeded the safe scan limit.");
+    budget.remaining -= 1;
+    entries.push(entry);
+  }
+  return entries;
+}

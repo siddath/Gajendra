@@ -345,6 +345,24 @@ h1 { margin: 0; max-width: 680px; font-size: clamp(28px, 5vw, 42px); line-height
 .running-toggle:not(:disabled):hover .running-scope { border-color: rgb(48 209 88 / 46%); background: rgb(48 209 88 / 15%); }
 .running-row { background: color-mix(in srgb, #30d158 4%, transparent); }
 
+.review-section { border-color: color-mix(in srgb, #ff9f0a 30%, var(--border)); background: color-mix(in srgb, #ff9f0a 4%, var(--surface)); }
+.review-heading:not(:disabled) { cursor: pointer; }
+.review-heading:not(:disabled):hover, .review-heading:not(:disabled):focus-visible { background: color-mix(in srgb, #ff9f0a 9%, transparent); }
+.review-heading[aria-expanded="false"] .review-chevron { transform: rotate(-90deg); }
+.review-title { color: var(--text); }
+.review-symbol, .review-mark { color: #d96d00; font-weight: 850; }
+:root[data-theme="dark"] .review-symbol, :root[data-theme="dark"] .review-mark { color: #ffb340; }
+.review-scope { border-color: rgb(255 159 10 / 34%); background: rgb(255 159 10 / 11%); }
+.review-heading:not(:disabled):hover .review-scope { border-color: rgb(255 159 10 / 52%); background: rgb(255 159 10 / 17%); }
+.review-row { background: color-mix(in srgb, #ff9f0a 5%, transparent); }
+.review-row-main { min-width: 0; flex: 1; }
+.review-primary { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.review-primary > span:nth-child(2) { display: grid; min-width: 0; }
+.review-primary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-primary small { margin-top: 2px; color: var(--muted); font-size: 11px; font-weight: 500; }
+.review-destination-label { padding: 3px 7px; border: 1px solid rgb(255 159 10 / 32%); border-radius: 999px; color: #9a4b00; font-size: 10px; font-weight: 750; }
+:root[data-theme="dark"] .review-destination-label { color: #ffc066; }
+
 .sources-strip {
   display: grid;
   gap: 10px;
@@ -689,5 +707,6 @@ input[type="search"]:focus { border-color: var(--accent); outline: 2px solid col
   .sources-strip, .source-chip, .source-badge, .context-badge, .placement-badge, .context-control select { border: 1px solid ButtonText; }
   .gaja-mark-main, .gaja-mark-detail, .gaja-mark-petal { fill: none; stroke: CanvasText; }
   .gaja-mark-pupil { fill: CanvasText; }
-  .activity-signal, .running-section, .thread-search-footer { border: 1px solid ButtonText; }
+  .activity-signal, .running-section, .review-section, .thread-search-footer { border: 1px solid ButtonText; }
+  .review-mark, .review-symbol, .review-destination-label { color: CanvasText; }
 }

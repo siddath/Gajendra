@@ -1,4 +1,5 @@
 import {
+  DEFAULT_IDEMPOTENCY_LEDGER_LIMIT,
   DEFAULT_SOURCE_PREFERENCES,
   EMPTY_STORE,
   FOCUS_GUIDE,
@@ -9,9 +10,11 @@ import {
   type DeckThread,
   type PriorityStore,
   type StoredEntry,
+  type StoredMutationReceipt,
   type ThreadSourceStatus,
   type ThreadContext,
 } from "../shared/contracts.js";
+import { hashIdempotencyKey, isSha256Digest } from "./idempotency.js";
 
 export function canonicalThreadId(sourceId: string, threadId: string): string {
   return `${sourceId}:${threadId}`;
@@ -37,6 +40,7 @@ export function normalizeStore(value: unknown): PriorityStore {
 
   return {
     version: STORE_VERSION,
+    revision: normalizeRevision(candidate.revision),
     currentFocusThreadId: current,
     entries,
     collapsed: {
@@ -44,6 +48,7 @@ export function normalizeStore(value: unknown): PriorityStore {
       important: Boolean(candidate.collapsed?.important),
     },
     sourcePreferences: normalizeSourcePreferences(candidate.sourcePreferences),
+    idempotency: normalizeIdempotency(candidate.idempotency),
   };
 }
 
@@ -59,6 +64,10 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
     return next;
   }
 
+  if (mutation.type === "move-before") {
+    return moveBefore(next, mutation, now);
+  }
+
   const index = next.entries.findIndex((entry) => entry.threadId === mutation.threadId);
 
   if (mutation.type === "set-context") {
@@ -67,7 +76,7 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
     if (!entry) return next;
     if (mutation.context) entry.context = mutation.context;
     else delete entry.context;
-    return next;
+    return repairCurrentFocus(next);
   }
 
   if (mutation.type === "set-level") {
@@ -77,10 +86,7 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
       next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
     if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
-    if (mutation.level !== "focus" && next.currentFocusThreadId === mutation.threadId) {
-      next.currentFocusThreadId = next.entries.find((entry) => entry.level === "focus")?.threadId ?? null;
-    }
-    return next;
+    return repairCurrentFocus(next);
   }
 
   if (mutation.type === "set-current") {
@@ -88,12 +94,12 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
     if (index >= 0) next.entries.splice(index, 1);
     next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
     next.currentFocusThreadId = mutation.threadId;
-    return next;
+    return repairCurrentFocus(next);
   }
 
-  if (index < 0) return next;
+  if (index < 0) return repairCurrentFocus(next);
   const entry = next.entries[index];
-  if (!entry) return next;
+  if (!entry) return repairCurrentFocus(next);
   const levelIndexes = next.entries
     .map((candidate, candidateIndex) => ({ candidate, candidateIndex }))
     .filter(({ candidate }) => candidate.level === entry.level)
@@ -101,12 +107,69 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
   const position = levelIndexes.indexOf(index);
   const swapPosition = mutation.direction === "up" ? position - 1 : position + 1;
   const swapIndex = levelIndexes[swapPosition];
-  if (swapIndex === undefined) return next;
+  if (swapIndex === undefined) return repairCurrentFocus(next);
   const swapped = next.entries[swapIndex];
-  if (!swapped) return next;
+  if (!swapped) return repairCurrentFocus(next);
   next.entries[index] = swapped;
   next.entries[swapIndex] = entry;
-  return next;
+  return repairCurrentFocus(next);
+}
+
+function moveBefore(
+  store: PriorityStore,
+  mutation: Extract<DeckMutation, { type: "move-before" }>,
+  now: Date,
+): PriorityStore {
+  const next = store;
+  const existingIndex = next.entries.findIndex((entry) => entry.threadId === mutation.threadId);
+  const existing = existingIndex >= 0 ? next.entries[existingIndex] : undefined;
+  if (existingIndex >= 0) next.entries.splice(existingIndex, 1);
+
+  if (mutation.level === null) {
+    if (Object.hasOwn(mutation, "currentThreadId")) next.currentFocusThreadId = mutation.currentThreadId ?? null;
+    return repairCurrentFocus(next);
+  }
+
+  const context = Object.hasOwn(mutation, "context")
+    ? normalizeThreadContext(mutation.context)
+    : existing?.context;
+  const entry = storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), context);
+  const beforeThreadId = mutation.beforeThreadId ?? null;
+  if (beforeThreadId) {
+    const beforeIndex = next.entries.findIndex((candidate) => candidate.threadId === beforeThreadId && candidate.level === mutation.level);
+    if (beforeIndex >= 0) next.entries.splice(beforeIndex, 0, entry);
+    else next.entries.push(entry);
+  } else {
+    let insertAt = next.entries.length;
+    for (let index = next.entries.length - 1; index >= 0; index -= 1) {
+      if (next.entries[index]?.level === mutation.level) {
+        insertAt = index + 1;
+        break;
+      }
+    }
+    next.entries.splice(insertAt, 0, entry);
+  }
+
+  if (Object.hasOwn(mutation, "currentThreadId")) {
+    next.currentFocusThreadId = mutation.currentThreadId ?? null;
+  } else {
+    if (mutation.isCurrent === true) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.isCurrent === false && next.currentFocusThreadId === mutation.threadId) {
+      next.currentFocusThreadId = null;
+    }
+  }
+  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId) {
+    next.currentFocusThreadId = mutation.threadId;
+  }
+  return repairCurrentFocus(next);
+}
+
+function repairCurrentFocus(store: PriorityStore): PriorityStore {
+  if (store.currentFocusThreadId && store.entries.some(
+    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus",
+  )) return store;
+  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+  return store;
 }
 
 export function buildSnapshot(
@@ -136,6 +199,7 @@ export function buildSnapshot(
 
   return {
     generatedAt: new Date().toISOString(),
+    revision: normalized.revision,
     current: focus.find((thread) => thread.isCurrent) ?? null,
     focus,
     important,
@@ -174,6 +238,33 @@ function storedEntry(
 
 function normalizeThreadContext(value: unknown): ThreadContext | undefined {
   return value === "design" || value === "engineering" || value === "life" ? value : undefined;
+}
+
+function normalizeRevision(value: unknown): number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
+function normalizeIdempotency(value: unknown): StoredMutationReceipt[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const receipts: StoredMutationReceipt[] = [];
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const receipt = candidate as Partial<StoredMutationReceipt> & { key?: unknown };
+    const keyHash = isSha256Digest(receipt.keyHash)
+      ? receipt.keyHash.toLowerCase()
+      : typeof receipt.key === "string" && receipt.key.length > 0 && receipt.key.length <= 256
+        ? hashIdempotencyKey(receipt.key)
+        : null;
+    if (!keyHash) continue;
+    if (typeof receipt.fingerprint !== "string" || !/^[a-f0-9]{64}$/iu.test(receipt.fingerprint)) continue;
+    if (typeof receipt.revision !== "number" || !Number.isSafeInteger(receipt.revision) || receipt.revision < 0) continue;
+    if (seen.has(keyHash)) continue;
+    seen.add(keyHash);
+    receipts.push({ keyHash, fingerprint: receipt.fingerprint.toLowerCase(), revision: receipt.revision });
+    if (receipts.length >= DEFAULT_IDEMPOTENCY_LEDGER_LIMIT) break;
+  }
+  return receipts;
 }
 
 function normalizeSourcePreferences(value: unknown): Record<string, boolean> {

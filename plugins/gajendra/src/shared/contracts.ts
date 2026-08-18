@@ -1,5 +1,8 @@
-export const STORE_VERSION = 2 as const;
+export const STORE_VERSION = 3 as const;
+export const MUTATION_PROTOCOL_VERSION = 1 as const;
 export const FOCUS_GUIDE = 5;
+export const DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
+export const DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"] as const;
 
 export type PriorityLevel = "focus" | "important";
 export type ThreadContext = "design" | "engineering" | "life";
@@ -33,6 +36,12 @@ export function runningDeckThreads(snapshot: DeckSnapshot): DeckThread[] {
     .sort((left, right) => right.updatedAt - left.updatedAt);
 }
 
+export function reviewReadyDeckThreads(snapshot: DeckSnapshot): DeckThread[] {
+  return allDeckThreads(snapshot)
+    .filter((thread) => thread.review?.state === "ready" && !isRunningThreadStatus(thread.status))
+    .sort((left, right) => (right.review?.updatedAt ?? 0) - (left.review?.updatedAt ?? 0));
+}
+
 export function normalizeDeckSelection(snapshot: DeckSnapshot): DeckSnapshot {
   const currentId = snapshot.current?.id ?? null;
   const markCurrent = (thread: DeckThread): DeckThread => ({
@@ -55,18 +64,42 @@ export type StoredEntry = {
   context?: ThreadContext;
 };
 
+/** A private receipt for a successfully committed mutation. No provider metadata is retained. */
+export type StoredMutationReceipt = {
+  /** SHA-256 of the caller-supplied idempotency key; raw caller metadata is never persisted. */
+  keyHash: string;
+  fingerprint: string;
+  revision: number;
+};
+
 export type PriorityStore = {
   version: typeof STORE_VERSION;
+  revision: number;
   currentFocusThreadId: string | null;
   entries: StoredEntry[];
   collapsed: Record<PriorityLevel, boolean>;
   sourcePreferences: Record<string, boolean>;
+  idempotency: StoredMutationReceipt[];
 };
 
 export type ResumeCommand = {
   executable: string;
   args: string[];
   cwd?: string;
+};
+
+/**
+ * Live provider evidence that a human-review destination is ready. This metadata is projected
+ * from source adapters and deliberately never enters the persisted priority store.
+ */
+export type ReviewSignal = {
+  state: "ready";
+  kind: "result" | "diff" | "pull-request";
+  updatedAt: number;
+  destination:
+    | { type: "thread"; deepLink: string }
+    | { type: "url"; url: string };
+  providerStatus: string;
 };
 
 export type AgentThread = {
@@ -78,7 +111,10 @@ export type AgentThread = {
   updatedAt: number;
   status: string;
   deepLink: string;
+  /** The source-declared schemes that may be opened for this thread. */
+  allowedDeepLinkSchemes?: string[];
   resumeCommand?: ResumeCommand;
+  review?: ReviewSignal;
 };
 
 export type DeckThread = AgentThread & {
@@ -99,6 +135,7 @@ export type ThreadSourceStatus = {
 
 export type DeckSnapshot = {
   generatedAt: string;
+  revision: number;
   current: DeckThread | null;
   focus: DeckThread[];
   important: DeckThread[];
@@ -127,9 +164,92 @@ export type DeckMutation =
   | { type: "set-level"; threadId: string; level: PriorityLevel | null }
   | { type: "set-current"; threadId: string }
   | { type: "move"; threadId: string; direction: "up" | "down" }
+  | {
+    type: "move-before";
+    threadId: string;
+    level: PriorityLevel | null;
+    /** Omit or use null to append. A non-null target must be in the requested lane. */
+    beforeThreadId?: string | null;
+    /** Omit to retain an existing context; null explicitly clears it. */
+    context?: ThreadContext | null;
+    /** Omit to retain current status; use true/false for an exact undo restoration. */
+    isCurrent?: boolean;
+    /**
+     * Explicit post-mutation NOW selection for exact undo. Null is repaired to the first Focus
+     * thread when one exists; a non-null value must be a post-mutation Focus thread.
+     * When supplied, this takes precedence over the legacy isCurrent compatibility field.
+     */
+    currentThreadId?: string | null;
+  }
   | { type: "set-context"; threadId: string; context: ThreadContext | null }
   | { type: "set-collapsed"; level: PriorityLevel; collapsed: boolean }
   | { type: "set-source-enabled"; sourceId: string; enabled: boolean };
+
+/**
+ * New writers send this envelope. The optional concurrency fields deliberately remain optional so
+ * legacy stdio/native callers can continue to serialize their existing mutation shape.
+ */
+export type DeckMutationRequest = {
+  protocolVersion?: typeof MUTATION_PROTOCOL_VERSION;
+  mutation: DeckMutation;
+  expectedRevision?: number;
+  idempotencyKey?: string;
+};
+
+export type MutationOutcome = "applied" | "replayed" | "conflict" | "rejected";
+
+export type MutationErrorCode =
+  | "stale-revision"
+  | "idempotency-key-reused"
+  | "unknown-thread"
+  | "unknown-source"
+  | "invalid-target"
+  | "store-recovery-required"
+  | "store-busy";
+
+export type DeckMutationResult = {
+  protocolVersion: typeof MUTATION_PROTOCOL_VERSION;
+  outcome: MutationOutcome;
+  revision: number;
+  snapshot: DeckSnapshot;
+  error?: { code: MutationErrorCode; message: string };
+};
+
+export function isDeckMutationResult(value: unknown): value is DeckMutationResult {
+  return Boolean(value
+    && typeof value === "object"
+    && "outcome" in value
+    && "snapshot" in value
+    && "revision" in value);
+}
+
+/**
+ * Do not normalize away whitespace or encoded scheme characters: accepting a rewritten value at
+ * the execution boundary would make source review ambiguous.
+ */
+export function isPermittedDeepLink(value: string, allowedSchemes: readonly string[]): boolean {
+  if (!value || value !== value.trim()) return false;
+  const separator = value.indexOf(":");
+  if (separator <= 0) return false;
+  const rawScheme = value.slice(0, separator);
+  if (!/^[a-z][a-z0-9+.-]*$/iu.test(rawScheme)) return false;
+  let decodedScheme: string;
+  try {
+    decodedScheme = decodeURIComponent(rawScheme);
+  } catch {
+    return false;
+  }
+  if (decodedScheme !== rawScheme) return false;
+  const scheme = rawScheme.toLowerCase();
+  if (["javascript", "data", "file"].includes(scheme)) return false;
+  if (!allowedSchemes.map((candidate) => candidate.toLowerCase()).includes(scheme)) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === `${scheme}:`;
+  } catch {
+    return false;
+  }
+}
 
 export const DEFAULT_SOURCE_PREFERENCES: Record<string, boolean> = {
   codex: true,
@@ -140,8 +260,10 @@ export const DEFAULT_SOURCE_PREFERENCES: Record<string, boolean> = {
 
 export const EMPTY_STORE: PriorityStore = {
   version: STORE_VERSION,
+  revision: 0,
   currentFocusThreadId: null,
   entries: [],
   collapsed: { focus: false, important: false },
   sourcePreferences: { ...DEFAULT_SOURCE_PREFERENCES },
+  idempotency: [],
 };

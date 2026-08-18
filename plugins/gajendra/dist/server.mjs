@@ -15503,11 +15503,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants2);
+          this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -15524,10 +15524,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants2);
+        this.rhs = optimizeExpr(this.rhs, names, constants3);
         return this;
       }
       get names() {
@@ -15588,8 +15588,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants2) {
-        this.code = optimizeExpr(this.code, names, constants2);
+      optimizeNames(names, constants3) {
+        this.code = optimizeExpr(this.code, names, constants3);
         return this;
       }
       get names() {
@@ -15618,12 +15618,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants2))
+          if (n.optimizeNames(names, constants3))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -15676,12 +15676,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a3;
-        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants2);
-        if (!(super.optimizeNames(names, constants2) || this.else))
+        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
+        if (!(super.optimizeNames(names, constants3) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants2);
+        this.condition = optimizeExpr(this.condition, names, constants3);
         return this;
       }
       get names() {
@@ -15704,10 +15704,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants2);
+        this.iteration = optimizeExpr(this.iteration, names, constants3);
         return this;
       }
       get names() {
@@ -15743,10 +15743,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants2) {
-        if (!super.optimizeNames(names, constants2))
+      optimizeNames(names, constants3) {
+        if (!super.optimizeNames(names, constants3))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants2);
+        this.iterable = optimizeExpr(this.iterable, names, constants3);
         return this;
       }
       get names() {
@@ -15788,11 +15788,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants2) {
+      optimizeNames(names, constants3) {
         var _a3, _b;
-        super.optimizeNames(names, constants2);
-        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants2);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants2);
+        super.optimizeNames(names, constants3);
+        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants3);
         return this;
       }
       get names() {
@@ -16093,7 +16093,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants2) {
+    function optimizeExpr(expr, names, constants3) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -16108,14 +16108,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants2[n.str];
+        const c = constants3[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants2[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants3[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -22009,7 +22009,7 @@ var require_dist = __commonJS({
 });
 
 // src/server/index.ts
-import { readFile as readFile3 } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path4 from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31698,8 +31698,11 @@ var StdioServerTransport = class {
 };
 
 // src/shared/contracts.ts
-var STORE_VERSION = 2;
+var STORE_VERSION = 3;
+var MUTATION_PROTOCOL_VERSION = 1;
 var FOCUS_GUIDE = 5;
+var DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
+var DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"];
 var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
   "active",
   "busy",
@@ -31712,6 +31715,29 @@ var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
 function isRunningThreadStatus(status) {
   return RUNNING_STATUS_KEYS.has(status.toLowerCase().replace(/[^a-z]/gu, ""));
 }
+function isPermittedDeepLink(value, allowedSchemes) {
+  if (!value || value !== value.trim()) return false;
+  const separator = value.indexOf(":");
+  if (separator <= 0) return false;
+  const rawScheme = value.slice(0, separator);
+  if (!/^[a-z][a-z0-9+.-]*$/iu.test(rawScheme)) return false;
+  let decodedScheme;
+  try {
+    decodedScheme = decodeURIComponent(rawScheme);
+  } catch {
+    return false;
+  }
+  if (decodedScheme !== rawScheme) return false;
+  const scheme = rawScheme.toLowerCase();
+  if (["javascript", "data", "file"].includes(scheme)) return false;
+  if (!allowedSchemes.map((candidate) => candidate.toLowerCase()).includes(scheme)) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === `${scheme}:`;
+  } catch {
+    return false;
+  }
+}
 var DEFAULT_SOURCE_PREFERENCES = {
   codex: true,
   claude: false,
@@ -31720,11 +31746,25 @@ var DEFAULT_SOURCE_PREFERENCES = {
 };
 var EMPTY_STORE = {
   version: STORE_VERSION,
+  revision: 0,
   currentFocusThreadId: null,
   entries: [],
   collapsed: { focus: false, important: false },
-  sourcePreferences: { ...DEFAULT_SOURCE_PREFERENCES }
+  sourcePreferences: { ...DEFAULT_SOURCE_PREFERENCES },
+  idempotency: []
 };
+
+// src/server/service.ts
+import { createHash as createHash2 } from "node:crypto";
+
+// src/server/idempotency.ts
+import { createHash } from "node:crypto";
+function hashIdempotencyKey(value) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+function isSha256Digest(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/iu.test(value);
+}
 
 // src/server/domain.ts
 function canonicalThreadId(sourceId, threadId) {
@@ -31740,13 +31780,15 @@ function normalizeStore(value) {
   ) ? candidateCurrent : entries.find((entry) => entry.level === "focus")?.threadId ?? null;
   return {
     version: STORE_VERSION,
+    revision: normalizeRevision(candidate.revision),
     currentFocusThreadId: current,
     entries,
     collapsed: {
       focus: Boolean(candidate.collapsed?.focus),
       important: Boolean(candidate.collapsed?.important)
     },
-    sourcePreferences: normalizeSourcePreferences(candidate.sourcePreferences)
+    sourcePreferences: normalizeSourcePreferences(candidate.sourcePreferences),
+    idempotency: normalizeIdempotency(candidate.idempotency)
   };
 }
 function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
@@ -31759,6 +31801,9 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     next.sourcePreferences[mutation.sourceId] = mutation.enabled;
     return next;
   }
+  if (mutation.type === "move-before") {
+    return moveBefore(next, mutation, now);
+  }
   const index = next.entries.findIndex((entry2) => entry2.threadId === mutation.threadId);
   if (mutation.type === "set-context") {
     if (index < 0) return next;
@@ -31766,7 +31811,7 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     if (!entry2) return next;
     if (mutation.context) entry2.context = mutation.context;
     else delete entry2.context;
-    return next;
+    return repairCurrentFocus(next);
   }
   if (mutation.type === "set-level") {
     const existing = index >= 0 ? next.entries[index] : void 0;
@@ -31775,31 +31820,74 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
       next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
     if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
-    if (mutation.level !== "focus" && next.currentFocusThreadId === mutation.threadId) {
-      next.currentFocusThreadId = next.entries.find((entry2) => entry2.level === "focus")?.threadId ?? null;
-    }
-    return next;
+    return repairCurrentFocus(next);
   }
   if (mutation.type === "set-current") {
     const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
     next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
     next.currentFocusThreadId = mutation.threadId;
-    return next;
+    return repairCurrentFocus(next);
   }
-  if (index < 0) return next;
+  if (index < 0) return repairCurrentFocus(next);
   const entry = next.entries[index];
-  if (!entry) return next;
+  if (!entry) return repairCurrentFocus(next);
   const levelIndexes = next.entries.map((candidate, candidateIndex) => ({ candidate, candidateIndex })).filter(({ candidate }) => candidate.level === entry.level).map(({ candidateIndex }) => candidateIndex);
   const position = levelIndexes.indexOf(index);
   const swapPosition = mutation.direction === "up" ? position - 1 : position + 1;
   const swapIndex = levelIndexes[swapPosition];
-  if (swapIndex === void 0) return next;
+  if (swapIndex === void 0) return repairCurrentFocus(next);
   const swapped = next.entries[swapIndex];
-  if (!swapped) return next;
+  if (!swapped) return repairCurrentFocus(next);
   next.entries[index] = swapped;
   next.entries[swapIndex] = entry;
-  return next;
+  return repairCurrentFocus(next);
+}
+function moveBefore(store, mutation, now) {
+  const next = store;
+  const existingIndex = next.entries.findIndex((entry2) => entry2.threadId === mutation.threadId);
+  const existing = existingIndex >= 0 ? next.entries[existingIndex] : void 0;
+  if (existingIndex >= 0) next.entries.splice(existingIndex, 1);
+  if (mutation.level === null) {
+    if (Object.hasOwn(mutation, "currentThreadId")) next.currentFocusThreadId = mutation.currentThreadId ?? null;
+    return repairCurrentFocus(next);
+  }
+  const context = Object.hasOwn(mutation, "context") ? normalizeThreadContext(mutation.context) : existing?.context;
+  const entry = storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), context);
+  const beforeThreadId = mutation.beforeThreadId ?? null;
+  if (beforeThreadId) {
+    const beforeIndex = next.entries.findIndex((candidate) => candidate.threadId === beforeThreadId && candidate.level === mutation.level);
+    if (beforeIndex >= 0) next.entries.splice(beforeIndex, 0, entry);
+    else next.entries.push(entry);
+  } else {
+    let insertAt = next.entries.length;
+    for (let index = next.entries.length - 1; index >= 0; index -= 1) {
+      if (next.entries[index]?.level === mutation.level) {
+        insertAt = index + 1;
+        break;
+      }
+    }
+    next.entries.splice(insertAt, 0, entry);
+  }
+  if (Object.hasOwn(mutation, "currentThreadId")) {
+    next.currentFocusThreadId = mutation.currentThreadId ?? null;
+  } else {
+    if (mutation.isCurrent === true) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.isCurrent === false && next.currentFocusThreadId === mutation.threadId) {
+      next.currentFocusThreadId = null;
+    }
+  }
+  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId) {
+    next.currentFocusThreadId = mutation.threadId;
+  }
+  return repairCurrentFocus(next);
+}
+function repairCurrentFocus(store) {
+  if (store.currentFocusThreadId && store.entries.some(
+    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus"
+  )) return store;
+  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+  return store;
 }
 function buildSnapshot(store, threads, sources, error51 = null) {
   const normalized = normalizeStore(store);
@@ -31819,6 +31907,7 @@ function buildSnapshot(store, threads, sources, error51 = null) {
   const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...thread, level: null, isCurrent: false, context: null }));
   return {
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+    revision: normalized.revision,
     current: focus.find((thread) => thread.isCurrent) ?? null,
     focus,
     important,
@@ -31849,6 +31938,27 @@ function storedEntry(threadId, level, addedAt, context) {
 function normalizeThreadContext(value) {
   return value === "design" || value === "engineering" || value === "life" ? value : void 0;
 }
+function normalizeRevision(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+function normalizeIdempotency(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = /* @__PURE__ */ new Set();
+  const receipts = [];
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const receipt = candidate;
+    const keyHash = isSha256Digest(receipt.keyHash) ? receipt.keyHash.toLowerCase() : typeof receipt.key === "string" && receipt.key.length > 0 && receipt.key.length <= 256 ? hashIdempotencyKey(receipt.key) : null;
+    if (!keyHash) continue;
+    if (typeof receipt.fingerprint !== "string" || !/^[a-f0-9]{64}$/iu.test(receipt.fingerprint)) continue;
+    if (typeof receipt.revision !== "number" || !Number.isSafeInteger(receipt.revision) || receipt.revision < 0) continue;
+    if (seen.has(keyHash)) continue;
+    seen.add(keyHash);
+    receipts.push({ keyHash, fingerprint: receipt.fingerprint.toLowerCase(), revision: receipt.revision });
+    if (receipts.length >= DEFAULT_IDEMPOTENCY_LEDGER_LIMIT) break;
+  }
+  return receipts;
+}
 function normalizeSourcePreferences(value) {
   const preferences = { ...DEFAULT_SOURCE_PREFERENCES };
   if (!value || typeof value !== "object") return preferences;
@@ -31875,51 +31985,418 @@ function isPresent(value) {
 }
 
 // src/server/store.ts
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, open, readdir, rename, rmdir, stat, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+var DEFAULT_MAX_STORE_BYTES = 512 * 1024;
+var DEFAULT_LOCK_TIMEOUT_MS = 5e3;
+var DEFAULT_STALE_LOCK_MS = 3e4;
+var RECOVERY_REQUIRED_MARKER = { recoveryRequired: true };
+var LOCK_OWNER_FILE = "owner.json";
+var LOCK_RECLAIM_FILE = ".reclaiming";
+var MAX_LOCK_RECORD_BYTES = 4 * 1024;
+var StoreRecoveryError = class extends Error {
+  constructor() {
+    super("Gajendra priority state needs recovery. The previous state was preserved privately.");
+    this.name = "StoreRecoveryError";
+  }
+};
+var StoreBusyError = class extends Error {
+  constructor() {
+    super("Gajendra priority state is busy. Refresh and try the change again.");
+    this.name = "StoreBusyError";
+  }
+};
 var GajendraStoreRepository = class {
   filePath;
   legacyFilePaths;
-  constructor(dataDirectory, legacyFilePaths) {
+  backupPath;
+  lockPath;
+  recoveryMarkerPath;
+  maxStoreBytes;
+  lockTimeoutMs;
+  staleLockMs;
+  idempotencyLimit;
+  onStaleLockCandidate;
+  onBeforeLockPublish;
+  onPrimaryWritten;
+  constructor(dataDirectory, legacyFilePaths, options = {}) {
     const usesDefaultDirectory = dataDirectory === void 0;
     const resolvedDirectory = dataDirectory ?? resolveDataDirectory();
     this.filePath = path.join(resolvedDirectory, "gajendra.v2.json");
+    this.backupPath = path.join(resolvedDirectory, "gajendra.v2.last-known-good.json");
+    this.lockPath = path.join(resolvedDirectory, ".gajendra.v2.lock");
+    this.recoveryMarkerPath = path.join(resolvedDirectory, ".gajendra.v2.recovery-required");
     this.legacyFilePaths = legacyFilePaths === void 0 && usesDefaultDirectory ? resolveLegacyStateFiles() : legacyFilePaths ?? [];
+    this.maxStoreBytes = positiveInteger(options.maxStoreBytes, DEFAULT_MAX_STORE_BYTES);
+    this.lockTimeoutMs = positiveInteger(options.lockTimeoutMs, DEFAULT_LOCK_TIMEOUT_MS);
+    this.staleLockMs = Math.max(this.lockTimeoutMs, positiveInteger(options.staleLockMs, DEFAULT_STALE_LOCK_MS));
+    this.idempotencyLimit = positiveInteger(options.idempotencyLimit, DEFAULT_IDEMPOTENCY_LEDGER_LIMIT);
+    this.onStaleLockCandidate = options.onStaleLockCandidate;
+    this.onBeforeLockPublish = options.onBeforeLockPublish;
+    this.onPrimaryWritten = options.onPrimaryWritten;
   }
   async read() {
-    try {
-      return normalizeStore(JSON.parse(await readFile(this.filePath, "utf8")));
-    } catch (error51) {
-      if (isMissing(error51)) return this.readLegacyOrEmpty();
-      throw error51;
-    }
+    return this.withLock(async () => this.readUnsafe());
   }
-  async readLegacyOrEmpty() {
+  async write(store) {
+    await this.withLock(async () => {
+      await this.writeUnsafe(store);
+    });
+  }
+  async transaction(operation) {
+    return this.withLock(async () => {
+      const current = await this.readUnsafe();
+      const transaction = await operation(structuredClone(current));
+      if (transaction.next) await this.writeUnsafe(transaction.next);
+      return transaction.value;
+    });
+  }
+  async readUnsafe() {
+    const primary = await this.readStoredFileUnsafe(this.filePath, "primary");
+    if (await this.hasRecoveryMarkerUnsafe()) return this.resumeRecoveryUnsafe(primary);
+    if (primary.kind === "valid") {
+      if (hasLegacyIdempotencyKey(primary.raw)) await this.writeUnsafe(primary.store);
+      return primary.store;
+    }
+    if (primary.kind === "missing") {
+      if (await this.hasQuarantinedPrimaryUnsafe()) throw new StoreRecoveryError();
+      return this.readLegacyOrEmptyUnsafe();
+    }
+    return this.recoverInvalidPrimaryUnsafe(primary);
+  }
+  async readLegacyOrEmptyUnsafe() {
     for (const legacyFilePath of this.legacyFilePaths) {
-      try {
-        const legacy = normalizeStore(JSON.parse(await readFile(legacyFilePath, "utf8")));
-        await this.write(legacy);
-        return legacy;
-      } catch (error51) {
-        if (!isMissing(error51)) throw error51;
-      }
+      const legacy = await this.readStoredFileUnsafe(legacyFilePath, "legacy");
+      if (legacy.kind === "missing") continue;
+      if (legacy.kind !== "valid") throw new StoreRecoveryError();
+      await this.writeUnsafe(legacy.store);
+      return legacy.store;
     }
     return structuredClone(EMPTY_STORE);
   }
-  async write(store) {
+  async recoverInvalidPrimaryUnsafe(primary) {
+    await this.ensurePrivateDirectory();
+    await this.writeRecoveryMarkerUnsafe();
+    if (primary.kind !== "missing" && primary.kind !== "recovery-marker") await this.quarantinePrimaryUnsafe();
+    return this.restoreLastKnownGoodUnsafe();
+  }
+  /**
+   * A marker is written before recovery mutates the primary. A crash can therefore leave either
+   * a valid replacement primary or only the private LKG. Re-check both on every later read so a
+   * completed restoration is finalized, while an invalid pair remains fail-closed.
+   */
+  async resumeRecoveryUnsafe(primary) {
+    if (primary.kind === "valid") {
+      await unlink(this.recoveryMarkerPath).catch((error51) => {
+        if (!isMissing(error51)) throw error51;
+      });
+      return primary.store;
+    }
+    if (primary.kind !== "missing" && primary.kind !== "recovery-marker") await this.quarantinePrimaryUnsafe();
+    return this.restoreLastKnownGoodUnsafe();
+  }
+  async restoreLastKnownGoodUnsafe() {
+    const backup = await this.readStoredFileUnsafe(this.backupPath, "backup");
+    if (backup.kind !== "valid") {
+      await this.writeRecoveryRequiredPrimaryUnsafe();
+      throw new StoreRecoveryError();
+    }
+    await this.writeMainUnsafe(backup.store);
+    await unlink(this.recoveryMarkerPath).catch((error51) => {
+      if (!isMissing(error51)) throw error51;
+    });
+    return backup.store;
+  }
+  async quarantinePrimaryUnsafe() {
+    const quarantinePath = path.join(
+      path.dirname(this.filePath),
+      `gajendra.v2.corrupt-${Date.now()}-${randomUUID()}.json`
+    );
+    try {
+      await rename(this.filePath, quarantinePath);
+      await chmod(quarantinePath, 384);
+    } catch (error51) {
+      if (!isMissing(error51)) throw new StoreRecoveryError();
+    }
+  }
+  async readStoredFileUnsafe(filePath, purpose) {
+    let raw;
+    try {
+      raw = await this.readBoundedFile(filePath);
+    } catch (error51) {
+      if (isMissing(error51)) return { kind: "missing" };
+      if (error51 instanceof StoreRecoveryError) return { kind: "invalid" };
+      throw error51;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { kind: "invalid" };
+    }
+    if (isRecoveryRequiredMarker(parsed)) return { kind: "recovery-marker" };
+    if (!hasKnownStoreShape(parsed, purpose)) return { kind: "invalid" };
+    return { kind: "valid", raw: parsed, store: normalizeStore(parsed) };
+  }
+  async writeRecoveryMarkerUnsafe() {
+    await this.writePrivateFile(this.recoveryMarkerPath, `${JSON.stringify(RECOVERY_REQUIRED_MARKER)}
+`);
+  }
+  async writeRecoveryRequiredPrimaryUnsafe() {
+    await this.writePrivateFile(this.filePath, `${JSON.stringify(RECOVERY_REQUIRED_MARKER)}
+`);
+  }
+  async hasRecoveryMarkerUnsafe() {
+    try {
+      await stat(this.recoveryMarkerPath);
+      return true;
+    } catch (error51) {
+      if (isMissing(error51)) return false;
+      throw new StoreRecoveryError();
+    }
+  }
+  async hasQuarantinedPrimaryUnsafe() {
+    try {
+      return (await readdir(path.dirname(this.filePath))).some((name) => /^gajendra\.v2\.corrupt-.+\.json$/u.test(name));
+    } catch (error51) {
+      if (isMissing(error51)) return false;
+      throw new StoreRecoveryError();
+    }
+  }
+  async writeUnsafe(store) {
+    const normalized = normalizeStore({
+      ...store,
+      idempotency: store.idempotency.slice(-this.idempotencyLimit)
+    });
+    const contents = `${JSON.stringify(normalized, null, 2)}
+`;
+    if (Buffer.byteLength(contents) > this.maxStoreBytes) throw new StoreRecoveryError();
+    await this.ensurePrivateDirectory();
+    await this.writeMainUnsafe(normalized, contents);
+    await this.onPrimaryWritten?.();
+    await this.writePrivateFile(this.backupPath, contents);
+  }
+  async writeMainUnsafe(store, contents) {
+    const serialized = contents ?? `${JSON.stringify(normalizeStore(store), null, 2)}
+`;
+    if (Buffer.byteLength(serialized) > this.maxStoreBytes) throw new StoreRecoveryError();
+    await this.writePrivateFile(this.filePath, serialized);
+  }
+  async writePrivateFile(destination, contents) {
+    const directory = path.dirname(destination);
+    const temporaryPath = path.join(directory, `.gajendra.${randomUUID()}.tmp`);
+    await writeFile(temporaryPath, contents, { encoding: "utf8", mode: 384 });
+    await chmod(temporaryPath, 384);
+    await rename(temporaryPath, destination);
+    await chmod(destination, 384);
+  }
+  async readBoundedFile(filePath) {
+    const handle = await open(filePath, "r");
+    try {
+      const metadata = await handle.stat();
+      if (!metadata.isFile()) throw new StoreRecoveryError();
+      const buffer = Buffer.alloc(this.maxStoreBytes + 1);
+      let offset = 0;
+      while (offset < buffer.length) {
+        const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, offset);
+        if (bytesRead === 0) break;
+        offset += bytesRead;
+      }
+      if (offset > this.maxStoreBytes) throw new StoreRecoveryError();
+      return buffer.subarray(0, offset).toString("utf8");
+    } finally {
+      await handle.close();
+    }
+  }
+  async withLock(operation) {
+    await this.ensurePrivateDirectory();
+    const deadline = Date.now() + this.lockTimeoutMs;
+    let owner = null;
+    while (!owner) {
+      owner = await this.tryAcquireLockUnsafe();
+      if (owner) break;
+      await this.recoverStaleLockUnsafe();
+      if (Date.now() >= deadline) throw new StoreBusyError();
+      await delay(12 + Math.floor(Math.random() * 18));
+    }
+    try {
+      return await operation();
+    } finally {
+      await this.releaseLockUnsafe(owner);
+    }
+  }
+  /**
+   * The lock is a directory instead of a replaceable file. A stale cleaner first claims a file
+   * *inside that directory*, then revalidates the owner token. A new owner cannot acquire until
+   * the old directory is removed, and a cleaner which raced a replacement sees a different token
+   * and only drops its own claim. This closes the file rename/unlink TOCTOU from the old lock.
+   */
+  async tryAcquireLockUnsafe() {
+    const owner = { token: randomUUID(), pid: process.pid, createdAt: Date.now() };
+    const candidatePath = this.lockCandidatePath(owner);
+    let candidateCreated = false;
+    let published = false;
+    try {
+      try {
+        await mkdir(candidatePath, { mode: 448 });
+        candidateCreated = true;
+      } catch (error51) {
+        if (isExists(error51)) return null;
+        throw error51;
+      }
+      await chmod(candidatePath, 448);
+      await this.onBeforeLockPublish?.();
+      await this.writeLockRecordUnsafe(path.join(candidatePath, LOCK_OWNER_FILE), owner);
+      try {
+        await rename(candidatePath, this.lockPath);
+      } catch (error51) {
+        if (isExists(error51) || isNotEmpty(error51)) return null;
+        throw error51;
+      }
+      published = true;
+      return owner;
+    } finally {
+      if (candidateCreated && !published) await this.discardLockCandidateUnsafe(candidatePath);
+    }
+  }
+  async releaseLockUnsafe(owner) {
+    const deadline = Date.now() + this.lockTimeoutMs;
+    for (; ; ) {
+      const current = await this.readLockRecordUnsafe(this.lockOwnerPath());
+      if (!sameLockOwner(current, owner)) return;
+      if (await this.reclaimGuardBlocksUnsafe()) {
+        if (Date.now() >= deadline) return;
+        await delay(8);
+        continue;
+      }
+      if (!sameLockOwner(await this.readLockRecordUnsafe(this.lockOwnerPath()), owner)) return;
+      try {
+        await unlink(this.lockOwnerPath());
+        await rmdir(this.lockPath);
+        return;
+      } catch (error51) {
+        if (isMissing(error51)) return;
+        if (isNotEmpty(error51) && Date.now() < deadline) {
+          await delay(8);
+          continue;
+        }
+        if (isNotEmpty(error51)) return;
+        throw error51;
+      }
+    }
+  }
+  async recoverStaleLockUnsafe() {
+    let metadata;
+    try {
+      metadata = await stat(this.lockPath);
+    } catch (error51) {
+      if (isMissing(error51)) return;
+      throw error51;
+    }
+    if (!metadata.isDirectory()) return;
+    if (await this.reclaimGuardBlocksUnsafe()) return;
+    if (Date.now() - metadata.mtimeMs < this.staleLockMs) return;
+    const candidate = await this.readLockRecordUnsafe(this.lockOwnerPath());
+    if (candidate && isProcessAlive(candidate.pid)) return;
+    await this.onStaleLockCandidate?.(this.lockPath);
+    const claim = { token: randomUUID(), pid: process.pid, createdAt: Date.now() };
+    let claimed = false;
+    try {
+      await this.writeLockRecordUnsafe(this.lockReclaimPath(), claim);
+      claimed = true;
+    } catch (error51) {
+      if (isMissing(error51) || isExists(error51)) return;
+      throw error51;
+    }
+    try {
+      const owner = await this.readLockRecordUnsafe(this.lockOwnerPath());
+      if (!sameLockIdentity(owner, candidate) || owner && isProcessAlive(owner.pid)) return;
+      await unlink(this.lockOwnerPath()).catch((error51) => {
+        if (!isMissing(error51)) throw error51;
+      });
+      await unlink(this.lockReclaimPath());
+      claimed = false;
+      await rmdir(this.lockPath).catch((error51) => {
+        if (!isMissing(error51) && !isNotEmpty(error51)) throw error51;
+      });
+    } finally {
+      if (claimed) {
+        await unlink(this.lockReclaimPath()).catch((error51) => {
+          if (!isMissing(error51)) throw error51;
+        });
+      }
+    }
+  }
+  async reclaimGuardBlocksUnsafe() {
+    let metadata;
+    try {
+      metadata = await stat(this.lockReclaimPath());
+    } catch (error51) {
+      if (isMissing(error51)) return false;
+      throw error51;
+    }
+    const guard = await this.readLockRecordUnsafe(this.lockReclaimPath());
+    if (Date.now() - metadata.mtimeMs < this.staleLockMs || guard && isProcessAlive(guard.pid)) return true;
+    await unlink(this.lockReclaimPath()).catch((error51) => {
+      if (!isMissing(error51)) throw error51;
+    });
+    return false;
+  }
+  lockOwnerPath() {
+    return path.join(this.lockPath, LOCK_OWNER_FILE);
+  }
+  lockReclaimPath() {
+    return path.join(this.lockPath, LOCK_RECLAIM_FILE);
+  }
+  lockCandidatePath(owner) {
+    return `${this.lockPath}.candidate-${owner.token}`;
+  }
+  async discardLockCandidateUnsafe(candidatePath) {
+    await unlink(path.join(candidatePath, LOCK_OWNER_FILE)).catch((error51) => {
+      if (!isMissing(error51)) throw error51;
+    });
+    await rmdir(candidatePath).catch((error51) => {
+      if (!isMissing(error51) && !isNotEmpty(error51)) throw error51;
+    });
+  }
+  async writeLockRecordUnsafe(destination, record2) {
+    const handle = await open(destination, "wx", 384);
+    try {
+      await handle.writeFile(`${JSON.stringify(record2)}
+`);
+    } finally {
+      await handle.close();
+    }
+    await chmod(destination, 384);
+  }
+  async readLockRecordUnsafe(filePath) {
+    let handle;
+    try {
+      handle = await open(filePath, "r");
+    } catch (error51) {
+      if (isMissing(error51)) return null;
+      throw error51;
+    }
+    try {
+      const metadata = await handle.stat();
+      if (!metadata.isFile() || metadata.size > MAX_LOCK_RECORD_BYTES) return null;
+      const buffer = Buffer.alloc(metadata.size);
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0);
+      const raw = buffer.subarray(0, bytesRead).toString("utf8");
+      const parsed = JSON.parse(raw);
+      return isLockOwner(parsed) ? parsed : null;
+    } catch {
+      return null;
+    } finally {
+      await handle.close();
+    }
+  }
+  async ensurePrivateDirectory() {
     const directory = path.dirname(this.filePath);
     await mkdir(directory, { recursive: true, mode: 448 });
     await chmod(directory, 448);
-    const temporaryPath = path.join(directory, `.gajendra.${randomUUID()}.tmp`);
-    await writeFile(temporaryPath, `${JSON.stringify(normalizeStore(store), null, 2)}
-`, {
-      encoding: "utf8",
-      mode: 384
-    });
-    await rename(temporaryPath, this.filePath);
-    await chmod(this.filePath, 384);
   }
 };
 function resolveDataDirectory(env = process.env) {
@@ -31930,6 +32407,7 @@ function resolveDataDirectory(env = process.env) {
   return path.join(configHome, "gajendra");
 }
 function resolveLegacyStateFiles(env = process.env) {
+  if (env.GAJENDRA_DATA_DIR) return [];
   if (env.PLUGIN_DATA && !env.GAJENDRA_DATA_DIR) {
     return ["gajendra.v1.json", "aadi.v1.json", "priority-deck.v1.json"].map((file2) => path.join(path.resolve(env.PLUGIN_DATA), file2));
   }
@@ -31942,108 +32420,345 @@ function resolveLegacyStateFiles(env = process.env) {
   if (env.PRIORITY_DECK_DATA_DIR) candidates.unshift(path.join(path.resolve(env.PRIORITY_DECK_DATA_DIR), "priority-deck.v1.json"));
   return candidates;
 }
+function positiveInteger(value, fallback) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+function delay(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error51) {
+    return !(error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ESRCH");
+  }
+}
 function isMissing(error51) {
   return Boolean(error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ENOENT");
 }
+function isExists(error51) {
+  return Boolean(error51 && typeof error51 === "object" && "code" in error51 && error51.code === "EEXIST");
+}
+function isNotEmpty(error51) {
+  return Boolean(error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ENOTEMPTY");
+}
+function isRecoveryRequiredMarker(value) {
+  return Boolean(value && typeof value === "object" && "recoveryRequired" in value && value.recoveryRequired === true);
+}
+function hasLegacyIdempotencyKey(value) {
+  if (!value || typeof value !== "object" || !("idempotency" in value) || !Array.isArray(value.idempotency)) return false;
+  return value.idempotency.some((receipt) => receipt && typeof receipt === "object" && Object.hasOwn(receipt, "key"));
+}
+function hasKnownStoreShape(value, purpose) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value;
+  const version2 = candidate.version;
+  if (version2 !== 1 && version2 !== 2 && version2 !== 3) return false;
+  if (purpose === "backup" && version2 !== 3) return false;
+  if (typeof candidate.currentFocusThreadId !== "string" && candidate.currentFocusThreadId !== null) return false;
+  if (!Array.isArray(candidate.entries) || !candidate.entries.every(isStrictStoredEntry)) return false;
+  const entryIds = candidate.entries.map((entry) => entry.threadId);
+  if (new Set(entryIds).size !== entryIds.length) return false;
+  if (!isCollapsedShape(candidate.collapsed)) return false;
+  if (version2 >= 2 && !isSourcePreferencesShape(candidate.sourcePreferences)) return false;
+  if (version2 === 3) {
+    if (!isRevision(candidate.revision) || !Array.isArray(candidate.idempotency) || !candidate.idempotency.every(isStrictReceipt)) return false;
+  }
+  return true;
+}
+function isStrictStoredEntry(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value;
+  return typeof entry.threadId === "string" && entry.threadId.length > 0 && (entry.level === "focus" || entry.level === "important") && typeof entry.addedAt === "string" && (entry.context === void 0 || entry.context === "design" || entry.context === "engineering" || entry.context === "life");
+}
+function isCollapsedShape(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && value.focus !== void 0 && value.important !== void 0 && typeof value.focus === "boolean" && typeof value.important === "boolean");
+}
+function isSourcePreferencesShape(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.entries(value).every(([sourceId, enabled]) => sourceId.trim().length > 0 && typeof enabled === "boolean"));
+}
+function isStrictReceipt(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value;
+  const validKey = typeof receipt.keyHash === "string" && /^[a-f0-9]{64}$/iu.test(receipt.keyHash) || typeof receipt.key === "string" && receipt.key.length > 0 && receipt.key.length <= 256;
+  return validKey && typeof receipt.fingerprint === "string" && /^[a-f0-9]{64}$/iu.test(receipt.fingerprint) && isRevision(receipt.revision);
+}
+function isRevision(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+function isLockOwner(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value;
+  return typeof candidate.token === "string" && candidate.token.length > 0 && typeof candidate.pid === "number" && Number.isSafeInteger(candidate.pid) && candidate.pid > 0 && typeof candidate.createdAt === "number" && Number.isFinite(candidate.createdAt);
+}
+function sameLockOwner(left, right) {
+  return left !== null && right !== null && left.token === right.token;
+}
+function sameLockIdentity(left, right) {
+  return left?.token === right?.token;
+}
 
 // src/server/thread-sources.ts
-import { constants } from "node:fs";
-import { access, open as open2, readdir, readFile as readFile2, stat as stat2 } from "node:fs/promises";
+import { constants as constants2 } from "node:fs";
+import { access, open as open3, opendir, stat as stat2 } from "node:fs/promises";
 import { spawn as spawn2 } from "node:child_process";
 import os3 from "node:os";
 import path3 from "node:path";
 
 // src/server/codex-app-server.ts
 import { spawn } from "node:child_process";
-import { open, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open as open2, realpath } from "node:fs/promises";
 import os2 from "node:os";
 import path2 from "node:path";
-import { createInterface } from "node:readline";
 var MAX_ROLLOUT_TAIL_BYTES = 256 * 1024;
 var LSOF_TIMEOUT_MS = 2e3;
+var LSOF_KILL_GRACE_MS = 250;
+var LSOF_CLOSE_GRACE_MS = LSOF_KILL_GRACE_MS;
+var MAX_LSOF_OUTPUT_BYTES = 512 * 1024;
+var CODEX_APP_SERVER_KILL_GRACE_MS = LSOF_KILL_GRACE_MS;
+var CODEX_APP_SERVER_CLOSE_GRACE_MS = LSOF_CLOSE_GRACE_MS;
+var DEFAULT_CODEX_APP_SERVER_MAX_LINE_BYTES = 512 * 1024;
+var MAX_CODEX_APP_SERVER_MAX_LINE_BYTES = 1024 * 1024;
+var MAX_CODEX_THREAD_PAGES = 20;
+var MAX_CODEX_THREAD_ROWS = 2e3;
+var MAX_CODEX_THREAD_LIST_DURATION_MS = 2e4;
+var DEFAULT_CODEX_ENRICHMENT_CONCURRENCY = 4;
+var MAX_CODEX_ENRICHMENT_CONCURRENCY = 8;
+var DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS = 5e3;
+var MAX_CODEX_ENRICHMENT_DEADLINE_MS = 1e4;
 var CodexAppServerClient = class {
   constructor(requestTimeoutMs = resolveRpcTimeout(), env = process.env) {
     this.requestTimeoutMs = requestTimeoutMs;
     this.env = env;
+    this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
   process = null;
+  lifecycle = null;
+  teardown = null;
+  closeEpoch = 0;
+  terminallyClosed = false;
   nextId = 1;
+  stdoutCleanup = null;
+  stdoutLineLimit;
   pending = /* @__PURE__ */ new Map();
   ready = null;
-  stderrTail = "";
   async listThreads() {
     await this.ensureReady();
-    const all = [];
-    let cursor = null;
-    const seenCursors = /* @__PURE__ */ new Set();
-    do {
-      const response = await this.request("thread/list", {
-        cursor,
-        limit: 100,
-        sortKey: "recency_at",
-        sortDirection: "desc",
-        archived: false
-      });
-      all.push(...response.data ?? []);
-      const next = response.nextCursor ?? null;
-      if (next && seenCursors.has(next)) throw new Error("Codex app-server repeated a pagination cursor.");
-      if (next) seenCursors.add(next);
-      cursor = next;
-    } while (cursor);
-    return enrichCodexRuntimeStatuses(all, this.env);
+    const threads = await listBoundedCodexThreads(async (params) => this.request("thread/list", params));
+    return enrichCodexRuntimeStatuses(threads, this.env);
   }
   async close() {
-    const active = this.process;
-    this.process = null;
-    this.ready = null;
-    if (!active || active.killed) return;
-    active.kill("SIGTERM");
+    this.terminallyClosed = true;
+    this.closeEpoch += 1;
+    const lifecycle = this.lifecycle;
+    if (lifecycle) {
+      await this.shutdownAppServer(lifecycle, new Error("Codex app-server was closed."));
+      return;
+    }
+    if (this.teardown) await this.teardown;
   }
   ensureReady() {
+    if (this.terminallyClosed) return Promise.reject(new Error("Codex app-server client is closed."));
     if (this.ready) return this.ready;
-    this.ready = this.start();
-    return this.ready;
+    const epoch = this.closeEpoch;
+    const starting = this.teardown ? this.teardown.then(() => this.start(epoch)) : this.start(epoch);
+    this.ready = starting;
+    void starting.catch(() => {
+      if (this.ready === starting) this.ready = null;
+    });
+    return starting;
   }
-  async start() {
-    const executable = process.env.GAJENDRA_CODEX_BIN || process.env.AADI_CODEX_BIN || process.env.PRIORITY_DECK_CODEX_BIN || "codex";
+  async start(epoch) {
+    if (this.terminallyClosed || epoch !== this.closeEpoch) {
+      throw new Error("Codex app-server client is closed.");
+    }
+    const executable = this.env.GAJENDRA_CODEX_BIN || this.env.AADI_CODEX_BIN || this.env.PRIORITY_DECK_CODEX_BIN || "codex";
     const child = spawn(executable, ["app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
-      env: process.env
+      env: this.env,
+      // On POSIX the app-server and inherited-pipe descendants share an isolated process group.
+      detached: supportsProcessGroupSignals()
     });
+    const lifecycle = this.createAppServerLifecycle(child);
     this.process = child;
+    this.lifecycle = lifecycle;
     child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk) => {
-      this.stderrTail = `${this.stderrTail}${chunk}`.slice(-2e3);
-    });
+    child.stderr.on("data", () => void 0);
     child.once("exit", (code, signal) => {
-      const detail = this.stderrTail.trim();
-      const error51 = new Error(
-        `Codex app-server exited (${signal ?? code ?? "unknown"})${detail ? `: ${detail}` : ""}`
-      );
-      for (const pending of this.pending.values()) {
-        clearTimeout(pending.timeout);
-        pending.reject(error51);
-      }
-      this.pending.clear();
-      if (this.process === child) {
-        this.process = null;
-        this.ready = null;
-      }
+      this.handleAppServerExit(lifecycle, code, signal);
     });
     child.once("error", (error51) => {
-      for (const pending of this.pending.values()) {
-        clearTimeout(pending.timeout);
-        pending.reject(error51);
-      }
-      this.pending.clear();
+      this.handleAppServerError(lifecycle, error51);
     });
-    const lines = createInterface({ input: child.stdout });
-    lines.on("line", (line) => this.acceptLine(line));
+    child.once("close", () => this.handleAppServerClose(lifecycle));
+    this.attachStdoutFraming(child);
     await this.request("initialize", {
-      clientInfo: { name: "gajendra", title: "Gaja, Elephant Focus for AI Power Users", version: "0.3.1" },
+      clientInfo: { name: "gajendra", title: "Gajendra", version: "0.3.1" },
       capabilities: null
     });
     this.notify("initialized", {});
+  }
+  /**
+   * Do not use readline here: it retains a complete line before emitting it, so a provider that
+   * never writes a newline can make the renderer retain arbitrary stdout. This parser holds at
+   * most one configured JSON-RPC frame and rejects before concatenating an oversize segment.
+   */
+  attachStdoutFraming(child) {
+    let buffered = Buffer.alloc(0);
+    let open4 = true;
+    const discard = () => {
+      if (!open4) return;
+      open4 = false;
+      child.stdout.off("data", onStdout);
+      child.stdout.resume();
+      if (this.stdoutCleanup === discard) this.stdoutCleanup = null;
+    };
+    const onStdout = (value) => {
+      if (!open4) return;
+      const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      let start = 0;
+      while (start < chunk.length) {
+        const newline = chunk.indexOf(10, start);
+        const end = newline === -1 ? chunk.length : newline;
+        const segment = chunk.subarray(start, end);
+        if (buffered.length + segment.length > this.stdoutLineLimit) {
+          discard();
+          this.failProtocolOutput(child);
+          return;
+        }
+        if (newline === -1) {
+          if (segment.length > 0) buffered = buffered.length === 0 ? Buffer.from(segment) : Buffer.concat([buffered, segment]);
+          return;
+        }
+        const line = buffered.length === 0 ? segment.toString("utf8") : Buffer.concat([buffered, segment]).toString("utf8");
+        buffered = Buffer.alloc(0);
+        this.acceptLine(line.endsWith("\r") ? line.slice(0, -1) : line);
+        start = newline + 1;
+      }
+    };
+    this.stdoutCleanup?.();
+    this.stdoutCleanup = discard;
+    child.stdout.on("data", onStdout);
+  }
+  failProtocolOutput(child) {
+    const lifecycle = this.lifecycle;
+    if (!lifecycle || lifecycle.child !== child) return;
+    const error51 = new Error("Codex app-server protocol output exceeded the safe limit.");
+    void this.shutdownAppServer(lifecycle, error51);
+  }
+  createAppServerLifecycle(child) {
+    let resolveClosed = null;
+    const closed = new Promise((resolve) => {
+      resolveClosed = resolve;
+    });
+    return {
+      child,
+      closed,
+      resolveClosed: () => resolveClosed?.(),
+      closing: false,
+      finished: false,
+      exited: false,
+      terminationError: null,
+      killTimer: null,
+      closeTimer: null,
+      postKillCloseTimer: null
+    };
+  }
+  shutdownAppServer(lifecycle, error51) {
+    if (lifecycle.closing) return lifecycle.closed;
+    lifecycle.closing = true;
+    lifecycle.terminationError = error51;
+    if (this.process === lifecycle.child) {
+      this.process = null;
+      this.ready = null;
+    }
+    this.stdoutCleanup?.();
+    this.stdoutCleanup = null;
+    this.rejectPending(error51);
+    this.teardown = lifecycle.closed;
+    void lifecycle.closed.then(() => {
+      if (this.teardown === lifecycle.closed) this.teardown = null;
+    });
+    signalProcessGroup(lifecycle.child, "SIGTERM");
+    if (lifecycle.exited) {
+      this.startAppServerCloseWatchdog(lifecycle);
+    } else {
+      lifecycle.killTimer = setTimeout(() => {
+        if (lifecycle.finished) return;
+        lifecycle.killTimer = null;
+        signalProcessGroup(lifecycle.child, "SIGKILL");
+        this.startAppServerCloseWatchdog(lifecycle);
+      }, CODEX_APP_SERVER_KILL_GRACE_MS);
+      lifecycle.killTimer.unref();
+    }
+    return lifecycle.closed;
+  }
+  handleAppServerExit(lifecycle, code, signal) {
+    lifecycle.exited = true;
+    if (lifecycle.killTimer) clearTimeout(lifecycle.killTimer);
+    lifecycle.killTimer = null;
+    if (!lifecycle.closing) {
+      void this.shutdownAppServer(lifecycle, new Error(`Codex app-server exited (${signal ?? code ?? "unknown"}).`));
+      return;
+    }
+    this.startAppServerCloseWatchdog(lifecycle);
+  }
+  handleAppServerError(lifecycle, error51) {
+    if (!lifecycle.closing) {
+      void this.shutdownAppServer(lifecycle, error51);
+      return;
+    }
+    this.startAppServerCloseWatchdog(lifecycle);
+  }
+  handleAppServerClose(lifecycle) {
+    if (!lifecycle.closing) {
+      lifecycle.closing = true;
+      lifecycle.terminationError = new Error("Codex app-server closed unexpectedly.");
+      if (this.process === lifecycle.child) {
+        this.process = null;
+        this.ready = null;
+      }
+      this.stdoutCleanup?.();
+      this.stdoutCleanup = null;
+      this.rejectPending(lifecycle.terminationError);
+    }
+    this.finishAppServerLifecycle(lifecycle);
+  }
+  startAppServerCloseWatchdog(lifecycle) {
+    if (lifecycle.finished || lifecycle.closeTimer || lifecycle.postKillCloseTimer) return;
+    lifecycle.closeTimer = setTimeout(() => {
+      lifecycle.closeTimer = null;
+      signalProcessGroup(lifecycle.child, "SIGKILL");
+      lifecycle.postKillCloseTimer = setTimeout(() => {
+        lifecycle.postKillCloseTimer = null;
+        destroyAppServerPipes(lifecycle.child);
+        this.finishAppServerLifecycle(lifecycle);
+      }, CODEX_APP_SERVER_KILL_GRACE_MS);
+      lifecycle.postKillCloseTimer.unref();
+    }, CODEX_APP_SERVER_CLOSE_GRACE_MS);
+    lifecycle.closeTimer.unref();
+  }
+  finishAppServerLifecycle(lifecycle) {
+    if (lifecycle.finished) return;
+    lifecycle.finished = true;
+    if (lifecycle.killTimer) clearTimeout(lifecycle.killTimer);
+    if (lifecycle.closeTimer) clearTimeout(lifecycle.closeTimer);
+    if (lifecycle.postKillCloseTimer) clearTimeout(lifecycle.postKillCloseTimer);
+    lifecycle.killTimer = null;
+    lifecycle.closeTimer = null;
+    lifecycle.postKillCloseTimer = null;
+    if (this.lifecycle === lifecycle) this.lifecycle = null;
+    if (this.process === lifecycle.child) this.process = null;
+    lifecycle.resolveClosed();
+  }
+  rejectPending(error51) {
+    for (const pending of this.pending.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(error51);
+    }
+    this.pending.clear();
   }
   acceptLine(line) {
     if (!line.trim()) return;
@@ -32089,30 +32804,104 @@ var CodexAppServerClient = class {
 `);
   }
 };
-async function enrichCodexRuntimeStatuses(threads, env = process.env) {
+async function listBoundedCodexThreads(request, bounds = {}) {
+  const maxPages = positiveBound(bounds.maxPages, MAX_CODEX_THREAD_PAGES);
+  const maxRows = positiveBound(bounds.maxRows, MAX_CODEX_THREAD_ROWS);
+  const deadlineMs = positiveBound(bounds.deadlineMs, MAX_CODEX_THREAD_LIST_DURATION_MS);
+  const now = bounds.now ?? Date.now;
+  const startedAt = now();
+  const all = [];
+  const seenCursors = /* @__PURE__ */ new Set();
+  let cursor = null;
+  let pages = 0;
+  for (; ; ) {
+    if (pages >= maxPages) throw new Error("Codex app-server exceeded the safe page limit.");
+    const remainingMs = deadlineMs - (now() - startedAt);
+    if (remainingMs <= 0) throw new Error("Codex app-server exceeded the total listing deadline.");
+    const response = await beforeDeadline(request({
+      cursor,
+      limit: Math.min(100, maxRows - all.length),
+      sortKey: "recency_at",
+      sortDirection: "desc",
+      archived: false
+    }), remainingMs);
+    pages += 1;
+    const rows = response.data ?? [];
+    if (rows.length > maxRows - all.length) throw new Error("Codex app-server exceeded the safe row limit.");
+    all.push(...rows);
+    if (now() - startedAt > deadlineMs) throw new Error("Codex app-server exceeded the total listing deadline.");
+    const next = response.nextCursor ?? null;
+    if (!next) return all;
+    if (all.length >= maxRows) throw new Error("Codex app-server exceeded the safe row limit.");
+    if (seenCursors.has(next)) throw new Error("Codex app-server repeated a pagination cursor.");
+    seenCursors.add(next);
+    cursor = next;
+  }
+}
+async function enrichCodexRuntimeStatuses(threads, env = process.env, options = {}) {
+  if (!isCodexActivityEnrichmentEnabled(env)) return threads;
   if (threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
+  const deadlineMs = boundedPositive(
+    options.deadlineMs ?? environmentInteger(env.GAJENDRA_CODEX_ENRICHMENT_DEADLINE_MS),
+    DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS,
+    MAX_CODEX_ENRICHMENT_DEADLINE_MS
+  );
+  const maxConcurrency = boundedPositive(
+    options.maxConcurrency ?? environmentInteger(env.GAJENDRA_CODEX_ENRICHMENT_CONCURRENCY),
+    DEFAULT_CODEX_ENRICHMENT_CONCURRENCY,
+    MAX_CODEX_ENRICHMENT_CONCURRENCY
+  );
+  const deadline = Date.now() + deadlineMs;
   const codexHome = path2.resolve(env.CODEX_HOME ?? path2.join(os2.homedir(), ".codex"));
   const lockDirectory = path2.join(codexHome, "thread-writer-locks");
+  const sessionsDirectory = path2.join(codexHome, "sessions");
   let heldThreadIds;
+  let realSessionsDirectory;
   try {
-    heldThreadIds = heldCodexThreadIds(await listOpenFiles(lockDirectory, env), lockDirectory);
+    heldThreadIds = heldCodexThreadIds(await beforeDeadline(
+      (options.listOpenFiles ?? listOpenFiles)(lockDirectory, env),
+      remainingDeadlineMs(deadline),
+      "Codex runtime enrichment exceeded its total deadline."
+    ), lockDirectory);
+    realSessionsDirectory = await beforeDeadline(
+      (options.resolveSessionsDirectory ?? realpath)(sessionsDirectory),
+      remainingDeadlineMs(deadline),
+      "Codex runtime enrichment exceeded its total deadline."
+    );
   } catch {
     return threads;
   }
   if (heldThreadIds.size === 0) return threads;
-  const activeThreadIds = /* @__PURE__ */ new Set();
-  await Promise.all(threads.map(async (thread) => {
-    if (codexStatusType(thread.status) === "active") {
-      activeThreadIds.add(thread.id);
-      return;
+  const activeThreadIds = new Set(threads.filter((thread) => codexStatusType(thread.status) === "active").map((thread) => thread.id));
+  const candidates = threads.filter((thread) => codexStatusType(thread.status) !== "active" && heldThreadIds.has(thread.id) && Boolean(thread.path));
+  let nextCandidate = 0;
+  let timedOut = false;
+  const readTail = options.readTail ?? readContainedRolloutTail;
+  const worker = async () => {
+    for (; ; ) {
+      if (timedOut || Date.now() >= deadline) {
+        timedOut = true;
+        return;
+      }
+      const thread = candidates[nextCandidate++];
+      if (!thread?.path) return;
+      try {
+        const tail = await beforeDeadline(
+          readTail(thread.path, realSessionsDirectory),
+          remainingDeadlineMs(deadline),
+          "Codex runtime enrichment exceeded its total deadline."
+        );
+        if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) activeThreadIds.add(thread.id);
+      } catch (error51) {
+        if (error51 instanceof DeadlineExceededError) {
+          timedOut = true;
+          return;
+        }
+      }
     }
-    if (!heldThreadIds.has(thread.id) || !thread.path || !isCodexRolloutPath(thread.path, codexHome)) return;
-    try {
-      const tail = await readRolloutTail(thread.path);
-      if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) activeThreadIds.add(thread.id);
-    } catch {
-    }
-  }));
+  };
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
+  if (timedOut || Date.now() >= deadline) return threads;
   return threads.map((thread) => activeThreadIds.has(thread.id) ? { ...thread, status: { type: "active" } } : thread);
 }
 function heldCodexThreadIds(output, lockDirectory) {
@@ -32141,73 +32930,232 @@ function rolloutTailShowsActiveTurn(tail, truncated = false) {
     }
     if (event.type === "event_msg" && event.payload?.type === "task_complete") return false;
     if (event.type === "session_meta") return false;
-    if (event.type === "turn_context" || event.type === "response_item" || event.type === "event_msg" || event.type === "inter_agent_communication_metadata") {
-      return true;
-    }
+    if (event.type === "turn_context") return true;
+    if (event.type === "event_msg" && isAllowedActivityMarker(event.payload?.type)) return true;
   }
   return false;
+}
+function isCodexActivityEnrichmentEnabled(env = process.env) {
+  const value = env.GAJENDRA_CODEX_ACTIVITY_ENRICHMENT;
+  return value === void 0 || !["0", "false", "off", "no"].includes(value.trim().toLowerCase());
+}
+function isAllowedActivityMarker(value) {
+  return value === "token_count" || value === "turn_started" || value === "turn_in_progress";
 }
 function codexStatusType(status) {
   return typeof status === "string" ? status : status?.type ?? "unknown";
 }
-function isCodexRolloutPath(filePath, codexHome) {
-  const resolved = path2.resolve(filePath);
-  const sessions = `${path2.join(codexHome, "sessions")}${path2.sep}`;
-  return resolved.startsWith(sessions) && resolved.endsWith(".jsonl");
-}
-async function readRolloutTail(filePath) {
-  const fileStat = await stat(filePath);
-  const length = Math.min(fileStat.size, MAX_ROLLOUT_TAIL_BYTES);
-  const truncated = fileStat.size > length;
-  const buffer = Buffer.alloc(length);
-  const file2 = await open(filePath, "r");
+async function readContainedRolloutTail(filePath, realSessionsDirectory) {
+  const resolvedFilePath = await realpath(filePath);
+  const containedRoot = `${realSessionsDirectory}${path2.sep}`;
+  if (!resolvedFilePath.startsWith(containedRoot) || !resolvedFilePath.endsWith(".jsonl")) {
+    throw new Error("Codex rollout path is outside the sessions directory.");
+  }
+  const file2 = await open2(resolvedFilePath, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
-    await file2.read(buffer, 0, length, fileStat.size - length);
-    return { text: buffer.toString("utf8"), truncated };
+    const metadata = await file2.stat();
+    if (!metadata.isFile()) throw new Error("Codex rollout is not a regular file.");
+    const length = Math.min(metadata.size, MAX_ROLLOUT_TAIL_BYTES);
+    const truncated = metadata.size > length;
+    const buffer = Buffer.alloc(length);
+    let offset = 0;
+    const position = metadata.size - length;
+    while (offset < buffer.length) {
+      const { bytesRead } = await file2.read(buffer, offset, buffer.length - offset, position + offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    return { text: buffer.subarray(0, offset).toString("utf8"), truncated };
   } finally {
     await file2.close();
   }
 }
-function listOpenFiles(lockDirectory, env) {
+function listOpenFiles(lockDirectory, env, options = {}) {
   const executable = env.GAJENDRA_LSOF_BIN ?? "/usr/sbin/lsof";
+  const timeoutMs = positiveBound(options.timeoutMs, LSOF_TIMEOUT_MS);
+  const killGraceMs = positiveBound(options.killGraceMs, LSOF_KILL_GRACE_MS);
+  const closeGraceMs = positiveBound(options.closeGraceMs, LSOF_CLOSE_GRACE_MS);
+  const outputLimitBytes = positiveBound(options.outputLimitBytes, MAX_LSOF_OUTPUT_BYTES);
   return new Promise((resolve, reject) => {
     const child = spawn(executable, ["-Fn", "+D", lockDirectory], {
       stdio: ["ignore", "pipe", "pipe"],
-      env
+      env,
+      // Keep lsof and descendants which inherit its pipes in an isolated POSIX process group.
+      detached: supportsProcessGroupSignals()
     });
-    let stdout = "";
-    let stderr = "";
+    const chunks = [];
+    let capturedBytes = 0;
+    let captureOpen = true;
     let settled = false;
+    let exited = false;
+    let terminationError = null;
+    let timeout = null;
+    let killTimer = null;
+    let closeTimer = null;
+    let postKillCloseTimer = null;
+    let onStdout = () => void 0;
+    const clearTimers = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      if (closeTimer) clearTimeout(closeTimer);
+      closeTimer = null;
+      if (postKillCloseTimer) clearTimeout(postKillCloseTimer);
+      postKillCloseTimer = null;
+    };
     const finish = (error51, value = "") => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
+      clearTimers();
+      stopCapture();
       if (error51) reject(error51);
       else resolve(value);
     };
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish(new Error(`lsof timed out after ${LSOF_TIMEOUT_MS}ms.`));
-    }, LSOF_TIMEOUT_MS);
+    const stopCapture = () => {
+      if (!captureOpen) return;
+      captureOpen = false;
+      child.stdout.off("data", onStdout);
+      child.stdout.resume();
+      child.stderr.resume();
+    };
+    const terminate = (error51) => {
+      if (settled || terminationError) return;
+      terminationError = error51;
+      stopCapture();
+      signalProcessGroup(child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        if (exited) return;
+        signalProcessGroup(child, "SIGKILL");
+      }, killGraceMs);
+      killTimer.unref();
+    };
+    const startCloseWatchdog = () => {
+      if (settled || closeTimer) return;
+      closeTimer = setTimeout(() => {
+        const error51 = terminationError ?? new Error("lsof did not close its output streams.");
+        terminationError = error51;
+        signalProcessGroup(child, "SIGKILL");
+        closeTimer = null;
+        postKillCloseTimer = setTimeout(() => {
+          stopCapture();
+          destroyLocalPipes(child);
+          finish(error51);
+        }, killGraceMs);
+        postKillCloseTimer.unref();
+      }, closeGraceMs);
+      closeTimer.unref();
+    };
+    timeout = setTimeout(() => {
+      terminate(new Error(`lsof timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
     timeout.unref();
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      stdout = `${stdout}${chunk}`.slice(-512 * 1024);
+    onStdout = (chunk) => {
+      if (!captureOpen) return;
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      if (bytes.length > outputLimitBytes - capturedBytes) {
+        terminate(new Error("lsof exceeded the safe output limit."));
+        return;
+      }
+      chunks.push(bytes);
+      capturedBytes += bytes.length;
+    };
+    child.stdout.on("data", onStdout);
+    child.stderr.on("data", () => void 0);
+    child.once("error", (error51) => {
+      if (!terminationError) terminationError = error51;
+      clearTimers();
+      startCloseWatchdog();
     });
-    child.stderr.on("data", (chunk) => {
-      stderr = `${stderr}${chunk}`.slice(-2e3);
+    child.once("exit", () => {
+      exited = true;
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      signalProcessGroup(child, "SIGTERM");
+      startCloseWatchdog();
     });
-    child.once("error", (error51) => finish(error51));
-    child.once("exit", (code) => {
-      if (code === 0 || code === 1) finish(null, stdout);
-      else finish(new Error(stderr.trim() || `lsof exited with status ${code ?? "unknown"}.`));
+    child.once("close", (code) => {
+      if (terminationError) {
+        finish(terminationError);
+      } else if (code === 0 || code === 1) {
+        finish(null, Buffer.concat(chunks, capturedBytes).toString("utf8"));
+      } else {
+        finish(new Error(`lsof exited with status ${code ?? "unknown"}.`));
+      }
     });
   });
 }
 function resolveRpcTimeout(env = process.env) {
   const configured = Number(env.GAJENDRA_RPC_TIMEOUT_MS ?? env.AADI_RPC_TIMEOUT_MS ?? env.PRIORITY_DECK_RPC_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0 ? configured : 15e3;
+}
+function resolveCodexAppServerStdoutLineLimit(env = process.env) {
+  return boundedPositive(
+    environmentInteger(env.GAJENDRA_CODEX_APP_SERVER_MAX_LINE_BYTES),
+    DEFAULT_CODEX_APP_SERVER_MAX_LINE_BYTES,
+    MAX_CODEX_APP_SERVER_MAX_LINE_BYTES
+  );
+}
+function positiveBound(value, fallback) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+function supportsProcessGroupSignals() {
+  return process.platform !== "win32";
+}
+function signalProcessGroup(child, signal) {
+  if (supportsProcessGroupSignals() && child.pid !== void 0) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+  }
+}
+function destroyLocalPipes(child) {
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+function destroyAppServerPipes(child) {
+  child.stdin.destroy();
+  child.stdout.destroy();
+  child.stderr.destroy();
+}
+function boundedPositive(value, fallback, maximum) {
+  return Math.min(positiveBound(value, fallback), maximum);
+}
+function environmentInteger(value) {
+  if (value === void 0) return void 0;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : void 0;
+}
+function remainingDeadlineMs(deadline) {
+  return Math.max(1, deadline - Date.now());
+}
+var DeadlineExceededError = class extends Error {
+};
+function beforeDeadline(operation, timeoutMs, message = "Codex app-server exceeded the total listing deadline.") {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new DeadlineExceededError(message)), timeoutMs);
+    timeout.unref();
+    void operation.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error51) => {
+        clearTimeout(timeout);
+        reject(error51);
+      }
+    );
+  });
 }
 
 // src/server/thread-sources.ts
@@ -32216,12 +33164,22 @@ var MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 var MAX_GROK_METADATA_BYTES = 128 * 1024;
 var MAX_CATALOG_BYTES = 2 * 1024 * 1024;
 var MAX_CURSOR_OUTPUT_BYTES = 2 * 1024 * 1024;
+var CURSOR_LIST_TIMEOUT_MS = 1e4;
+var PROCESS_KILL_GRACE_MS = 250;
+var PROCESS_CLOSE_GRACE_MS = PROCESS_KILL_GRACE_MS;
+var DEFAULT_MAX_SOURCES_CONFIG_BYTES = 128 * 1024;
+var MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES = 2 * 1024 * 1024;
+var MAX_DISCOVERY_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE * 10;
+var DEFAULT_SOURCE_COLLECTION_CONCURRENCY = 4;
+var MAX_SOURCE_COLLECTION_CONCURRENCY = 8;
 var ThreadSourceRegistry = class {
   constructor(codex = new CodexAppServerClient(), env = process.env) {
     this.env = env;
     this.codex = codex;
+    this.sourceCollectionConcurrency = boundedSourceConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
   codex;
+  sourceCollectionConcurrency;
   async collect(preferences) {
     const configured = await loadConfiguredSources(this.env);
     const adapters = [
@@ -32231,23 +33189,7 @@ var ThreadSourceRegistry = class {
       new GrokThreadSource(this.env),
       ...configured.adapters
     ];
-    const outcomes = await Promise.all(adapters.map(async (adapter) => {
-      const enabled2 = preferences[adapter.id] ?? adapter.enabledByDefault;
-      if (!enabled2) return {
-        threads: [],
-        status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads.")
-      };
-      try {
-        const threads2 = selectSourceThreads(await adapter.listThreads());
-        return { threads: threads2, status: statusFor(adapter, "ready", true, threads2.length, null) };
-      } catch (error52) {
-        const state = error52 instanceof SourceUnavailableError ? error52.state : "error";
-        return {
-          threads: [],
-          status: statusFor(adapter, state, true, 0, readableError(error52))
-        };
-      }
-    }));
+    const outcomes = await collectSourceAdapters(adapters, preferences, this.sourceCollectionConcurrency);
     const sources = outcomes.map(({ status }) => status);
     if (configured.issue) {
       sources.push({
@@ -32269,6 +33211,40 @@ var ThreadSourceRegistry = class {
     return this.codex.close();
   }
 };
+async function collectSourceAdapters(adapters, preferences, maxConcurrency = DEFAULT_SOURCE_COLLECTION_CONCURRENCY) {
+  const concurrency = Math.min(boundedSourceConcurrency(maxConcurrency), adapters.length);
+  const outcomes = new Array(adapters.length);
+  let nextAdapter = 0;
+  const worker = async () => {
+    for (; ; ) {
+      const index = nextAdapter++;
+      const adapter = adapters[index];
+      if (!adapter) return;
+      outcomes[index] = await collectSourceAdapter(adapter, preferences);
+    }
+  };
+  await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  return outcomes;
+}
+async function collectSourceAdapter(adapter, preferences) {
+  const enabled = preferences[adapter.id] ?? adapter.enabledByDefault;
+  if (!enabled) {
+    return {
+      threads: [],
+      status: statusFor(adapter, "disabled", false, 0, "Enable this source to include its threads.")
+    };
+  }
+  try {
+    const threads = selectSourceThreads(await adapter.listThreads());
+    return { threads, status: statusFor(adapter, "ready", true, threads.length, null) };
+  } catch (error51) {
+    const state = error51 instanceof SourceUnavailableError ? error51.state : "error";
+    return {
+      threads: [],
+      status: statusFor(adapter, state, true, 0, readableError(error51))
+    };
+  }
+}
 var CodexThreadSource = class {
   constructor(client) {
     this.client = client;
@@ -32340,24 +33316,45 @@ var GrokThreadSource = class {
   }
 };
 var CatalogThreadSource = class {
-  constructor(id, name, catalogPath, enabled) {
+  constructor(id, name, catalogPath, enabled, deepLinkSchemes) {
     this.id = id;
     this.name = name;
     this.catalogPath = catalogPath;
+    this.deepLinkSchemes = deepLinkSchemes;
     this.enabledByDefault = enabled;
   }
   kind = "configured";
   enabledByDefault;
   async listThreads() {
-    const catalogStat = await stat2(this.catalogPath).catch((error51) => {
-      if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", `Catalog not found: ${this.catalogPath}`);
+    let rawCatalog;
+    try {
+      rawCatalog = await readBoundedRegularFile(this.catalogPath, MAX_CATALOG_BYTES);
+    } catch (error51) {
+      if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", "Configured agent catalog is not available.");
       throw error51;
-    });
-    if (catalogStat.size > MAX_CATALOG_BYTES) throw new Error(`Catalog exceeds ${MAX_CATALOG_BYTES} bytes.`);
-    const catalog = threadCatalogSchema.parse(JSON.parse(await readFile2(this.catalogPath, "utf8")));
+    }
+    const catalog = threadCatalogSchema.parse(JSON.parse(rawCatalog));
     return catalog.threads.map((thread) => {
+      if (thread.deepLink && !isPermittedDeepLink(thread.deepLink, this.deepLinkSchemes)) {
+        throw new Error("Configured agent catalog contains a disallowed deep link.");
+      }
+      const reviewDestination = thread.review ? thread.review.destination.type === "thread" ? thread.review.destination.deepLink : thread.review.destination.url : null;
+      if (reviewDestination && !isPermittedDeepLink(reviewDestination, this.deepLinkSchemes)) {
+        throw new Error("Configured agent catalog contains a disallowed review destination.");
+      }
       const id = canonicalThreadId(this.id, thread.id);
       const resumeCommand = thread.resumeCommand ? normalizeResumeCommand(thread.resumeCommand) : void 0;
+      const review = thread.review ? {
+        state: "ready",
+        kind: thread.review.kind,
+        updatedAt: normalizeTimestamp(thread.review.updatedAt),
+        destination: thread.review.destination,
+        providerStatus: thread.review.providerStatus
+      } : void 0;
+      const allowedDeepLinkSchemes = [.../* @__PURE__ */ new Set([
+        ...thread.deepLink ? this.deepLinkSchemes : ["gajendra"],
+        ...review ? this.deepLinkSchemes : []
+      ])];
       return {
         id,
         sourceId: this.id,
@@ -32367,7 +33364,9 @@ var CatalogThreadSource = class {
         updatedAt: normalizeTimestamp(thread.updatedAt),
         status: cleanTitle(thread.status) || "unknown",
         deepLink: thread.deepLink || (resumeCommand ? gajendraThreadLink(id) : ""),
-        ...resumeCommand ? { resumeCommand } : {}
+        allowedDeepLinkSchemes,
+        ...resumeCommand ? { resumeCommand } : {},
+        ...review ? { review } : {}
       };
     });
   }
@@ -32394,15 +33393,19 @@ function parseCursorSessionList(output, executable = "cursor-agent") {
       updatedAt: parseTimestampFromText(line),
       status: "resumable",
       deepLink: gajendraThreadLink(canonicalId),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: [`--resume=${id}`] }
     });
   }
   return rows;
 }
-async function recentClaudeSessionFiles(projectsDirectory) {
+async function recentClaudeSessionFiles(projectsDirectory, options = {}) {
+  const candidateLimit = positiveCandidateLimit(options.candidateLimit);
+  const measurement = options.measurement;
+  const directoryBudget = { remaining: positiveDirectoryEntryLimit(options.directoryEntryLimit) };
   let projects;
   try {
-    projects = await readdir(projectsDirectory, { withFileTypes: true });
+    projects = await boundedDirectoryEntries(projectsDirectory, directoryBudget);
   } catch (error51) {
     if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", "Claude Code has no local session directory yet.");
     throw error51;
@@ -32411,36 +33414,51 @@ async function recentClaudeSessionFiles(projectsDirectory) {
   for (const project of projects) {
     if (!project.isDirectory()) continue;
     const directory = path3.join(projectsDirectory, project.name);
-    for (const entry of await readdir(directory, { withFileTypes: true })) {
+    if (measurement) measurement.directoriesRead += 1;
+    for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
+      if (measurement) measurement.candidateFiles += 1;
+      if (files.length >= candidateLimit) {
+        throw new Error("Claude Code has too many session files to inspect safely.");
+      }
       const filePath = path3.join(directory, entry.name);
       const fileStat = await stat2(filePath);
+      if (measurement) measurement.metadataStats += 1;
       files.push({ path: filePath, modifiedAt: fileStat.mtimeMs });
     }
   }
   return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((file2) => file2.path);
 }
-async function recentGrokSummaryFiles(sessionsDirectory) {
+async function recentGrokSummaryFiles(sessionsDirectory, options = {}) {
+  const candidateLimit = positiveCandidateLimit(options.candidateLimit);
+  const measurement = options.measurement;
+  const directoryBudget = { remaining: positiveDirectoryEntryLimit(options.directoryEntryLimit) };
   let workspaces;
   try {
-    workspaces = await readdir(sessionsDirectory, { withFileTypes: true });
+    workspaces = await boundedDirectoryEntries(sessionsDirectory, directoryBudget);
   } catch (error51) {
     if (isMissing2(error51)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
     throw error51;
   }
-  const workspaceDirectories = await Promise.all(workspaces.filter((entry) => entry.isDirectory()).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map(async (entry) => {
-    const directory = path3.join(sessionsDirectory, entry.name);
-    const directoryStat = await stat2(directory);
-    return { directory, modifiedAt: directoryStat.mtimeMs };
-  }));
   const summaries = [];
-  for (const workspace of workspaceDirectories.sort((left, right) => right.modifiedAt - left.modifiedAt)) {
-    for (const entry of await readdir(workspace.directory, { withFileTypes: true })) {
+  for (const workspace of workspaces) {
+    if (!workspace.isDirectory()) continue;
+    const directory = path3.join(sessionsDirectory, workspace.name);
+    if (measurement) measurement.directoriesRead += 1;
+    for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isDirectory()) continue;
-      const summaryPath = path3.join(workspace.directory, entry.name, "summary.json");
+      const summaryPath = path3.join(directory, entry.name, "summary.json");
       try {
         const summaryStat = await stat2(summaryPath);
-        if (summaryStat.isFile()) summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
+        if (!summaryStat.isFile()) continue;
+        if (measurement) {
+          measurement.candidateFiles += 1;
+          measurement.metadataStats += 1;
+        }
+        if (summaries.length >= candidateLimit) {
+          throw new Error("Grok Build has too many session summaries to inspect safely.");
+        }
+        summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
       } catch (error51) {
         if (!isMissing2(error51)) throw error51;
       }
@@ -32450,7 +33468,7 @@ async function recentGrokSummaryFiles(sessionsDirectory) {
 }
 async function readClaudeThreadMetadata(filePath, executable) {
   const fileStat = await stat2(filePath);
-  const file2 = await open2(filePath, "r");
+  const file2 = await open3(filePath, "r");
   try {
     const length = Math.min(fileStat.size, MAX_CLAUDE_METADATA_BYTES);
     const buffer = Buffer.alloc(length);
@@ -32485,18 +33503,19 @@ async function readClaudeThreadMetadata(filePath, executable) {
       updatedAt: timestamp,
       status: "resumable",
       deepLink: gajendraThreadLink(id),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: ["--resume", sessionId], ...cwd ? { cwd } : {} }
     };
   } finally {
     await file2.close();
   }
 }
-async function readGrokThreadMetadata(filePath, executable) {
-  const fileStat = await stat2(filePath);
-  if (fileStat.size > MAX_GROK_METADATA_BYTES) return null;
+async function readGrokThreadMetadata(filePath, executable, options = {}) {
+  const summary = await readBoundedGrokSummary(filePath, options.onOpened);
+  if (!summary) return null;
   let value;
   try {
-    value = JSON.parse(await readFile2(filePath, "utf8"));
+    value = JSON.parse(summary.contents);
   } catch {
     return null;
   }
@@ -32513,11 +33532,31 @@ async function readGrokThreadMetadata(filePath, executable) {
     sourceName: "Grok Build",
     title: cleanTitle(generatedTitle || sessionSummary) || `Grok session ${sessionId.slice(0, 8)}`,
     project: cleanProject(cwd),
-    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || fileStat.mtimeMs / 1e3,
+    updatedAt: normalizeTimestamp(value.last_active_at ?? value.updated_at) || summary.modifiedAt / 1e3,
     status: "resumable",
     deepLink: gajendraThreadLink(id),
+    allowedDeepLinkSchemes: ["gajendra"],
     resumeCommand: { executable, args: ["--resume", sessionId], ...cwd ? { cwd } : {} }
   };
+}
+async function readBoundedGrokSummary(filePath, onOpened) {
+  const file2 = await open3(filePath, constants2.O_RDONLY | constants2.O_NOFOLLOW);
+  try {
+    const metadata = await file2.stat();
+    if (!metadata.isFile() || metadata.size > MAX_GROK_METADATA_BYTES) return null;
+    await onOpened?.();
+    const buffer = Buffer.alloc(MAX_GROK_METADATA_BYTES + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await file2.read(buffer, offset, buffer.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > MAX_GROK_METADATA_BYTES) return null;
+    return { contents: buffer.subarray(0, offset).toString("utf8"), modifiedAt: metadata.mtimeMs };
+  } finally {
+    await file2.close();
+  }
 }
 function codexThread(thread) {
   const id = canonicalThreadId("codex", thread.id);
@@ -32529,7 +33568,8 @@ function codexThread(thread) {
     project: cleanProject(thread.cwd),
     updatedAt: thread.recencyAt ?? thread.updatedAt ?? 0,
     status: typeof thread.status === "string" ? thread.status : thread.status?.type ?? "unknown",
-    deepLink: `codex://threads/${encodeURIComponent(thread.id)}`
+    deepLink: `codex://threads/${encodeURIComponent(thread.id)}`,
+    allowedDeepLinkSchemes: ["codex"]
   };
 }
 function parseCursorJson(output, executable) {
@@ -32556,6 +33596,7 @@ function parseCursorJson(output, executable) {
       updatedAt: normalizeTimestamp(row.updatedAt ?? row.createdAt),
       status: cleanTitle(typeof row.status === "string" ? row.status : "resumable") || "resumable",
       deepLink: gajendraThreadLink(id),
+      allowedDeepLinkSchemes: ["gajendra"],
       resumeCommand: { executable, args: [`--resume=${threadId}`], ...typeof row.cwd === "string" ? { cwd: row.cwd } : {} }
     }];
   });
@@ -32564,9 +33605,9 @@ async function loadConfiguredSources(env) {
   const configPath = resolveSourcesConfigPath(env);
   let raw;
   try {
-    raw = await readFile2(configPath, "utf8");
+    raw = await readBoundedSourcesConfig(configPath, sourcesConfigByteLimit(env));
   } catch (error51) {
-    return isMissing2(error51) ? { adapters: [], issue: null } : { adapters: [], issue: readableError(error51) };
+    return isMissing2(error51) ? { adapters: [], issue: null } : { adapters: [], issue: "Configured source configuration is unavailable." };
   }
   try {
     const config2 = sourcesConfigSchema.parse(JSON.parse(raw));
@@ -32574,12 +33615,44 @@ async function loadConfiguredSources(env) {
       source.id,
       source.name,
       expandHome(source.catalog),
-      source.enabled
+      source.enabled,
+      source.deepLinkSchemes ?? [...DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES]
     ));
     return { adapters, issue: null };
   } catch (error51) {
-    return { adapters: [], issue: `Invalid source configuration at ${configPath}: ${readableError(error51)}` };
+    return { adapters: [], issue: "Configured source configuration is invalid." };
   }
+}
+async function readBoundedSourcesConfig(configPath, maxBytes) {
+  return readBoundedRegularFile(configPath, maxBytes);
+}
+async function readBoundedRegularFile(filePath, maxBytes) {
+  const file2 = await open3(filePath, "r");
+  try {
+    const metadata = await file2.stat();
+    if (!metadata.isFile()) throw new Error("Configured source metadata is unavailable.");
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let offset = 0;
+    while (offset < buffer.length) {
+      const { bytesRead } = await file2.read(buffer, offset, buffer.length - offset, offset);
+      if (bytesRead === 0) break;
+      offset += bytesRead;
+    }
+    if (offset > maxBytes) throw new Error("Configured source metadata exceeds its limit.");
+    return buffer.subarray(0, offset).toString("utf8");
+  } finally {
+    await file2.close();
+  }
+}
+function sourcesConfigByteLimit(env) {
+  const requested = Number(env.GAJENDRA_SOURCES_CONFIG_MAX_BYTES);
+  if (!Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MAX_SOURCES_CONFIG_BYTES;
+  return Math.min(requested, MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES);
+}
+function boundedSourceConcurrency(value) {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) return DEFAULT_SOURCE_COLLECTION_CONCURRENCY;
+  return Math.min(parsed, MAX_SOURCE_COLLECTION_CONCURRENCY);
 }
 function resolveSourcesConfigPath(env = process.env) {
   if (env.GAJENDRA_SOURCES_CONFIG) return path3.resolve(env.GAJENDRA_SOURCES_CONFIG);
@@ -32594,7 +33667,7 @@ async function resolveExecutable(explicit, candidates) {
   const paths = explicit ? [path3.resolve(explicit), ...candidates] : candidates;
   for (const candidate of paths) {
     try {
-      await access(candidate, constants.X_OK);
+      await access(candidate, constants2.X_OK);
       return candidate;
     } catch {
       continue;
@@ -32602,40 +33675,150 @@ async function resolveExecutable(explicit, candidates) {
   }
   return null;
 }
-function collectProcessOutput(executable, args, env) {
+function collectProcessOutput(executable, args, env, options = {}) {
+  const outputLimitBytes = positiveProcessBound(options.outputLimitBytes, MAX_CURSOR_OUTPUT_BYTES);
+  const timeoutMs = positiveProcessBound(options.timeoutMs, CURSOR_LIST_TIMEOUT_MS);
+  const killGraceMs = positiveProcessBound(options.killGraceMs, PROCESS_KILL_GRACE_MS);
+  const closeGraceMs = positiveProcessBound(options.closeGraceMs, PROCESS_CLOSE_GRACE_MS);
   return new Promise((resolve, reject) => {
-    const child = spawn2(executable, args, { stdio: ["ignore", "pipe", "pipe"], env });
-    let stdout = "";
-    let stderr = "";
-    const timeout = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`${path3.basename(executable)} ${args.join(" ")} timed out.`));
-    }, 1e4);
+    const child = spawn2(executable, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env,
+      // On POSIX this gives the provider and every inherited-pipe descendant its own process
+      // group, so a timeout cannot leave a grandchild holding stdout/stderr open forever.
+      detached: supportsProcessGroupSignals2()
+    });
+    const chunks = [];
+    let capturedBytes = 0;
+    let captureOpen = true;
+    let settled = false;
+    let exited = false;
+    let terminationError = null;
+    let timeout = null;
+    let killTimer = null;
+    let closeTimer = null;
+    let postKillCloseTimer = null;
+    let onStdout = () => void 0;
+    const clearTimers = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = null;
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      if (closeTimer) clearTimeout(closeTimer);
+      closeTimer = null;
+      if (postKillCloseTimer) clearTimeout(postKillCloseTimer);
+      postKillCloseTimer = null;
+    };
+    const stopCapture = () => {
+      if (!captureOpen) return;
+      captureOpen = false;
+      child.stdout.off("data", onStdout);
+      child.stdout.resume();
+      child.stderr.resume();
+    };
+    const settle = (error51, value = "") => {
+      if (settled) return;
+      settled = true;
+      clearTimers();
+      stopCapture();
+      if (error51) reject(error51);
+      else resolve(value);
+    };
+    const terminate = (error51) => {
+      if (settled || terminationError) return;
+      terminationError = error51;
+      stopCapture();
+      signalProcessGroup2(child, "SIGTERM");
+      killTimer = setTimeout(() => {
+        if (exited) return;
+        signalProcessGroup2(child, "SIGKILL");
+      }, killGraceMs);
+      killTimer.unref();
+    };
+    const startCloseWatchdog = () => {
+      if (settled || closeTimer) return;
+      closeTimer = setTimeout(() => {
+        const error51 = terminationError ?? new Error("Cursor session listing did not close its output streams.");
+        terminationError = error51;
+        signalProcessGroup2(child, "SIGKILL");
+        closeTimer = null;
+        postKillCloseTimer = setTimeout(() => {
+          stopCapture();
+          destroyLocalPipes2(child);
+          settle(error51);
+        }, killGraceMs);
+        postKillCloseTimer.unref();
+      }, closeGraceMs);
+      closeTimer.unref();
+    };
+    onStdout = (chunk) => {
+      if (!captureOpen) return;
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      const remaining = outputLimitBytes - capturedBytes;
+      if (bytes.length > remaining) {
+        if (remaining > 0) {
+          chunks.push(bytes.subarray(0, remaining));
+          capturedBytes += remaining;
+        }
+        terminate(new Error("Cursor session catalog exceeded the output limit."));
+        return;
+      }
+      chunks.push(bytes);
+      capturedBytes += bytes.length;
+    };
+    timeout = setTimeout(() => terminate(new Error("Cursor session listing timed out.")), timeoutMs);
     timeout.unref();
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk;
-      if (Buffer.byteLength(stdout) > MAX_CURSOR_OUTPUT_BYTES) child.kill("SIGTERM");
-    });
-    child.stderr.on("data", (chunk) => {
-      stderr = `${stderr}${chunk}`.slice(-2e3);
-    });
+    child.stdout.on("data", onStdout);
+    child.stderr.on("data", () => void 0);
     child.once("error", (error51) => {
-      clearTimeout(timeout);
-      reject(error51);
+      if (!terminationError) terminationError = error51;
+      clearTimers();
+      startCloseWatchdog();
     });
-    child.once("exit", (code, signal) => {
-      clearTimeout(timeout);
-      if (Buffer.byteLength(stdout) > MAX_CURSOR_OUTPUT_BYTES) {
-        reject(new Error("Cursor session catalog exceeded the output limit."));
+    child.once("exit", () => {
+      exited = true;
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      if (killTimer) clearTimeout(killTimer);
+      killTimer = null;
+      signalProcessGroup2(child, "SIGTERM");
+      startCloseWatchdog();
+    });
+    child.once("close", (code, signal) => {
+      if (terminationError) {
+        settle(terminationError);
       } else if (code === 0) {
-        resolve(stdout);
+        settle(null, Buffer.concat(chunks, capturedBytes).toString("utf8"));
       } else {
-        reject(new Error(`Cursor session listing failed (${signal ?? code ?? "unknown"})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
+        settle(new Error(`Cursor session listing failed (${signal ?? code ?? "unknown"}).`));
       }
     });
   });
+}
+function positiveProcessBound(value, fallback) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : fallback;
+}
+function supportsProcessGroupSignals2() {
+  return process.platform !== "win32";
+}
+function signalProcessGroup2(child, signal) {
+  if (supportsProcessGroupSignals2() && child.pid !== void 0) {
+    try {
+      process.kill(-child.pid, signal);
+      return;
+    } catch {
+    }
+  }
+  try {
+    child.kill(signal);
+  } catch {
+  }
+}
+function destroyLocalPipes2(child) {
+  child.stdout.destroy();
+  child.stderr.destroy();
 }
 function cleanTitle(value) {
   if (!value) return "";
@@ -32680,11 +33863,13 @@ function deduplicate(threads) {
 function selectSourceThreads(threads) {
   const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
   const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
-  const background = ordered.filter((thread) => !isRunningThreadStatus(thread.status)).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
-  return [...running, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
+  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state === "ready");
+  const background = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready").slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
+  return [...running, ...reviewReady, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 function readableError(error51) {
-  return error51 instanceof Error ? error51.message : "Thread source failed.";
+  if (error51 instanceof SourceUnavailableError) return error51.message;
+  return "Thread source could not be read. Review its local setup and try again.";
 }
 function isMissing2(error51) {
   return Boolean(error51 && typeof error51 === "object" && "code" in error51 && error51.code === "ENOENT");
@@ -32703,6 +33888,29 @@ var resumeCommandSchema = external_exports.object({
   args: external_exports.array(external_exports.string()).max(24).default([]),
   cwd: external_exports.string().min(1).optional()
 });
+var reviewDestinationSchema = external_exports.discriminatedUnion("type", [
+  external_exports.object({
+    type: external_exports.literal("thread"),
+    deepLink: external_exports.string().min(1).max(2048).url()
+  }).strict(),
+  external_exports.object({
+    type: external_exports.literal("url"),
+    url: external_exports.string().min(1).max(2048).url()
+  }).strict()
+]);
+var reviewSignalSchema = external_exports.object({
+  state: external_exports.literal("ready"),
+  kind: external_exports.enum(["result", "diff", "pull-request"]),
+  updatedAt: external_exports.union([external_exports.number().positive().finite(), external_exports.string().min(1)]).refine(
+    (value) => normalizeTimestamp(value) > 0,
+    "Review updatedAt must be a valid timestamp."
+  ),
+  destination: reviewDestinationSchema,
+  providerStatus: external_exports.string().min(1).max(80).refine(
+    (value) => cleanTitle(value) === value,
+    "Review providerStatus must be one bounded line."
+  )
+}).strict();
 var catalogThreadSchema = external_exports.object({
   id: external_exports.string().min(1).max(300),
   title: external_exports.string().max(500),
@@ -32710,7 +33918,8 @@ var catalogThreadSchema = external_exports.object({
   updatedAt: external_exports.union([external_exports.number(), external_exports.string()]).optional(),
   status: external_exports.string().max(80).default("unknown"),
   deepLink: external_exports.string().url().optional(),
-  resumeCommand: resumeCommandSchema.optional()
+  resumeCommand: resumeCommandSchema.optional(),
+  review: reviewSignalSchema.optional()
 }).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
   message: "A configured thread must declare deepLink or resumeCommand."
 });
@@ -32718,63 +33927,352 @@ var threadCatalogSchema = external_exports.object({
   version: external_exports.literal(1),
   threads: external_exports.array(catalogThreadSchema).max(2e3)
 });
+var RESERVED_SOURCE_IDS = /* @__PURE__ */ new Set(["codex", "claude", "cursor", "grok", "configured-sources"]);
+var configuredSourceSchema = external_exports.object({
+  id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,48}$/u),
+  name: external_exports.string().min(1).max(80),
+  catalog: external_exports.string().min(1),
+  enabled: external_exports.boolean().default(true),
+  deepLinkSchemes: external_exports.array(external_exports.string().regex(/^[a-z][a-z0-9+.-]{0,31}$/iu).refine(
+    (scheme) => !["javascript", "data", "file"].includes(scheme.toLowerCase()),
+    "Unsafe deep-link scheme."
+  )).min(1).max(8).optional()
+});
 var sourcesConfigSchema = external_exports.object({
   version: external_exports.literal(1),
-  sources: external_exports.array(external_exports.object({
-    id: external_exports.string().regex(/^[a-z0-9][a-z0-9-]{0,48}$/u),
-    name: external_exports.string().min(1).max(80),
-    catalog: external_exports.string().min(1),
-    enabled: external_exports.boolean().default(true)
-  })).max(32)
+  sources: external_exports.array(configuredSourceSchema).max(32)
+}).superRefine((config2, context) => {
+  const seen = /* @__PURE__ */ new Set();
+  config2.sources.forEach((source, index) => {
+    if (RESERVED_SOURCE_IDS.has(source.id)) {
+      context.addIssue({ code: external_exports.ZodIssueCode.custom, path: ["sources", index, "id"], message: "Configured source ID is reserved." });
+    }
+    if (seen.has(source.id)) {
+      context.addIssue({ code: external_exports.ZodIssueCode.custom, path: ["sources", index, "id"], message: "Configured source IDs must be unique." });
+    }
+    seen.add(source.id);
+  });
 });
+function positiveCandidateLimit(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : MAX_DISCOVERY_CANDIDATES;
+}
+function positiveDirectoryEntryLimit(value) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : MAX_DISCOVERY_CANDIDATES;
+}
+async function boundedDirectoryEntries(directoryPath, budget) {
+  const entries = [];
+  const directory = await opendir(directoryPath);
+  for await (const entry of directory) {
+    if (budget.remaining <= 0) throw new Error("Thread source directory catalog exceeded the safe scan limit.");
+    budget.remaining -= 1;
+    entries.push(entry);
+  }
+  return entries;
+}
 
 // src/server/service.ts
+var GENERATION_BUSY_MESSAGE = "Gajendra changed repeatedly while sources were loading. Refresh and retry.";
+var MAX_GENERATION_RETRIES = 4;
 var GajendraService = class {
-  constructor(store = new GajendraStoreRepository(), sources = new ThreadSourceRegistry()) {
+  constructor(store = new GajendraStoreRepository(), sources = new ThreadSourceRegistry(), options = {}) {
     this.store = store;
     this.sources = sources;
+    this.generationDeadlineMs = boundedPositive2(
+      options.generationDeadlineMs,
+      this.store.lockTimeoutMs,
+      Math.max(this.store.lockTimeoutMs, this.store.staleLockMs)
+    );
+    this.maxGenerationRetries = boundedPositive2(
+      options.maxGenerationRetries,
+      Math.max(1, Math.floor(this.generationDeadlineMs / this.store.lockTimeoutMs)),
+      MAX_GENERATION_RETRIES
+    );
   }
+  generationDeadlineMs;
+  maxGenerationRetries;
   async snapshot() {
-    const state = await this.store.read();
-    let collection;
-    try {
-      collection = await this.sources.collect(state.sourcePreferences);
-    } catch (error51) {
-      collection = { threads: [], sources: [], error: readableError2(error51) };
+    const deadline = Date.now() + this.generationDeadlineMs;
+    const collections = /* @__PURE__ */ new Map();
+    let retries = 0;
+    for (; ; ) {
+      if (Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      const state = await this.store.read();
+      let collection;
+      try {
+        collection = await this.collectForGeneration(state.sourcePreferences, collections, deadline);
+      } catch (error51) {
+        if (error51 instanceof GenerationDeadlineError) return this.safeAuthoritativeSnapshot();
+        throw error51;
+      }
+      const confirmed = await this.store.read();
+      if (confirmed.revision === state.revision) {
+        return buildSnapshot(state, collection.threads, collection.sources, collection.error);
+      }
+      if (sameSourcePreferences(confirmed.sourcePreferences, state.sourcePreferences)) {
+        return buildSnapshot(confirmed, collection.threads, collection.sources, collection.error);
+      }
+      if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      collections.clear();
+      retries += 1;
     }
-    return buildSnapshot(state, collection.threads, collection.sources, collection.error);
   }
-  async mutate(mutation) {
-    const before = await this.store.read();
-    await this.store.write(applyMutation(before, mutation));
-    return this.snapshot();
+  /** All writers enter here, whether they use the envelope or a legacy bare mutation shape. */
+  async mutate(input) {
+    const request = normalizeRequest(input);
+    const fingerprint = mutationFingerprint(request.mutation);
+    const idempotencyKeyHash = request.idempotencyKey ? hashIdempotencyKey(request.idempotencyKey) : void 0;
+    const deadline = Date.now() + this.generationDeadlineMs;
+    const collections = /* @__PURE__ */ new Map();
+    let retries = 0;
+    for (; ; ) {
+      if (Date.now() >= deadline) return this.storeBusyResult();
+      const stateForSources = await this.store.read();
+      let collection;
+      try {
+        collection = await this.collectForGeneration(stateForSources.sourcePreferences, collections, deadline);
+      } catch (error51) {
+        if (error51 instanceof GenerationDeadlineError) return this.storeBusyResult();
+        throw error51;
+      }
+      const attempt = await this.store.transaction(async (current) => {
+        if (current.revision !== stateForSources.revision && !sameSourcePreferences(current.sourcePreferences, stateForSources.sourcePreferences)) {
+          return { value: { retry: true } };
+        }
+        const snapshot = (state = current) => buildSnapshot(state, collection.threads, collection.sources, collection.error);
+        const result = (value, committedState) => ({
+          ...committedState ? { next: committedState } : {},
+          value: {
+            retry: false,
+            result: value,
+            ...committedState ? { committedState } : {},
+            refreshSources: Boolean(committedState && request.mutation.type === "set-source-enabled")
+          }
+        });
+        const existingReceipt = idempotencyKeyHash ? current.idempotency.find((receipt) => receipt.keyHash === idempotencyKeyHash) : void 0;
+        if (existingReceipt) {
+          if (existingReceipt.fingerprint !== fingerprint) {
+            return result(rejected(snapshot(), current.revision, "idempotency-key-reused"));
+          }
+          return result({
+            protocolVersion: MUTATION_PROTOCOL_VERSION,
+            outcome: "replayed",
+            revision: current.revision,
+            snapshot: snapshot()
+          });
+        }
+        if (request.expectedRevision !== void 0 && request.expectedRevision !== current.revision) {
+          return result(conflict(snapshot(), current.revision));
+        }
+        const validationError = validateMutation(current, request.mutation, collection);
+        if (validationError) return result(rejected(snapshot(), current.revision, validationError));
+        const next = applyMutation(current, request.mutation);
+        next.revision = current.revision + 1;
+        if (idempotencyKeyHash) {
+          next.idempotency = [
+            ...current.idempotency,
+            { keyHash: idempotencyKeyHash, fingerprint, revision: next.revision }
+          ].slice(-this.store.idempotencyLimit);
+        }
+        return result({
+          protocolVersion: MUTATION_PROTOCOL_VERSION,
+          outcome: "applied",
+          revision: next.revision,
+          snapshot: snapshot(next)
+        }, next);
+      });
+      if (attempt.retry) {
+        if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.storeBusyResult();
+        collections.clear();
+        retries += 1;
+        continue;
+      }
+      if (attempt.refreshSources && attempt.committedState) {
+        let refreshed;
+        try {
+          refreshed = await this.collectForGeneration(attempt.committedState.sourcePreferences, collections, deadline);
+        } catch (error51) {
+          if (error51 instanceof GenerationDeadlineError) {
+            return {
+              ...attempt.result,
+              snapshot: this.safeSnapshotFromState(attempt.committedState)
+            };
+          }
+          throw error51;
+        }
+        return {
+          ...attempt.result,
+          snapshot: buildSnapshot(attempt.committedState, refreshed.threads, refreshed.sources, refreshed.error)
+        };
+      }
+      return attempt.result;
+    }
   }
   close() {
     return this.sources.close();
   }
+  async collect(preferences) {
+    try {
+      return await this.sources.collect(preferences);
+    } catch {
+      return { threads: [], sources: [], error: "Gajendra could not read the configured thread sources." };
+    }
+  }
+  async collectForGeneration(preferences, collections, deadline) {
+    const key = sourcePreferencesKey(preferences);
+    const cached2 = collections.get(key);
+    if (cached2) return cached2;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new GenerationDeadlineError();
+    const collection = await completeBeforeDeadline(this.collect(preferences), remaining);
+    collections.set(key, collection);
+    return collection;
+  }
+  async safeAuthoritativeSnapshot() {
+    return this.safeSnapshotFromState(await this.store.read());
+  }
+  safeSnapshotFromState(state) {
+    return buildSnapshot(state, [], [], GENERATION_BUSY_MESSAGE);
+  }
+  async storeBusyResult() {
+    const snapshot = await this.safeAuthoritativeSnapshot();
+    return {
+      protocolVersion: MUTATION_PROTOCOL_VERSION,
+      outcome: "rejected",
+      revision: snapshot.revision,
+      snapshot,
+      error: { code: "store-busy", message: GENERATION_BUSY_MESSAGE }
+    };
+  }
 };
-function readableError2(error51) {
-  return error51 instanceof Error ? error51.message : "Unable to read configured agent threads.";
+var GenerationDeadlineError = class extends Error {
+};
+function completeBeforeDeadline(operation, remainingMs) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new GenerationDeadlineError()), remainingMs);
+    timeout.unref();
+    void operation.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error51) => {
+        clearTimeout(timeout);
+        reject(error51);
+      }
+    );
+  });
+}
+function sourcePreferencesKey(preferences) {
+  return JSON.stringify(Object.entries(preferences).sort(([left], [right]) => left.localeCompare(right)));
+}
+function sameSourcePreferences(left, right) {
+  return sourcePreferencesKey(left) === sourcePreferencesKey(right);
+}
+function boundedPositive2(value, fallback, maximum) {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? Math.min(value, maximum) : fallback;
+}
+function normalizeRequest(input) {
+  if ("mutation" in input) return input;
+  return { mutation: input };
+}
+function mutationFingerprint(mutation) {
+  return createHash2("sha256").update(JSON.stringify(mutation)).digest("hex");
+}
+function validateMutation(store, mutation, collection) {
+  if (mutation.type === "set-collapsed") return null;
+  if (mutation.type === "set-source-enabled") {
+    return collection.sources.some((source) => source.id === mutation.sourceId && source.id !== "configured-sources") ? null : "unknown-source";
+  }
+  const knownThreadIds = new Set(collection.threads.map((thread) => thread.id));
+  if (!knownThreadIds.has(mutation.threadId)) return "unknown-thread";
+  const stored = store.entries.find((entry) => entry.threadId === mutation.threadId);
+  if (mutation.type === "move" || mutation.type === "set-context") {
+    return stored ? null : "invalid-target";
+  }
+  if (mutation.type !== "move-before") return null;
+  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.isCurrent === true && mutation.level !== "focus") return "invalid-target";
+  if (mutation.level === null) {
+    if (mutation.beforeThreadId) return "invalid-target";
+    return validatePostMoveCurrent(store, mutation, knownThreadIds);
+  }
+  if (mutation.beforeThreadId) {
+    if (mutation.beforeThreadId === mutation.threadId || !knownThreadIds.has(mutation.beforeThreadId)) return "invalid-target";
+    const before = store.entries.find((entry) => entry.threadId === mutation.beforeThreadId);
+    if (before?.level !== mutation.level) return "invalid-target";
+  }
+  return validatePostMoveCurrent(store, mutation, knownThreadIds);
+}
+function validatePostMoveCurrent(store, mutation, knownThreadIds) {
+  if (!Object.hasOwn(mutation, "currentThreadId")) return null;
+  const currentThreadId = mutation.currentThreadId;
+  if (currentThreadId === void 0 || currentThreadId === null) return null;
+  if (!knownThreadIds.has(currentThreadId)) return "invalid-target";
+  const postMoveFocusIds = new Set(store.entries.filter((entry) => entry.level === "focus").map((entry) => entry.threadId));
+  if (mutation.level === "focus") postMoveFocusIds.add(mutation.threadId);
+  else postMoveFocusIds.delete(mutation.threadId);
+  return postMoveFocusIds.has(currentThreadId) ? null : "invalid-target";
+}
+function conflict(snapshot, revision) {
+  return {
+    protocolVersion: MUTATION_PROTOCOL_VERSION,
+    outcome: "conflict",
+    revision,
+    snapshot,
+    error: { code: "stale-revision", message: "Gajendra changed elsewhere. Refresh and retry this change." }
+  };
+}
+function rejected(snapshot, revision, code) {
+  const messages = {
+    "idempotency-key-reused": "This request key was already used for a different change.",
+    "unknown-thread": "That thread is no longer available from an enabled source.",
+    "unknown-source": "That source is not available in the current Gajendra registry.",
+    "invalid-target": "That priority target is no longer valid. Refresh and retry."
+  };
+  return {
+    protocolVersion: MUTATION_PROTOCOL_VERSION,
+    outcome: "rejected",
+    revision,
+    snapshot,
+    error: { code, message: messages[code] }
+  };
 }
 
 // src/server/index.ts
 var RESOURCE_URI = "ui://gajendra/app-v1.html";
+var mutationOptionsSchema = {
+  expectedRevision: external_exports.number().int().nonnegative().optional(),
+  idempotencyKey: external_exports.string().min(1).max(256).optional()
+};
 var deckMutationSchema = external_exports.discriminatedUnion("type", [
   external_exports.object({ type: external_exports.literal("set-level"), threadId: external_exports.string().min(1), level: external_exports.enum(["focus", "important"]).nullable() }),
   external_exports.object({ type: external_exports.literal("set-current"), threadId: external_exports.string().min(1) }),
   external_exports.object({ type: external_exports.literal("move"), threadId: external_exports.string().min(1), direction: external_exports.enum(["up", "down"]) }),
+  external_exports.object({
+    type: external_exports.literal("move-before"),
+    threadId: external_exports.string().min(1),
+    level: external_exports.enum(["focus", "important"]).nullable(),
+    beforeThreadId: external_exports.string().min(1).nullable().optional(),
+    context: external_exports.enum(["design", "engineering", "life"]).nullable().optional(),
+    isCurrent: external_exports.boolean().optional(),
+    currentThreadId: external_exports.string().min(1).nullable().optional()
+  }),
   external_exports.object({ type: external_exports.literal("set-context"), threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable() }),
   external_exports.object({ type: external_exports.literal("set-collapsed"), level: external_exports.enum(["focus", "important"]), collapsed: external_exports.boolean() }),
   external_exports.object({ type: external_exports.literal("set-source-enabled"), sourceId: external_exports.string().min(1), enabled: external_exports.boolean() })
 ]);
+var deckMutationRequestSchema = external_exports.object({
+  protocolVersion: external_exports.literal(MUTATION_PROTOCOL_VERSION).optional(),
+  mutation: deckMutationSchema,
+  ...mutationOptionsSchema
+});
 function createGajendraServer(service = new GajendraService()) {
   const server = new McpServer({ name: "gajendra", version: "0.3.1" });
   N3(server, "gajendra-ui", RESOURCE_URI, { mimeType: p }, async () => ({
     contents: [{ uri: RESOURCE_URI, mimeType: p, text: await loadUiHtml() }]
   }));
   K3(server, "gajendra_open", {
-    title: "Gaja, Elephant Focus for AI Power Users",
-    description: "Open one unified focus queue across configured AI-agent thread sources.",
+    title: "Gajendra",
+    description: "One clear focus across your AI tools.",
     inputSchema: {},
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
@@ -32783,58 +34281,124 @@ function createGajendraServer(service = new GajendraService()) {
       "openai/widgetAccessible": true,
       "openai/ui": { entrypoints: [{ type: "global" }] }
     }
-  }, async () => toolResult(await service.snapshot()));
+  }, async () => snapshotToolResult(await service.snapshot()));
   K3(server, "gajendra_set_level", {
     title: "Set thread priority",
-    description: "Add, move, or remove one agent thread in Gaja.",
-    inputSchema: { threadId: external_exports.string().min(1), level: external_exports.enum(["focus", "important"]).nullable() },
+    description: "Add, move, or remove one agent thread in Gajendra.",
+    inputSchema: { threadId: external_exports.string().min(1), level: external_exports.enum(["focus", "important"]).nullable(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ threadId, level }) => toolResult(await service.mutate({ type: "set-level", threadId, level })));
+  }, async ({ threadId, level, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-level", threadId, level },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_set_current", {
     title: "Set current focus",
     description: "Make one thread from any configured source the single NOW item.",
-    inputSchema: { threadId: external_exports.string().min(1) },
+    inputSchema: { threadId: external_exports.string().min(1), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ threadId }) => toolResult(await service.mutate({ type: "set-current", threadId })));
+  }, async ({ threadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-current", threadId },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_move", {
     title: "Move prioritized thread",
-    description: "Move one thread up or down within its Gaja section.",
-    inputSchema: { threadId: external_exports.string().min(1), direction: external_exports.enum(["up", "down"]) },
+    description: "Move one thread up or down within its Gajendra section.",
+    inputSchema: { threadId: external_exports.string().min(1), direction: external_exports.enum(["up", "down"]), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ threadId, direction }) => toolResult(await service.mutate({ type: "move", threadId, direction })));
+  }, async ({ threadId, direction, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "move", threadId, direction },
+    expectedRevision,
+    idempotencyKey
+  ))));
+  K3(server, "gajendra_move_before", {
+    title: "Move thread before target",
+    description: "Atomically place, append, or remove a thread while preserving one Gajendra NOW item.",
+    inputSchema: {
+      threadId: external_exports.string().min(1),
+      level: external_exports.enum(["focus", "important"]).nullable(),
+      beforeThreadId: external_exports.string().min(1).nullable().optional(),
+      context: external_exports.enum(["design", "engineering", "life"]).nullable().optional(),
+      isCurrent: external_exports.boolean().optional(),
+      currentThreadId: external_exports.string().min(1).nullable().optional(),
+      ...mutationOptionsSchema
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } }
+  }, async ({ threadId, level, beforeThreadId, context, isCurrent, currentThreadId, expectedRevision, idempotencyKey }) => {
+    const mutation = {
+      type: "move-before",
+      threadId,
+      level,
+      ...beforeThreadId === void 0 ? {} : { beforeThreadId },
+      ...context === void 0 ? {} : { context },
+      ...isCurrent === void 0 ? {} : { isCurrent },
+      ...currentThreadId === void 0 ? {} : { currentThreadId }
+    };
+    return mutationToolResult(await service.mutate(requestFor(mutation, expectedRevision, idempotencyKey)));
+  });
   K3(server, "gajendra_set_context", {
     title: "Set thread context",
-    description: "Assign or clear one bounded Gaja context label on a prioritized thread.",
-    inputSchema: { threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable() },
+    description: "Assign or clear one bounded Gajendra context label on a prioritized thread.",
+    inputSchema: { threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ threadId, context }) => toolResult(await service.mutate({ type: "set-context", threadId, context })));
+  }, async ({ threadId, context, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-context", threadId, context },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
-    description: "Persist whether a Gaja priority section is collapsed.",
-    inputSchema: { level: external_exports.enum(["focus", "important"]), collapsed: external_exports.boolean() },
+    description: "Persist whether a Gajendra priority section is collapsed.",
+    inputSchema: { level: external_exports.enum(["focus", "important"]), collapsed: external_exports.boolean(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ level, collapsed }) => toolResult(await service.mutate({ type: "set-collapsed", level, collapsed })));
+  }, async ({ level, collapsed, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-collapsed", level, collapsed },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_set_source_enabled", {
     title: "Set thread source availability",
-    description: "Enable or disable a local Gaja thread source. Claude metadata discovery remains opt-in.",
-    inputSchema: { sourceId: external_exports.string().min(1), enabled: external_exports.boolean() },
+    description: "Enable or disable a local Gajendra thread source. Claude metadata discovery remains opt-in.",
+    inputSchema: { sourceId: external_exports.string().min(1), enabled: external_exports.boolean(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } }
-  }, async ({ sourceId, enabled }) => toolResult(await service.mutate({ type: "set-source-enabled", sourceId, enabled })));
+  }, async ({ sourceId, enabled, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-source-enabled", sourceId, enabled },
+    expectedRevision,
+    idempotencyKey
+  ))));
   return server;
 }
-function toolResult(snapshot) {
-  const readySources = snapshot.sources.filter((source) => source.state === "ready").length;
+function requestFor(mutation, expectedRevision, idempotencyKey) {
+  return {
+    protocolVersion: MUTATION_PROTOCOL_VERSION,
+    mutation,
+    ...expectedRevision === void 0 ? {} : { expectedRevision },
+    ...idempotencyKey === void 0 ? {} : { idempotencyKey }
+  };
+}
+function snapshotToolResult(snapshot) {
   return {
     structuredContent: snapshot,
     content: [{
       type: "text",
-      text: snapshot.error ? `Gaja could not read configured threads: ${snapshot.error}` : `Gaja has ${snapshot.focus.length} focus threads and ${snapshot.important.length} important threads across ${readySources} ready sources.`
+      text: snapshot.error ? `Gajendra could not read configured threads: ${snapshot.error}` : `Gajendra has ${snapshot.focus.length} focus threads and ${snapshot.important.length} important threads across ${snapshot.sources.filter((source) => source.state === "ready").length} ready sources.`
+    }]
+  };
+}
+function mutationToolResult(result) {
+  return {
+    structuredContent: result,
+    content: [{
+      type: "text",
+      text: result.error?.message ?? `Gajendra applied a priority change at revision ${result.revision}.`
     }]
   };
 }
@@ -32847,17 +34411,21 @@ async function loadUiHtml() {
   ];
   for (const candidate of candidates) {
     try {
-      return await readFile3(candidate, "utf8");
+      return await readFile(candidate, "utf8");
     } catch (error51) {
       if (!error51 || typeof error51 !== "object" || !("code" in error51) || error51.code !== "ENOENT") throw error51;
     }
   }
-  throw new Error("Gaja UI bundle is missing. Run npm run build.");
+  throw new Error("Gajendra UI bundle is missing. Run npm run build.");
 }
 async function runCompanionCommand(command, input, service) {
   if (command === "snapshot") return service.snapshot();
-  const mutation = deckMutationSchema.parse(JSON.parse(input));
-  return service.mutate(mutation);
+  const parsed = JSON.parse(input);
+  const request = deckMutationRequestSchema.safeParse(parsed);
+  if (request.success) return service.mutate(request.data);
+  const legacyMutation = deckMutationSchema.parse(parsed);
+  const result = await service.mutate(legacyMutation);
+  return result.snapshot;
 }
 var companionCommand = process.argv.includes("--snapshot-json") ? "snapshot" : process.argv.includes("--mutate-json") ? "mutate" : null;
 if (companionCommand) {
@@ -32866,9 +34434,8 @@ if (companionCommand) {
     const input = companionCommand === "mutate" ? await readStandardInput() : "";
     process.stdout.write(`${JSON.stringify(await runCompanionCommand(companionCommand, input, service))}
 `);
-  } catch (error51) {
-    process.stderr.write(`${error51 instanceof Error ? error51.message : "Gajendra companion command failed."}
-`);
+  } catch {
+    process.stderr.write("Gajendra companion command was rejected.\n");
     process.exitCode = 1;
   } finally {
     await service.close();

@@ -2,15 +2,17 @@ import type { DeckSnapshot } from "../shared/contracts.js";
 
 export const fixtureSnapshot: DeckSnapshot = {
   generatedAt: "2026-08-12T12:00:00.000Z",
+  revision: 0,
   current: null,
   focus: [
     {
       id: "codex:00000000-0000-7000-8000-000000000001",
       sourceId: "codex", sourceName: "Codex",
-      title: "Ship the Gaja source release", project: "gajendra",
+      title: "Ship the Gajendra source release", project: "gajendra",
       updatedAt: 1786545400, status: "active", level: "focus", isCurrent: true,
       context: "design",
       deepLink: "codex://threads/00000000-0000-7000-8000-000000000001",
+      allowedDeepLinkSchemes: ["codex"],
     },
     {
       id: "claude:11111111-1111-4111-8111-111111111111",
@@ -19,16 +21,48 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786541800, status: "resumable", level: "focus", isCurrent: false,
       context: "engineering",
       deepLink: "gajendra://thread/claude%3A11111111-1111-4111-8111-111111111111",
+      allowedDeepLinkSchemes: ["gajendra"],
+    },
+    {
+      id: "review-agent:focus-review",
+      sourceId: "review-agent", sourceName: "Review Agent",
+      title: "Review the provider boundary patch", project: "agent-platform",
+      updatedAt: 1786541200, status: "idle", level: "focus", isCurrent: false,
+      context: "engineering",
+      deepLink: "review-agent://threads/focus-review",
+      allowedDeepLinkSchemes: ["review-agent", "https"],
+      review: {
+        state: "ready", kind: "pull-request", updatedAt: 1786541500,
+        destination: { type: "url", url: "https://example.invalid/reviews/focus-review" },
+        providerStatus: "FINISHED",
+      },
     },
   ],
-  important: [{
-    id: "cursor:22222222-2222-4222-8222-222222222222",
-    sourceId: "cursor", sourceName: "Cursor",
-    title: "Prepare the release readiness checklist", project: "desktop-client",
-    updatedAt: 1786538200, status: "resumable", level: "important", isCurrent: false,
-    context: "life",
-    deepLink: "gajendra://thread/cursor%3A22222222-2222-4222-8222-222222222222",
-  }],
+  important: [
+    {
+      id: "cursor:22222222-2222-4222-8222-222222222222",
+      sourceId: "cursor", sourceName: "Cursor",
+      title: "Prepare the release readiness checklist", project: "desktop-client",
+      updatedAt: 1786538200, status: "resumable", level: "important", isCurrent: false,
+      context: "life",
+      deepLink: "gajendra://thread/cursor%3A22222222-2222-4222-8222-222222222222",
+      allowedDeepLinkSchemes: ["gajendra"],
+    },
+    {
+      id: "review-agent:important-review",
+      sourceId: "review-agent", sourceName: "Review Agent",
+      title: "Inspect the generated accessibility receipt", project: "desktop-client",
+      updatedAt: 1786537600, status: "idle", level: "important", isCurrent: false,
+      context: "design",
+      deepLink: "review-agent://threads/important-review",
+      allowedDeepLinkSchemes: ["review-agent"],
+      review: {
+        state: "ready", kind: "result", updatedAt: 1786540000,
+        destination: { type: "thread", deepLink: "review-agent://threads/important-review" },
+        providerStatus: "READY",
+      },
+    },
+  ],
   available: [
     {
       id: "codex:available-1", sourceId: "codex", sourceName: "Codex",
@@ -36,6 +70,7 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786534600, status: "notLoaded", level: null, isCurrent: false,
       context: null,
       deepLink: "codex://threads/available-1",
+      allowedDeepLinkSchemes: ["codex"],
     },
     {
       id: "windsurf:available-2", sourceId: "windsurf", sourceName: "Windsurf",
@@ -43,6 +78,12 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786531000, status: "active", level: null, isCurrent: false,
       context: null,
       deepLink: "https://example.invalid/thread/available-2",
+      allowedDeepLinkSchemes: ["https"],
+      review: {
+        state: "ready", kind: "diff", updatedAt: 1786543000,
+        destination: { type: "url", url: "https://example.invalid/reviews/stale-running" },
+        providerStatus: "FINISHED",
+      },
     },
     {
       id: "grok:33333333-3333-4333-8333-333333333333", sourceId: "grok", sourceName: "Grok Build",
@@ -50,6 +91,7 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786527400, status: "resumable", level: null, isCurrent: false,
       context: null,
       deepLink: "gajendra://thread/grok%3A33333333-3333-4333-8333-333333333333",
+      allowedDeepLinkSchemes: ["gajendra"],
     },
     {
       id: "cursor:running-3", sourceId: "cursor", sourceName: "Cursor",
@@ -57,6 +99,7 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786530200, status: "streaming", level: null, isCurrent: false,
       context: null,
       deepLink: "gajendra://thread/cursor%3Arunning-3",
+      allowedDeepLinkSchemes: ["gajendra"],
     },
     {
       id: "grok:running-4", sourceId: "grok", sourceName: "Grok Build",
@@ -64,6 +107,20 @@ export const fixtureSnapshot: DeckSnapshot = {
       updatedAt: 1786529800, status: "working", level: null, isCurrent: false,
       context: null,
       deepLink: "gajendra://thread/grok%3Arunning-4",
+      allowedDeepLinkSchemes: ["gajendra"],
+    },
+    {
+      id: "review-agent:available-review", sourceId: "review-agent", sourceName: "Review Agent",
+      title: "Review the bounded catalog result", project: "agent-platform",
+      updatedAt: 1786529600, status: "idle", level: null, isCurrent: false,
+      context: null,
+      deepLink: "review-agent://threads/available-review",
+      allowedDeepLinkSchemes: ["review-agent", "https"],
+      review: {
+        state: "ready", kind: "diff", updatedAt: 1786539000,
+        destination: { type: "url", url: "https://example.invalid/reviews/available-review" },
+        providerStatus: "FINISHED",
+      },
     },
   ],
   collapsed: { focus: false, important: false },
@@ -77,6 +134,7 @@ export const fixtureSnapshot: DeckSnapshot = {
     { id: "cursor", name: "Cursor", kind: "builtin", state: "ready", enabled: true, threadCount: 2, detail: null },
     { id: "grok", name: "Grok Build", kind: "builtin", state: "ready", enabled: true, threadCount: 2, detail: null },
     { id: "windsurf", name: "Windsurf", kind: "configured", state: "ready", enabled: true, threadCount: 1, detail: null },
+    { id: "review-agent", name: "Review Agent", kind: "configured", state: "ready", enabled: true, threadCount: 3, detail: null },
   ],
   error: null,
 };

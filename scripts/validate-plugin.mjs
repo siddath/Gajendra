@@ -6,11 +6,20 @@ const manifestPath = path.join(pluginRoot, ".codex-plugin/plugin.json");
 const marketplacePath = path.resolve(".agents/plugins/marketplace.json");
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const marketplace = JSON.parse(await readFile(marketplacePath, "utf8"));
+const brand = {
+  name: "Gajendra",
+  descriptor: "One clear focus across your AI tools.",
+  promise: "One NOW. One short queue. One click back to the exact thread.",
+};
 
 assert(manifest.name === "gajendra", "plugin name must be gajendra");
 assert(/^\d+\.\d+\.\d+$/u.test(manifest.version), "plugin version must be semantic");
 assert(manifest.version === "0.3.1", "plugin release candidate must be version 0.3.1");
-assert(manifest.interface?.displayName === "Gaja, Elephant Focus for AI Power Users", "plugin display name must use the Gaja product identity");
+assert(manifest.description === brand.descriptor, "plugin description must use the approved Gajendra descriptor");
+assert(manifest.interface?.displayName === brand.name, "plugin display name must use the Gajendra product identity");
+assert(manifest.interface?.shortDescription === brand.descriptor, "plugin short description must use the approved descriptor");
+assert(manifest.interface?.longDescription === brand.promise, "plugin long description must use the approved promise");
+assert(marketplace.interface?.displayName === brand.name, "marketplace display name must use the Gajendra product identity");
 assert(manifest.mcpServers === "./.mcp.json", "plugin must declare its bundled MCP server");
 assert(manifest.skills === "./skills/", "plugin must declare its bundled skill directory");
 assert(manifest.license === "MIT", "plugin must declare the repository license");
@@ -43,12 +52,33 @@ for (const relativePath of [
   await access(path.join(pluginRoot, relativePath));
 }
 
-const [adaptiveMark, appIcon, menuBarMark, webStyles, webMain] = await Promise.all([
+const [adaptiveMark, appIcon, menuBarMark, webStyles, webMain, runtimeHtml, runtimeServer, publicBrandSurfaces] = await Promise.all([
   readFile(path.join(pluginRoot, "assets/gajendra.svg"), "utf8"),
   readFile(path.join(pluginRoot, "assets/gajendra-app-icon.svg"), "utf8"),
   readFile(path.join(pluginRoot, "assets/gajendra-menubar.svg"), "utf8"),
   readFile(path.join(pluginRoot, "src/ui/styles.css"), "utf8"),
   readFile(path.join(pluginRoot, "src/ui/main.ts"), "utf8"),
+  readFile(path.join(pluginRoot, "dist/gajendra.html"), "utf8"),
+  readFile(path.join(pluginRoot, "dist/server.mjs"), "utf8"),
+  Promise.all([
+    [".codex-plugin/plugin.json", manifestPath],
+    [".mcp.json", path.join(pluginRoot, ".mcp.json")],
+    ["package.json", path.join(pluginRoot, "package.json")],
+    ["gajendra.html", path.join(pluginRoot, "gajendra.html")],
+    ["assets/gajendra.svg", path.join(pluginRoot, "assets/gajendra.svg")],
+    ["assets/gajendra-app-icon.svg", path.join(pluginRoot, "assets/gajendra-app-icon.svg")],
+    ["assets/gajendra-menubar.svg", path.join(pluginRoot, "assets/gajendra-menubar.svg")],
+    ["skills/gajendra/SKILL.md", path.join(pluginRoot, "skills/gajendra/SKILL.md")],
+    ["src/ui/main.ts", path.join(pluginRoot, "src/ui/main.ts")],
+    ["src/ui/motion.ts", path.join(pluginRoot, "src/ui/motion.ts")],
+    ["src/ui/fixtures.ts", path.join(pluginRoot, "src/ui/fixtures.ts")],
+    ["src/server/codex-app-server.ts", path.join(pluginRoot, "src/server/codex-app-server.ts")],
+    ["src/server/index.ts", path.join(pluginRoot, "src/server/index.ts")],
+    ["src/server/service.ts", path.join(pluginRoot, "src/server/service.ts")],
+    ["src/server/store.ts", path.join(pluginRoot, "src/server/store.ts")],
+    ["dist/gajendra.html", path.join(pluginRoot, "dist/gajendra.html")],
+    ["dist/server.mjs", path.join(pluginRoot, "dist/server.mjs")],
+  ].map(async ([relativePath, filePath]) => [relativePath, await readFile(filePath, "utf8")])),
 ]);
 assert(adaptiveMark.includes(".main,.detail,.petal{fill:none;"), "adaptive elephant-and-lotus contours must remain outline-only");
 assert(appIcon.includes('filter="url(#shadow)" fill="none"'), "app-icon mark must remain outline-only");
@@ -69,11 +99,23 @@ assert(webMain.includes('scrollIntoView({ block: "start" })'), "MCP App search m
 assert(webMain.includes("search.select()"), "MCP App search must synchronously select existing text when focused");
 assert(webMain.includes('class="now-actions"'), "MCP App must align the NOW actions as one ordered group");
 assert(webMain.includes('class="visual-settings"'), "MCP App must consolidate visual preferences under the header lotus");
-assert(webMain.includes('aria-label="Open Gaja settings"'), "MCP App header lotus settings needs an explicit accessible action");
+assert(webMain.includes('aria-label="Open Gajendra settings"'), "MCP App header lotus settings needs an explicit accessible action");
 assert(webMain.includes('class="brand-copy"'), "MCP App brand text and subtext must share one left-aligned stack beside the mark");
 assert(webMain.includes('class="running-scope"'), "MCP App Running disclosure must expose its all-lanes scope as a visible control");
 assert(webStyles.includes(".visual-settings-popover"), "MCP App must style the header-lotus settings disclosure near its control");
 assert(webStyles.includes(".running-scope"), "MCP App must make the all-lanes Running disclosure visibly clickable");
+assert(runtimeHtml.includes(`<title>${brand.name} — ${brand.descriptor}</title>`), "published MCP App title must use the approved Gajendra descriptor");
+assert(runtimeHtml.includes(brand.promise), "published MCP App must include the approved Gajendra promise");
+assert(runtimeServer.includes('title: "Gajendra"'), "published MCP server must expose the Gajendra app-server title");
+
+// This is intentionally limited to product-facing and bundled runtime artifacts. Compatibility
+// identifiers (for example data-gaja-theme, .gaja-mark, gajendra tool/package/storage names)
+// and source-only tests are excluded because they are never rendered as product copy.
+for (const [relativePath, contents] of publicBrandSurfaces) {
+  for (const retiredPhrase of ["Gaja", "Elephant Focus for AI Power Users", "Double-star focus", "Focus ✦✦"]) {
+    assert(!contents.includes(retiredPhrase), `${relativePath} retains retired public brand copy: ${retiredPhrase}`);
+  }
+}
 
 const markPaths = [
   "M37 42C29 40 23 45 18 54C18 63 23 70 30 75C34 79 35 86 39 89C44 92 49 86 48 78C47 69 47 60 45 52C43 46 40 43 37 42Z",

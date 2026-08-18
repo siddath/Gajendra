@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   allDeckThreads,
   EMPTY_STORE,
+  isPermittedDeepLink,
   isRunningThreadStatus,
   normalizeDeckSelection,
+  reviewReadyDeckThreads,
   runningDeckThreads,
   type AgentThread,
   type PriorityStore,
@@ -60,7 +62,7 @@ describe("Gajendra domain", () => {
       ],
       collapsed: { focus: 1, important: 0 },
     });
-    expect(result.version).toBe(2);
+    expect(result.version).toBe(3);
     expect(result.currentFocusThreadId).toBe("codex:a");
     expect(result.entries).toHaveLength(1);
     expect(result.sourcePreferences).toMatchObject({ codex: true, claude: false, cursor: true, grok: false });
@@ -87,7 +89,7 @@ describe("Gajendra domain", () => {
     expect(result.entries).toEqual([]);
   });
 
-  it("assigns only bounded Gaja contexts and preserves them across priority changes", () => {
+  it("assigns only bounded Gajendra contexts and preserves them across priority changes", () => {
     let store = applyMutation(structuredClone(EMPTY_STORE), { type: "set-level", threadId: "codex:a", level: "focus" }, now);
     store = applyMutation(store, { type: "set-context", threadId: "codex:a", context: "engineering" }, now);
     store = applyMutation(store, { type: "set-current", threadId: "codex:a" }, now);
@@ -106,6 +108,65 @@ describe("Gajendra domain", () => {
       level: "important",
       addedAt: now.toISOString(),
     });
+  });
+
+  it("moves a thread atomically before a target, retains or overrides context, and repairs NOW", () => {
+    const initial = state([
+      { threadId: "codex:now", level: "focus", addedAt: now.toISOString(), context: "design" },
+      { threadId: "codex:focus", level: "focus", addedAt: now.toISOString() },
+      { threadId: "cursor:important", level: "important", addedAt: now.toISOString(), context: "life" },
+    ], "codex:now");
+
+    const crossLane = applyMutation(initial, {
+      type: "move-before",
+      threadId: "cursor:important",
+      level: "focus",
+      beforeThreadId: "codex:focus",
+      context: "engineering",
+      isCurrent: true,
+    }, now);
+    expect(crossLane.entries.map((entry) => ({ id: entry.threadId, level: entry.level, context: entry.context }))).toEqual([
+      { id: "codex:now", level: "focus", context: "design" },
+      { id: "cursor:important", level: "focus", context: "engineering" },
+      { id: "codex:focus", level: "focus", context: undefined },
+    ]);
+    expect(crossLane.currentFocusThreadId).toBe("cursor:important");
+
+    const append = applyMutation(crossLane, {
+      type: "move-before",
+      threadId: "codex:now",
+      level: "focus",
+      beforeThreadId: null,
+      isCurrent: false,
+    }, now);
+    expect(append.entries.filter((entry) => entry.level === "focus").map((entry) => entry.threadId)).toEqual([
+      "cursor:important", "codex:focus", "codex:now",
+    ]);
+    expect(append.currentFocusThreadId).toBe("cursor:important");
+
+    const removed = applyMutation(append, {
+      type: "move-before",
+      threadId: "cursor:important",
+      level: null,
+    }, now);
+    expect(removed.currentFocusThreadId).toBe("codex:focus");
+    expect(removed.entries.map((entry) => entry.threadId)).not.toContain("cursor:important");
+  });
+
+  it("rejects unsafe and ambiguously encoded deep-link schemes at the shared execution boundary", () => {
+    expect(isPermittedDeepLink("https://example.test/thread", ["https"])).toBe(true);
+    expect(isPermittedDeepLink("my-agent://thread/1", ["my-agent"])).toBe(true);
+    for (const unsafe of [
+      "javascript:alert(1)",
+      "data:text/html,boom",
+      "file:///private/secret",
+      " JavaScript:alert(1)",
+      "javascript%3Aalert(1)",
+      "jav%61script:alert(1)",
+      "unknown://thread/1",
+    ]) {
+      expect(isPermittedDeepLink(unsafe, ["https", "my-agent"])).toBe(false);
+    }
   });
 
   it("uses canonical source-qualified thread IDs", () => {
@@ -139,6 +200,46 @@ describe("Gajendra domain", () => {
       "cursor:important",
       "codex:available",
     ]);
+  });
+
+  it("derives review-ready work by provider timestamp while Running takes precedence", () => {
+    const initial = state([
+      { threadId: "codex:now", level: "focus", addedAt: now.toISOString() },
+      { threadId: "claude:important", level: "important", addedAt: now.toISOString() },
+    ], "codex:now");
+    const focusReady = agentThread("codex:now", "idle", 400);
+    focusReady.review = {
+      state: "ready",
+      kind: "diff",
+      updatedAt: 200,
+      destination: { type: "url", url: "https://example.test/review/now" },
+      providerStatus: "FINISHED",
+    };
+    const importantReady = agentThread("claude:important", "idle", 300);
+    importantReady.review = {
+      state: "ready",
+      kind: "result",
+      updatedAt: 300,
+      destination: { type: "thread", deepLink: "claude://threads/important" },
+      providerStatus: "READY",
+    };
+    const staleRunningReady = agentThread("cursor:running", "active", 500);
+    staleRunningReady.review = {
+      state: "ready",
+      kind: "pull-request",
+      updatedAt: 500,
+      destination: { type: "url", url: "https://example.test/review/running" },
+      providerStatus: "FINISHED",
+    };
+    const snapshot = buildSnapshot(initial, [focusReady, importantReady, staleRunningReady], sources);
+
+    expect(reviewReadyDeckThreads(snapshot).map((thread) => thread.id)).toEqual([
+      "claude:important",
+      "codex:now",
+    ]);
+    expect(runningDeckThreads(snapshot).map((thread) => thread.id)).toEqual(["cursor:running"]);
+    expect(JSON.stringify(initial)).not.toContain("review");
+    expect(JSON.stringify(initial)).not.toContain("FINISHED");
   });
 
   it("normalizes malformed snapshots to one current task", () => {
