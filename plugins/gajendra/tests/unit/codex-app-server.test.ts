@@ -749,7 +749,7 @@ if (starts === 0) {
       await expect(client.listThreads()).resolves.toEqual([]);
       expect(await readFile(statePath, "utf8")).toBe("2");
       expect(() => process.kill(parentPid!, 0)).toThrow();
-      expect(() => process.kill(descendantPid!, 0)).toThrow();
+      await expectProcessTerminated(descendantPid!);
       await client.close();
     } finally {
       await client?.close().catch(() => undefined);
@@ -869,9 +869,11 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       await client.close();
       expect(Date.now() - startedAt).toBeLessThan(2_000);
       // close() resolves only after the lifecycle has observed close or the bounded local-pipe
-      // watchdog has completed; neither resilient process remains alive at this boundary.
+      // watchdog has completed; neither resilient process remains runnable at this boundary.
+      // Linux PID 1 may retain the killed orphan briefly as a zombie, for which kill(pid, 0)
+      // succeeds even though it cannot execute or retain pipes.
       expect(() => process.kill(parentPid!, 0)).toThrow();
-      expect(() => process.kill(descendantPid!, 0)).toThrow();
+      await expectProcessTerminated(descendantPid!);
     } finally {
       await client?.close().catch(() => undefined);
       await rm(directory, { recursive: true, force: true });
@@ -948,7 +950,7 @@ if (starts === 0) {
       expect((retryError as Error).message).toBe("Codex app-server client is closed.");
       expect(await readFile(statePath, "utf8")).toBe("1");
       expect(() => process.kill(parentPid!, 0)).toThrow();
-      expect(() => process.kill(descendantPid!, 0)).toThrow();
+      await expectProcessTerminated(descendantPid!);
     } finally {
       await client?.close().catch(() => undefined);
       await rm(directory, { recursive: true, force: true });
@@ -997,7 +999,7 @@ setInterval(() => {}, 1_000);
       expect((error as Error).message).not.toContain(privateStderr);
       expect(Date.now() - startedAt).toBeLessThan(3_000);
       expect(() => process.kill(parentPid!, 0)).toThrow();
-      expect(() => process.kill(descendantPid!, 0)).toThrow();
+      await expectProcessTerminated(descendantPid!);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
