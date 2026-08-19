@@ -638,10 +638,7 @@ enum GajendraUITest {
     ) throws {
         let header = try waitForStableDockHeader(pid: pid, label: label, value: value)
         try tap(try elementFrame(header).center)
-        let refreshed = try waitForElement(pid: pid, label: label)
-        guard (attribute(refreshed, kAXValueAttribute) as? String) == value else {
-            throw GajendraUITestError.failed("a single click unexpectedly toggled \(label)")
-        }
+        _ = try waitForDockHeaderValue(header, pid: pid, label: label, expected: value)
     }
 
     private static func verifyDockControlClick(
@@ -650,10 +647,18 @@ enum GajendraUITest {
         controlLabel: String
     ) throws {
         _ = try waitForStableDockHeader(pid: pid, label: headerLabel, value: "Expanded")
-        let expandedControl = try waitForStableHittableElement(
+        let visibleExpandedControl = try waitForElement(
             pid: pid,
             label: controlLabel,
             value: "Expanded"
+        )
+        try raiseContainingWindow(of: visibleExpandedControl, context: "Running dock control")
+        _ = AXUIElementPerformAction(visibleExpandedControl, "AXScrollToVisible" as CFString)
+        let expandedControl = try waitForStableHittableElement(
+            pid: pid,
+            label: controlLabel,
+            value: "Expanded",
+            scrollToVisible: true
         )
         try tapWithoutSettling(try elementFrame(expandedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Collapsed")
@@ -662,7 +667,8 @@ enum GajendraUITest {
         let collapsedControl = try waitForStableHittableElement(
             pid: pid,
             label: controlLabel,
-            value: "Collapsed"
+            value: "Collapsed",
+            scrollToVisible: true
         )
         try tapWithoutSettling(try elementFrame(collapsedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Expanded")
@@ -682,7 +688,35 @@ enum GajendraUITest {
         Thread.sleep(forTimeInterval: 0.7)
         let header = try waitForStableDockHeader(pid: pid, label: label, value: initialValue)
         try doubleTap(try elementFrame(header).center)
-        _ = try waitForElement(pid: pid, label: label, value: finalValue)
+        _ = try waitForDockHeaderValue(header, pid: pid, label: label, expected: finalValue)
+    }
+
+    private static func waitForDockHeaderValue(
+        _ retainedHeader: AXUIElement,
+        pid: pid_t,
+        label: String,
+        expected: String
+    ) throws -> AXUIElement {
+        let deadline = Date().addingTimeInterval(timeout)
+        var observedValues: [String] = []
+        repeat {
+            _ = AXUIElementPerformAction(retainedHeader, "AXScrollToVisible" as CFString)
+            if let retainedValue = attribute(retainedHeader, kAXValueAttribute) as? String {
+                observedValues.append(retainedValue)
+                if retainedValue == expected { return retainedHeader }
+            }
+            let application = AXUIElementCreateApplication(pid)
+            if let current = firstElement(in: application, depth: 0, label: label),
+               let currentValue = attribute(current, kAXValueAttribute) as? String {
+                observedValues.append(currentValue)
+                if currentValue == expected { return current }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        throw GajendraUITestError.failed(
+            "timed out waiting for dock header \(label) value \(expected); "
+                + "observed=\(observedValues.suffix(12))"
+        )
     }
 
     private static func pressAccessibleToggle(
@@ -1119,6 +1153,7 @@ enum GajendraUITest {
         value: String
     ) throws -> AXUIElement {
         let header = try waitForElement(pid: pid, label: label, value: value)
+        try raiseContainingWindow(of: header, context: "dock header")
         // Compact cards can place the review disclosure below the current ScrollView viewport.
         // Request visibility before resolving a pointer frame; unsupported AX actions are safe
         // to ignore on older accessibility implementations.
@@ -1225,13 +1260,21 @@ enum GajendraUITest {
               ) == .success else {
             throw GajendraUITestError.failed("the isolated Organizer window could not be positioned for pointer testing")
         }
+        try raiseContainingWindow(of: element, context: "Organizer")
+    }
+
+    private static func raiseContainingWindow(of element: AXUIElement, context: String) throws {
+        guard let rawWindow = attribute(element, kAXWindowAttribute),
+              CFGetTypeID(rawWindow) == AXUIElementGetTypeID() else {
+            throw GajendraUITestError.failed("the \(context) did not expose its containing window")
+        }
         var ownerPID: pid_t = 0
         AXUIElementGetPid(rawWindow as! AXUIElement, &ownerPID)
         NSRunningApplication(processIdentifier: ownerPID)?.activate(
             options: [.activateAllWindows, .activateIgnoringOtherApps]
         )
         guard AXUIElementPerformAction(rawWindow as! AXUIElement, kAXRaiseAction as CFString) == .success else {
-            throw GajendraUITestError.failed("the isolated Organizer window could not be raised for pointer testing")
+            throw GajendraUITestError.failed("the \(context) window could not be raised for pointer testing")
         }
         Thread.sleep(forTimeInterval: 0.2)
     }

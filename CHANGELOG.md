@@ -2,11 +2,22 @@
 
 ## Unreleased
 
-- Added a skippable, keyboard-accessible first-launch **Connect your AI tools** screen that reports real local source health, preserves Claude/Grok opt-in boundaries, discovers explicitly configured agents, supports local rescan and source toggles, avoids upgrade interruption for existing users, and remains replayable from Settings or the application menu.
-- Fixed native thread search in both the floating card and Organizer: the first cross-app click reaches the real text field, normal multi-character typing is never replaced by delayed select-all work, existing queries select once on a new focus entry, clear/backspace keep the field ready for continued search, and the standard macOS Edit menu now routes ⌘A, ⌘C, ⌘V, and ⌘X through the native field editor.
-- Finalized the approved Gaja visual master as seventeen deterministic contours plus one attentive pupil across native, web, menu-bar, and app-icon surfaces: an Indian-elephant profile with a listening ear, calm eye, short tusk, raised trunk holding one curved stem, and a softly asymmetric lotus. Native headers keep the mark left, the two-line Gaja identity truly centered, and Settings trailing after Organizer and Refresh.
-- Added user-assigned Design, Engineering, and Life context labels across the native organizer, hover card, and MCP App without persisting provider content or free text.
-- Publication, hosted CI, signing, notarization, and an optional WidgetKit extension remain separate owner-gated work.
+- Restored the visible **Gajendra** identity with the descriptor **One clear focus across your AI
+  tools.** and promise **One NOW. One short queue. One click back to the exact thread.**, while
+  retaining the established package, URL, bundle, executable, and state compatibility identifiers.
+- Added the compact floating focus card, explicit Organizer, one global NOW, ordered Focus and
+  Important queues, app-owned Undo/Redo, native Search, bounded context labels, and full-row
+  hold/select/drag interaction without persisting provider content.
+- Added provider-reported Running across all priority lanes and guarded Ready for Review metadata.
+  The explicit **All priority lanes** control and the Running dock header independently
+  collapse/expand the list in both native surfaces.
+- Added bounded local adapters for Codex, opt-in Claude Code, Cursor, Grok, and explicit configured
+  catalogs, with generation-safe collection, strict destination validation, private atomic state,
+  process-group cleanup, and fail-closed recovery.
+- Added a source-build guide, user/support/security/contribution documentation, synthetic product
+  screenshots, deterministic browser/native interaction tests, and local release-readiness checks.
+- Published source remains separate from binary distribution: Developer ID signing, notarization,
+  stapling, Gatekeeper, clean-Mac proof, and mobile implementation are still open gates.
 
 ## 0.3.1 - 2026-08-13
 
