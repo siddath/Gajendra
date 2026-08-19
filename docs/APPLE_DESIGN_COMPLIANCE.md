@@ -11,9 +11,9 @@ Apple-platform, assistive-technology, or App Review validation.
   be explicit, ordered, and confirmed.
 - Compact queue rows keep a quick Open click distinct from a stationary hold. The hold selects the
   task; continuing the same press lifts a visible metadata preview for full-row drag. Compact rows
-  have no permanent menu/drag handle. Running and Ready for Review use text, symbols,
-  high-visibility counts, and a deliberate double-click (or accessibility press) to shrink or
-  expand their dock contents.
+  have no permanent menu/drag handle. Running and Ready for Review use text, symbols, and
+  high-visibility counts. Running adds an explicit **All priority lanes** click control; both docks
+  retain a deliberate header double-click (or accessibility press) to shrink or expand contents.
 - The visible identity is **Gajendra** with **One clear focus across your AI tools.** Queue labels
   are NOW, Focus, Important, Running, and Ready for Review.
 - The native target floor is macOS 13.5. The source contract treats the floating utility as an

@@ -7,14 +7,14 @@ opening retained in the source product.
 For a short build, first-launch, daily-use, and troubleshooting path, start with the
 [user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
 
-This page records the **source/build contract** and the exact-installed automated interaction receipt. On
-2026-08-19, the implementation merged through PR #17 passed the real-window `npm run companion:ui-test` and
-`npm run companion:ui-performance-test` journeys, `npm run companion:test`,
-`npm run companion:build`, `npm run companion:validate`, and
+This page records the **source/build contract** and the exact-installed automated interaction
+receipt. On 2026-08-19, the source candidate in
+[PR #21](https://github.com/siddath/Gajendra/pull/21) passed the real-window
+`npm run companion:ui-test` and `npm run companion:ui-performance-test` journeys,
+`npm run companion:test`, `npm run companion:build`, `npm run companion:validate`, and
 `npm run companion:bundle-readiness`; the aggregate source check passed 98/98 and E2E passed
-17/17. The same exact ad-hoc build also passed the complete isolated pointer journey after local
-installation; the exact source build separately passed the cycle-sensitive performance journey.
-Those receipts do not establish a
+17/17. The earlier PR #17 exact ad-hoc build separately passed the complete isolated pointer
+journey after local installation. Those receipts do not establish a
 clean-Mac run, physical VoiceOver, login-item, or a manual human drag,
 Developer ID signing, notarization, or distribution readiness.
 
@@ -54,9 +54,10 @@ Developer ID signing, notarization, or distribution readiness.
   `checkmark.bubble` glyph, label, count, ready time, destination label, and accessibility copy.
   The main review row opens the declared Review or Task destination; its provider badge separately
   opens the owning task. Review metadata remains live-only and Running has overlap precedence.
-- Running and Ready for Review use high-visibility numeric badges. A pointer double-click on either
-  dock header shrinks or expands its rows; a single click is intentionally inert, while the
-  accessibility press action provides the equivalent toggle.
+- Running and Ready for Review use high-visibility numeric badges. Running also exposes an explicit
+  **All priority lanes** control that shrinks or expands its rows on click. A pointer double-click
+  on either dock header remains available; a single click on the header is intentionally inert,
+  while the accessibility press action provides the equivalent header toggle.
 
 ## Local source build procedure
 
@@ -76,9 +77,10 @@ The UI command launches the built app with a temporary isolated store, disabled 
 and a bounded synthetic catalog. It drives the real 60×60 window with stationary, 2 px,
 edit-recovery, AX-press, and edge taps; distinguishes quick task clicks from stationary holds;
 drags the lifted full task row and verifies compact/Organizer cross-lane pointer changes against the
-exact persisted queue order; then exercises the Running/Ready single-click and double-click
-contract. The performance command runs the widget-only portion, enforces the measured
-200 ms popup budget, and rejects any SwiftUI dependency cycle in that journey. Both require a
+exact persisted queue order; then exercises the explicit Running control plus the Running/Ready
+single-click guards and double-click contract. The performance command runs the widget-only
+portion, enforces the measured 200 ms popup budget, and rejects any SwiftUI dependency cycle in
+that journey. Both require a
 logged-in Mac whose invoking test host may post pointer and
 accessibility events; hosted CI compiles the target but does not claim a manual physical journey.
 Bundle readiness is an inspection, not a release authorization: it checks source-controlled bundle

@@ -19,6 +19,10 @@ npm run companion:test
 npm run companion:preview
 ```
 
+For user-interface changes, also run the observable journey for the surface you changed. Native
+launcher, card, Organizer, Search, and pointer behavior use `npm run companion:ui-test` on a
+logged-in Mac with Accessibility permission; browser behavior uses `npm run test:e2e`.
+
 Release loop:
 
 ```bash

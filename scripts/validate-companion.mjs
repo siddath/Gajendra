@@ -189,6 +189,8 @@ assertContains(overlay, [
   '? "Dragging"',
   '? "Drop target"',
   ".onTapGesture(count: 2)",
+  "runningDisclosureControl",
+  'accessibilityLabel("All priority lanes, Running")',
 ], "launcher tap recovery contract");
 assertContains(content, [
   "GajendraOrganizerTaskFramePreferenceKey",
@@ -196,6 +198,8 @@ assertContains(content, [
   "queueDragHandle",
   "GajendraStatusCountBadge",
   ".onTapGesture(count: 2)",
+  "runningSectionControl",
+  'accessibilityLabel("All priority lanes, Running in Organizer")',
 ], "organizer drag and dock contract");
 assertNotContains([content, overlay, models], [
   "GajendraQueueDragPayload",
@@ -219,6 +223,8 @@ assertContains(uiTest, [
   "queueDragAndDrop",
   "organizerQueueDragAndDrop",
   "dockSingleClickGuard",
+  "runningDockControlClick",
+  "organizerRunningDockControlClick",
   "runningDockDoubleClick",
   "reviewDockDoubleClick",
   "popupLatencyBudgetMet",
@@ -419,6 +425,7 @@ console.log(JSON.stringify({
     taskLongPressAndFullRowDrag: true,
     measuredWidgetPopupBudgetMilliseconds: 200,
     dockDoubleClickContract: true,
+    runningDockExplicitControl: true,
   },
   syntheticValidation: {
     configuredSourceOnly: true,

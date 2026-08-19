@@ -51,7 +51,7 @@ thread content is used.
 | --- | --- |
 | **NOW** | Keep exactly one current thread visible and open it immediately. NOW always belongs to Focus. |
 | **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact rows stay focused on thread metadata instead of showing a permanent drag/menu handle. Organizer retains explicit queue controls. |
-| **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label. |
+| **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label. |
 | **Ready for Review** | See a proven completed result awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled; a newer provider turn changes the live signal. Its highlighted count stays visible, and Running takes precedence. |
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |

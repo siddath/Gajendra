@@ -1,7 +1,7 @@
 # Security policy
 
-Gajendra is local-first. This document describes the current **source contract** for the dirty,
-local candidate, not installed-app or distribution proof.
+Gajendra is local-first. This document describes the current public **source contract**, not an
+installed-app or binary-distribution claim.
 
 ## Data boundary
 
@@ -34,8 +34,8 @@ copy; otherwise it fails closed. `GAJENDRA_DATA_DIR` isolates a test/custom stor
   ready from idle, age, or resumability.
 - Codex app-server activity enrichment is disabled by
   `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off`. When enabled on macOS it is the A4 bounded
-  metadata-only tail inspection described in [README.md](README.md#codex-rollout-tail-boundary-a4),
-  not transcript inspection.
+  metadata-only tail inspection described in
+  [Thread sources](docs/THREAD_SOURCES.md#codex-activity-enrichment), not transcript inspection.
 
 ## Host and native boundaries
 

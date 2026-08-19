@@ -55,13 +55,18 @@ enum GajendraUITest {
     static func main() {
         do {
             let metrics = try run()
-            if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget" {
+            let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
+            if scope == "running-dock" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true}"#
+                )
+            } else if scope == "widget" {
+                print(
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"dockSingleClickGuard":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -90,6 +95,16 @@ enum GajendraUITest {
         let pill = try waitForPill(pid: rawPID)
         _ = try waitForPillHelp(pid: rawPID, containing: "Click to show or hide priorities")
         Thread.sleep(forTimeInterval: 0.3)
+
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "running-dock" {
+            try verifyRunningDockControlsOnly(pid: rawPID)
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: 0,
+                coldPopupMilliseconds: 0,
+                warmPopupMilliseconds: 0,
+                statusItemCompactSurfaceObserved: false
+            )
+        }
 
         let prewarmedRevealMilliseconds = try verifyApplicationReopenSurface(
             pid: rawPID,
@@ -160,6 +175,11 @@ enum GajendraUITest {
         try verifyQueueDrag(pid: rawPID, stateURL: stateURL)
         try verifyTaskTapPreservesOpenMode(pid: rawPID)
         try verifySearch(pid: rawPID)
+        try verifyDockControlClick(
+            pid: rawPID,
+            headerLabel: "Running, 2 active threads",
+            controlLabel: "All priority lanes, Running"
+        )
         try verifyDockDoubleClick(
             pid: rawPID,
             label: "Running, 2 active threads",
@@ -511,6 +531,11 @@ enum GajendraUITest {
             label: "Running, 2 active threads across all priority lanes",
             value: "Expanded"
         )
+        try verifyDockControlClick(
+            pid: pid,
+            headerLabel: "Running, 2 active threads across all priority lanes",
+            controlLabel: "All priority lanes, Running in Organizer"
+        )
         try toggleDockDoubleClick(
             pid: pid,
             label: "Running, 2 active threads across all priority lanes",
@@ -542,6 +567,60 @@ enum GajendraUITest {
         )
     }
 
+    private static func verifyRunningDockControlsOnly(pid: pid_t) throws {
+        let pillButton = try waitForPillHelp(pid: pid, containing: "Click to show or hide priorities")
+        guard AXUIElementPerformAction(pillButton, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the launcher accessibility press action was unavailable for dock proof")
+        }
+        try waitForCard(pid: pid, visible: true, label: "running dock focused proof")
+        // The first visible refresh can overlap the source process warming on a clean
+        // isolated launch. A second enabled-state refresh makes this focused journey
+        // deterministic without bypassing the user-visible control.
+        for _ in 0..<2 {
+            let refresh = try waitForElement(pid: pid, label: "Refresh Threads", enabled: true)
+            guard AXUIElementPerformAction(refresh, kAXPressAction as CFString) == .success else {
+                throw GajendraUITestError.failed("the visible refresh action was unavailable for dock proof")
+            }
+            Thread.sleep(forTimeInterval: 0.35)
+        }
+
+        try verifyDockControlClick(
+            pid: pid,
+            headerLabel: "Running, 2 active threads",
+            controlLabel: "All priority lanes, Running"
+        )
+        try verifyDockDoubleClick(
+            pid: pid,
+            label: "Running, 2 active threads",
+            collapsedValue: "Collapsed"
+        )
+
+        let organizer = try waitForElement(pid: pid, label: "Open organizer")
+        guard AXUIElementPerformAction(organizer, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the organizer accessibility press action was unavailable for dock proof")
+        }
+        NSRunningApplication(processIdentifier: pid)?.activate(options: .activateIgnoringOtherApps)
+        Thread.sleep(forTimeInterval: 0.25)
+        let organizerHeader = try waitForElement(
+            pid: pid,
+            label: "Running, 2 active threads across all priority lanes",
+            value: "Expanded"
+        )
+        try moveContainingWindow(of: organizerHeader, to: CGPoint(x: 40, y: 40))
+        Thread.sleep(forTimeInterval: 0.25)
+
+        try verifyDockControlClick(
+            pid: pid,
+            headerLabel: "Running, 2 active threads across all priority lanes",
+            controlLabel: "All priority lanes, Running in Organizer"
+        )
+        try verifyDockDoubleClick(
+            pid: pid,
+            label: "Running, 2 active threads across all priority lanes",
+            collapsedValue: "Collapsed"
+        )
+    }
+
     private static func verifyDockDoubleClick(
         pid: pid_t,
         label: String,
@@ -559,10 +638,42 @@ enum GajendraUITest {
     ) throws {
         let header = try waitForStableDockHeader(pid: pid, label: label, value: value)
         try tap(try elementFrame(header).center)
-        let refreshed = try waitForElement(pid: pid, label: label)
-        guard (attribute(refreshed, kAXValueAttribute) as? String) == value else {
-            throw GajendraUITestError.failed("a single click unexpectedly toggled \(label)")
-        }
+        _ = try waitForDockHeaderValue(header, pid: pid, label: label, expected: value)
+    }
+
+    private static func verifyDockControlClick(
+        pid: pid_t,
+        headerLabel: String,
+        controlLabel: String
+    ) throws {
+        _ = try waitForStableDockHeader(pid: pid, label: headerLabel, value: "Expanded")
+        let visibleExpandedControl = try waitForElement(
+            pid: pid,
+            label: controlLabel,
+            value: "Expanded"
+        )
+        try raiseContainingWindow(of: visibleExpandedControl, context: "Running dock control")
+        _ = AXUIElementPerformAction(visibleExpandedControl, "AXScrollToVisible" as CFString)
+        let expandedControl = try waitForStableHittableElement(
+            pid: pid,
+            label: controlLabel,
+            value: "Expanded",
+            scrollToVisible: true
+        )
+        try tapWithoutSettling(try elementFrame(expandedControl).center)
+        _ = try waitForElement(pid: pid, label: controlLabel, value: "Collapsed")
+        Thread.sleep(forTimeInterval: 0.7)
+
+        let collapsedControl = try waitForStableHittableElement(
+            pid: pid,
+            label: controlLabel,
+            value: "Collapsed",
+            scrollToVisible: true
+        )
+        try tapWithoutSettling(try elementFrame(collapsedControl).center)
+        _ = try waitForElement(pid: pid, label: controlLabel, value: "Expanded")
+        Thread.sleep(forTimeInterval: 0.7)
+        _ = try waitForStableDockHeader(pid: pid, label: headerLabel, value: "Expanded")
     }
 
     private static func toggleDockDoubleClick(
@@ -577,7 +688,35 @@ enum GajendraUITest {
         Thread.sleep(forTimeInterval: 0.7)
         let header = try waitForStableDockHeader(pid: pid, label: label, value: initialValue)
         try doubleTap(try elementFrame(header).center)
-        _ = try waitForElement(pid: pid, label: label, value: finalValue)
+        _ = try waitForDockHeaderValue(header, pid: pid, label: label, expected: finalValue)
+    }
+
+    private static func waitForDockHeaderValue(
+        _ retainedHeader: AXUIElement,
+        pid: pid_t,
+        label: String,
+        expected: String
+    ) throws -> AXUIElement {
+        let deadline = Date().addingTimeInterval(timeout)
+        var observedValues: [String] = []
+        repeat {
+            _ = AXUIElementPerformAction(retainedHeader, "AXScrollToVisible" as CFString)
+            if let retainedValue = attribute(retainedHeader, kAXValueAttribute) as? String {
+                observedValues.append(retainedValue)
+                if retainedValue == expected { return retainedHeader }
+            }
+            let application = AXUIElementCreateApplication(pid)
+            if let current = firstElement(in: application, depth: 0, label: label),
+               let currentValue = attribute(current, kAXValueAttribute) as? String {
+                observedValues.append(currentValue)
+                if currentValue == expected { return current }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        throw GajendraUITestError.failed(
+            "timed out waiting for dock header \(label) value \(expected); "
+                + "observed=\(observedValues.suffix(12))"
+        )
     }
 
     private static func pressAccessibleToggle(
@@ -1014,6 +1153,7 @@ enum GajendraUITest {
         value: String
     ) throws -> AXUIElement {
         let header = try waitForElement(pid: pid, label: label, value: value)
+        try raiseContainingWindow(of: header, context: "dock header")
         // Compact cards can place the review disclosure below the current ScrollView viewport.
         // Request visibility before resolving a pointer frame; unsupported AX actions are safe
         // to ignore on older accessibility implementations.
@@ -1041,6 +1181,7 @@ enum GajendraUITest {
         var stableSamples = 0
         var lastOwnerPID: pid_t = 0
         var lastHitLabel = "none"
+        var recentFrames: [String] = []
         repeat {
             let application = AXUIElementCreateApplication(pid)
             for element in matchingElements(in: application, depth: 0, label: label) {
@@ -1051,6 +1192,10 @@ enum GajendraUITest {
                 }
                 guard let frame = try? elementFrame(element),
                       let hit = systemElementAtPosition(point: frame.center) else { continue }
+                recentFrames.append(describeFrame(frame))
+                if recentFrames.count > 12 {
+                    recentFrames.removeFirst(recentFrames.count - 12)
+                }
                 lastHitLabel = accessibilityLabel(hit) ?? "unlabeled"
                 var hitPID: pid_t = 0
                 AXUIElementGetPid(hit, &hitPID)
@@ -1073,7 +1218,8 @@ enum GajendraUITest {
         } while Date() < deadline
         throw GajendraUITestError.failed(
             "timed out waiting for stable hittable accessibility element \(label); "
-                + "ownerPID=\(lastOwnerPID), hitLabel=\(lastHitLabel)"
+                + "ownerPID=\(lastOwnerPID), hitLabel=\(lastHitLabel), "
+                + "recentFrames=\(recentFrames.joined(separator: ";"))"
         )
     }
 
@@ -1114,6 +1260,23 @@ enum GajendraUITest {
               ) == .success else {
             throw GajendraUITestError.failed("the isolated Organizer window could not be positioned for pointer testing")
         }
+        try raiseContainingWindow(of: element, context: "Organizer")
+    }
+
+    private static func raiseContainingWindow(of element: AXUIElement, context: String) throws {
+        guard let rawWindow = attribute(element, kAXWindowAttribute),
+              CFGetTypeID(rawWindow) == AXUIElementGetTypeID() else {
+            throw GajendraUITestError.failed("the \(context) did not expose its containing window")
+        }
+        var ownerPID: pid_t = 0
+        AXUIElementGetPid(rawWindow as! AXUIElement, &ownerPID)
+        NSRunningApplication(processIdentifier: ownerPID)?.activate(
+            options: [.activateAllWindows, .activateIgnoringOtherApps]
+        )
+        guard AXUIElementPerformAction(rawWindow as! AXUIElement, kAXRaiseAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the \(context) window could not be raised for pointer testing")
+        }
+        Thread.sleep(forTimeInterval: 0.2)
     }
 
     private static func firstElement(
@@ -1281,12 +1444,16 @@ enum GajendraUITest {
     }
 
     private static func tap(_ point: CGPoint) throws {
+        try tapWithoutSettling(point)
+        Thread.sleep(forTimeInterval: 0.7)
+    }
+
+    private static func tapWithoutSettling(_ point: CGPoint) throws {
         postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
         Thread.sleep(forTimeInterval: 0.06)
         try postMouse(.leftMouseUp, at: point, clickState: 1)
-        Thread.sleep(forTimeInterval: 0.7)
     }
 
     private static func focusSearchField(pid: pid_t, field: AXUIElement) throws {
