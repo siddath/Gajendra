@@ -71,7 +71,7 @@ writer begins.
 | D1 | Provider discovery is correct under large catalogs and bounded; native launcher presentation has a measured regression budget | Synthetic-catalog correctness/performance test plus real-window popup metric | Provider bounds, a 200 ms widget popup gate, five repeat runs, and an exact-installed local metric are recorded; provider-scale and cross-machine measurement remain pending |
 | D2 | User-visible diagnostics redact paths/content; temporary launch artifacts are owner-private and cleaned on startup/exit | Error-sanitization and file-lifecycle tests | Current local gauntlet and source error-sanitization/file-lifecycle proof recorded; installed/provider and external receipts pending |
 | D3 | Status, release, security, compatibility, architecture, and mobile docs describe current source truth without implementation claims for gated work | Documentation reconciliation review | Current documentation/link/copy reconciliation proven; future source changes reopen it |
-| D4 | CI runs behavior-level server/native/release validators and rejects missing privacy, identity, or bundle artifacts | Local CI-equivalent command set | Current local gates proven; merged baseline `b359ab6` passed both hosted jobs in [run 32148617813](https://github.com/siddath/Gajendra/actions/runs/32148617813); each later revision requires its own hosted receipt |
+| D4 | CI runs behavior-level server/native/release validators and rejects missing privacy, identity, or bundle artifacts | Local CI-equivalent command set | Current local gates proven; public `main` `9e989e9` passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042); each later revision requires its own hosted receipt |
 | D5 | Product language uses Focus consistently and removes retired product/queue copy except explicitly documented compatibility/history | Narrow copy audit | Current narrow copy scan proven; validator retains the sole intentional retired-copy detector |
 | E0 | Mobile plan covers transport, auth, pairing, discovery, lifecycle, connectivity, deep-link policy, app-store/privacy, architecture, and test matrix against the current MCP transport/auth contract | Protocol review against primary sources; no listener/client code | Documentation-only amendment proven; D01–D07 and D11 remain pending |
 | IMG | Launch media contains no private data, is labeled synthetic, and is generated only after brand/UX gates pass | Actual SwiftUI rendering, deterministic hero composition, image inspection, and exact-path validation | Five real-view screenshots, a screenshot-led hero, and their [generation/privacy receipt](../evidence/launch/README.md) are present; publication approval remains pending |
@@ -90,10 +90,13 @@ writer begins.
 
 ## Live evidence boundary
 
-- The public-review candidate was committed and pushed on `codex/gajendra-public-release` from
-  baseline `53e9855`. [PR #12](https://github.com/siddath/Gajendra/pull/12) merged as `747b2c7` on
-  2026-08-18 after its Linux plugin and macOS companion checks passed. This is not a binary release
-  artifact, and the current dirty working candidate is not yet represented by that merge.
+- [PR #12](https://github.com/siddath/Gajendra/pull/12) remains the historical first public-review
+  baseline. [PR #16](https://github.com/siddath/Gajendra/pull/16) added the current launch media and
+  user guide; [PR #17](https://github.com/siddath/Gajendra/pull/17) merged the compact interactions,
+  Ready-for-Review path, and final publication package; [PR #18](https://github.com/siddath/Gajendra/pull/18)
+  added portable process-proof and hosted-CI reliability corrections. Public `main` `9e989e9`
+  passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
+  This is public source, not a signed or notarized binary release.
 - The final server/web source lane recorded focused tests, `npm run check` (**98/98**), and E2E
   (**17/17**) after the Ready-for-Review and exact-open corrections. Those source-lane receipts were
   subsequently incorporated into the passed local gauntlet below.

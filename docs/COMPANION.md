@@ -8,7 +8,7 @@ For a short build, first-launch, daily-use, and troubleshooting path, start with
 [user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
 
 This page records the **source/build contract** and the exact-installed automated interaction receipt. On
-2026-08-19, the current working candidate passed the real-window `npm run companion:ui-test` and
+2026-08-19, the implementation merged through PR #17 passed the real-window `npm run companion:ui-test` and
 `npm run companion:ui-performance-test` journeys, `npm run companion:test`,
 `npm run companion:build`, `npm run companion:validate`, and
 `npm run companion:bundle-readiness`; the aggregate source check passed 98/98 and E2E passed

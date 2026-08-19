@@ -1,6 +1,6 @@
 # Local host-validation procedure
 
-This procedure has a completed host receipt for the 2026-08-19 working candidate: the exact ad-hoc
+This procedure has a completed host receipt for the 2026-08-19 implementation merged in PR #17: the exact ad-hoc
 bundle installed in `~/Applications` passed the isolated launcher, hold/select/lift/full-row drag,
 Organizer reorder, Search, dock, and measured popup journey. The executable matches the
 verified build, and the private state hashes and modes stayed unchanged. It does not claim a
