@@ -828,7 +828,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it("awaits primary app-server group teardown before close returns", async () => {
     if (process.platform === "win32") return;
