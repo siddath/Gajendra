@@ -1,6 +1,22 @@
 import AppKit
 import SwiftUI
 
+private struct GajendraOrganizerTaskFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newest in newest })
+    }
+}
+
+private struct GajendraOrganizerSectionFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newest in newest })
+    }
+}
+
 public struct DeckContentView: View {
     @ObservedObject private var model: DeckViewModel
     @ObservedObject private var visualSettings: GajendraVisualSettings
@@ -14,7 +30,11 @@ public struct DeckContentView: View {
     @State private var isReviewHeaderHovered = false
     @State private var isReviewExpanded = true
     @State private var searchFocused = false
-    @StateObject private var dragRegistry = GajendraQueueDragRegistry()
+    @State private var organizerTaskFrames: [String: CGRect] = [:]
+    @State private var organizerSectionFrames: [String: CGRect] = [:]
+    @State private var organizerDraggingThreadId: String?
+    @State private var organizerTargetThreadId: String?
+    @State private var organizerTargetLevel: PriorityLevel?
     private let usesScrollView: Bool
     private let isPreview: Bool
     private let onManageSources: () -> Void
@@ -82,10 +102,18 @@ public struct DeckContentView: View {
         .padding(16)
         .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650, alignment: .topLeading)
         .background(organizerSurface)
-        .animation(deckAnimation, value: model.errorMessage)
-        .task {
-            model.refresh()
+        .coordinateSpace(name: "gajendra-organizer")
+        .onPreferenceChange(GajendraOrganizerTaskFramePreferenceKey.self) { frames in
+            DispatchQueue.main.async {
+                if organizerTaskFrames != frames { organizerTaskFrames = frames }
+            }
         }
+        .onPreferenceChange(GajendraOrganizerSectionFramePreferenceKey.self) { frames in
+            DispatchQueue.main.async {
+                if organizerSectionFrames != frames { organizerSectionFrames = frames }
+            }
+        }
+        .animation(deckAnimation, value: model.errorMessage)
     }
 
     private var deckAnimation: Animation? {
@@ -480,10 +508,25 @@ public struct DeckContentView: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(sectionBorderColor(level), lineWidth: 1)
+                .stroke(
+                    organizerDraggingThreadId != nil && organizerTargetLevel == level
+                        ? Color.gajendraAccent(for: colorScheme).opacity(0.82)
+                        : sectionBorderColor(level),
+                    lineWidth: organizerDraggingThreadId != nil && organizerTargetLevel == level ? 1.5 : 1
+                )
         )
         .animation(deckAnimation, value: threads.map(\.id))
-        return priorityDropSection(sectionContent, level: level)
+        .background {
+            if !isPreview {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: GajendraOrganizerSectionFramePreferenceKey.self,
+                        value: [level.rawValue: proxy.frame(in: .named("gajendra-organizer"))]
+                    )
+                }
+            }
+        }
+        return sectionContent
     }
 
     private func priorityRow(_ thread: DeckThread, level: PriorityLevel, index: Int, count: Int) -> some View {
@@ -520,6 +563,10 @@ public struct DeckContentView: View {
             .buttonStyle(.plain)
 
             contextControl(thread)
+
+            if !isPreview {
+                queueDragHandle(thread)
+            }
 
             if level == .focus && !thread.isCurrent {
                 Button("Make NOW") {
@@ -574,8 +621,22 @@ public struct DeckContentView: View {
             }
         }
         .padding(10)
-        .background(thread.isCurrent ? nowSurfaceColor : Color.clear)
-        return priorityDragRow(row, threadId: thread.id, level: level, before: thread.id)
+        .background(
+            organizerTargetThreadId == thread.id
+                ? Color.gajendraAccent(for: colorScheme).opacity(0.11)
+                : (thread.isCurrent ? nowSurfaceColor : Color.clear)
+        )
+        .background {
+            if !isPreview {
+                GeometryReader { proxy in
+                    Color.clear.preference(
+                        key: GajendraOrganizerTaskFramePreferenceKey.self,
+                        value: [thread.id: proxy.frame(in: .named("gajendra-organizer"))]
+                    )
+                }
+            }
+        }
+        return row
     }
 
     @ViewBuilder
@@ -639,23 +700,25 @@ public struct DeckContentView: View {
             if threads.isEmpty {
                 runningSectionHeader(count: 0, expanded: false)
             } else {
-                Button {
-                    withAnimation(deckAnimation) {
-                        isRunningExpanded.toggle()
-                    }
-                } label: {
-                    runningSectionHeader(count: threads.count, expanded: isRunningExpanded)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                runningSectionHeader(count: threads.count, expanded: isRunningExpanded)
+                .contentShape(Rectangle())
                 .background(
                     isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 8)
                 )
                 .onHover { isRunningHeaderHovered = $0 }
-                .accessibilityLabel("Running, \(threads.count) active threads")
+                .onTapGesture(count: 2) {
+                    toggleRunningDock()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    toggleRunningDock()
+                }
+                .accessibilityLabel("Running, \(threads.count) active threads across all priority lanes")
                 .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint(isRunningExpanded ? "Collapse the running thread list" : "Expand the running thread list")
+                .accessibilityHint("Double-click to \(isRunningExpanded ? "collapse" : "expand") the running thread list")
+                .help("Double-click to \(isRunningExpanded ? "shrink" : "expand") Running")
             }
 
             Divider()
@@ -686,7 +749,12 @@ public struct DeckContentView: View {
                 .stroke(Color.green.opacity(0.22), lineWidth: 1)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Running, \(threads.count) active threads across all priority lanes")
+    }
+
+    private func toggleRunningDock() {
+        withAnimation(deckAnimation) {
+            isRunningExpanded.toggle()
+        }
     }
 
     private func runningSectionHeader(count: Int, expanded: Bool) -> some View {
@@ -696,9 +764,7 @@ public struct DeckContentView: View {
                 .foregroundStyle(Color.green)
             Text("Running")
                 .font(.subheadline.weight(.semibold))
-            Text("\(count)")
-                .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.secondary)
+            GajendraStatusCountBadge(count: count, tint: .green)
             Spacer()
             HStack(spacing: 5) {
                 Text("All priority lanes")
@@ -777,23 +843,27 @@ public struct DeckContentView: View {
             if threads.isEmpty {
                 reviewSectionHeader(count: 0, expanded: false)
             } else {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                        isReviewExpanded.toggle()
-                    }
-                } label: {
-                    reviewSectionHeader(count: threads.count, expanded: isReviewExpanded)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                reviewSectionHeader(count: threads.count, expanded: isReviewExpanded)
+                .contentShape(Rectangle())
                 .background(
                     isReviewHeaderHovered ? Color.orange.opacity(colorScheme == .dark ? 0.12 : 0.08) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 8)
                 )
                 .onHover { isReviewHeaderHovered = $0 }
-                .accessibilityLabel("Ready for Review, \(threads.count) threads")
+                .onTapGesture(count: 2) {
+                    toggleReviewDock()
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction {
+                    toggleReviewDock()
+                }
+                .accessibilityLabel(
+                    "Ready for Review, \(threads.count) \(threads.count == 1 ? "thread" : "threads") needing human attention"
+                )
                 .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint(isReviewExpanded ? "Collapse the review-ready thread list" : "Expand the review-ready thread list")
+                .accessibilityHint("Double-click to \(isReviewExpanded ? "collapse" : "expand") the review-ready thread list")
+                .help("Double-click to \(isReviewExpanded ? "shrink" : "expand") Ready for Review")
             }
 
             Divider()
@@ -809,7 +879,11 @@ public struct DeckContentView: View {
                     if index < threads.count - 1 { Divider() }
                 }
             } else {
-                Text("\(threads.count) threads need your review")
+                Text(
+                    threads.count == 1
+                        ? "1 thread needs your review"
+                        : "\(threads.count) threads need your review"
+                )
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(10)
@@ -824,7 +898,12 @@ public struct DeckContentView: View {
                 .stroke(Color.orange.opacity(0.28), lineWidth: 1)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Ready for Review, \(threads.count) threads needing human attention")
+    }
+
+    private func toggleReviewDock() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            isReviewExpanded.toggle()
+        }
     }
 
     private func reviewSectionHeader(count: Int, expanded: Bool) -> some View {
@@ -832,9 +911,7 @@ public struct DeckContentView: View {
             GajendraReviewStatusMark()
             Text("Ready for Review")
                 .font(.subheadline.weight(.semibold))
-            Text("\(count)")
-                .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(.secondary)
+            GajendraStatusCountBadge(count: count, tint: .orange)
             Spacer()
             HStack(spacing: 5) {
                 Text("Needs your review")
@@ -901,7 +978,7 @@ public struct DeckContentView: View {
             Text(normalizedQuery.isEmpty ? "Add from recent threads" : "Search every thread")
                 .font(.subheadline.weight(.semibold))
             ForEach(Array(matches.prefix(8))) { thread in
-                recentDragRow(HStack {
+                HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(thread.title).lineLimit(1)
                         HStack(spacing: 6) {
@@ -951,8 +1028,21 @@ public struct DeckContentView: View {
                         .controlSize(.small)
                         .disabled(model.isLoading)
                     }
-                }, threadId: thread.id)
+                    if !isPreview {
+                        queueDragHandle(thread)
+                    }
+                }
                 .padding(.vertical, 3)
+                .background {
+                    if !isPreview {
+                        GeometryReader { proxy in
+                            Color.clear.preference(
+                                key: GajendraOrganizerTaskFramePreferenceKey.self,
+                                value: [thread.id: proxy.frame(in: .named("gajendra-organizer"))]
+                            )
+                        }
+                    }
+                }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
             if matches.isEmpty {
@@ -1167,8 +1257,7 @@ public struct DeckContentView: View {
         return Color.secondary.opacity(0.22)
     }
 
-    private func moveDroppedThread(_ payload: GajendraQueueDragPayload, to level: PriorityLevel, before targetId: String?) -> Bool {
-        guard let threadId = dragRegistry.resolve(payload) else { return false }
+    private func moveOrganizerThread(_ threadId: String, to level: PriorityLevel, before targetId: String?) -> Bool {
         if threadId == targetId { return true }
         guard !model.isLoading,
               let snapshot = model.snapshot,
@@ -1184,44 +1273,67 @@ public struct DeckContentView: View {
         return true
     }
 
-    @ViewBuilder
-    private func priorityDropSection<Content: View>(_ content: Content, level: PriorityLevel) -> some View {
-        if isPreview {
-            content
-        } else {
-            content.dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
-                guard let payload = payloads.first else { return false }
-                return moveDroppedThread(payload, to: level, before: nil)
-            }
-        }
+    private func queueDragHandle(_ thread: DeckThread) -> some View {
+        Image(systemName: "line.3.horizontal")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(
+                organizerDraggingThreadId == thread.id
+                    ? Color.gajendraAccent(for: colorScheme)
+                    : Color.secondary
+            )
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 3, coordinateSpace: .named("gajendra-organizer"))
+                    .onChanged { value in
+                        guard !model.isLoading else { return }
+                        organizerDraggingThreadId = thread.id
+                        updateOrganizerDropTarget(at: value.location, sourceThreadId: thread.id)
+                    }
+                    .onEnded { value in
+                        finishOrganizerDrag(threadId: thread.id, at: value.location)
+                    }
+            )
+            .disabled(model.isLoading)
+            .help("Drag \(thread.title) to reorder or move priority lanes")
+            .accessibilityLabel("Drag \(thread.title)")
+            .accessibilityValue(model.isLoading ? "Busy; unavailable" : "Ready")
+            .accessibilityHint("Drag with the pointer. Use the row actions for keyboard or VoiceOver moves.")
+            .accessibilityAddTraits(.isButton)
     }
 
-    @ViewBuilder
-    private func priorityDragRow<Content: View>(
-        _ content: Content,
-        threadId: String,
-        level: PriorityLevel,
-        before targetId: String
-    ) -> some View {
-        if isPreview {
-            content
-        } else {
-            content
-                .draggable(dragRegistry.issue(threadId: threadId))
-                .dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
-                    guard let payload = payloads.first else { return false }
-                    return moveDroppedThread(payload, to: level, before: targetId)
-                }
+    private func updateOrganizerDropTarget(at point: CGPoint, sourceThreadId: String) {
+        if organizerTaskFrames[sourceThreadId]?.contains(point) == true {
+            organizerTargetThreadId = nil
+            organizerTargetLevel = nil
+            return
         }
+        if let target = organizerTaskFrames.first(where: {
+            $0.key != sourceThreadId && $0.value.contains(point)
+        }), let level = model.snapshot?.allThreads.first(where: { $0.id == target.key })?.level {
+            organizerTargetThreadId = target.key
+            organizerTargetLevel = level
+            return
+        }
+        if let section = organizerSectionFrames.first(where: { $0.value.contains(point) }),
+           let level = PriorityLevel(rawValue: section.key) {
+            organizerTargetThreadId = nil
+            organizerTargetLevel = level
+            return
+        }
+        organizerTargetThreadId = nil
+        organizerTargetLevel = nil
     }
 
-    @ViewBuilder
-    private func recentDragRow<Content: View>(_ content: Content, threadId: String) -> some View {
-        if isPreview {
-            content
-        } else {
-            content.draggable(dragRegistry.issue(threadId: threadId))
-        }
+    private func finishOrganizerDrag(threadId: String, at point: CGPoint) {
+        updateOrganizerDropTarget(at: point, sourceThreadId: threadId)
+        let targetLevel = organizerTargetLevel
+        let targetThreadId = organizerTargetThreadId
+        organizerDraggingThreadId = nil
+        organizerTargetThreadId = nil
+        organizerTargetLevel = nil
+        guard let targetLevel else { return }
+        _ = moveOrganizerThread(threadId, to: targetLevel, before: targetThreadId)
     }
 
     private var footer: some View {

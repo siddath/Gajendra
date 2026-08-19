@@ -1,7 +1,7 @@
 # Engineering audit
 
 This audit tracks current source risks and controls for the Gajendra source-review candidate. It
-does not certify a signed release, full installed journey, or external service.
+does not certify a clean-Mac/physical journey, signed release, or external service.
 
 | Risk | Current source control | Required release evidence |
 | --- | --- | --- |
@@ -16,5 +16,5 @@ does not certify a signed release, full installed journey, or external service.
 | Mobile trust expansion | Documentation-only E0; no listener/client/credential exists | Separate D01–D07/D11 approvals and spike proof |
 
 No current record proves clean-Mac behavior, physical VoiceOver/login/drag, Developer ID,
-notarization, binary distribution, app-store readiness, or LinkedIn publication. A narrow installed
-launcher receipt and public source review are recorded in [Status](../STATUS.md).
+notarization, binary distribution, app-store readiness, or LinkedIn publication. An exact installed
+automated interaction receipt and public source review are recorded in [Status](../STATUS.md).

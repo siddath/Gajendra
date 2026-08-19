@@ -27,29 +27,116 @@ enum GajendraSelfTest {
             "priority edit hold must feel deliberate without delaying drag pickup"
         )
         try require(
+            GajendraQueueInteractionTuning.movementTolerance == 4,
+            "priority edit hold must cancel before an intentional task drag or scroll"
+        )
+        try require(
             !GajendraQueueInteractionPolicy.cancelsStationaryPress(
                 start: CGPoint(x: 10, y: 10), current: CGPoint(x: 12, y: 12)
-            ),
-            "small hold movement must remain within tolerance"
+            )
+                && GajendraQueueInteractionPolicy.cancelsStationaryPress(
+                    start: CGPoint(x: 10, y: 10), current: CGPoint(x: 15, y: 10)
+                )
+                && GajendraQueueInteractionPolicy.cancelsStationaryPress(
+                    start: CGPoint(x: 10, y: 10), current: CGPoint(x: 10, y: 10), competingDrag: true
+                )
+                && GajendraQueueInteractionPolicy.cancelsStationaryPress(
+                    start: CGPoint(x: 10, y: 10), current: CGPoint(x: 10, y: 10), viewVisible: false
+                ),
+            "hold selection must cancel on excessive movement, competing drag, or disappearance"
         )
         try require(
-            GajendraQueueInteractionPolicy.cancelsStationaryPress(
-                start: CGPoint(x: 10, y: 10), current: CGPoint(x: 15, y: 10)
-            ),
-            "movement beyond hold tolerance must cancel the hold"
+            GajendraQueueInteractionTuning.dragMinimumDistance == 3
+                && GajendraQueueInteractionTuning.dragLiftScale > 1
+                && GajendraQueueInteractionTuning.holdToDragInstruction == "Hold to select; keep holding to drag",
+            "compact queue drag must use a local lifted preview and hold-to-drag instruction"
         )
         try require(
-            GajendraQueueInteractionPolicy.cancelsStationaryPress(
-                start: CGPoint(x: 10, y: 10), current: CGPoint(x: 10, y: 10), competingDrag: true
-            ),
-            "a competing drag must cancel the hold"
+            GajendraQueueInteractionTuning.dragPreviewScale(reduceMotion: false) > 1
+                && GajendraQueueInteractionTuning.dragPreviewScale(reduceMotion: true) == 1,
+            "Reduce Motion must remove the lifted preview scale"
         )
         try require(
-            GajendraQueueInteractionPolicy.cancelsStationaryPress(
-                start: CGPoint(x: 10, y: 10), current: CGPoint(x: 10, y: 10), viewVisible: false
-            ),
-            "a disappearing row must cancel the hold"
+            GajendraSurfaceRefreshPolicy.interval == 30
+                && GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: true,
+                    modelIsLoading: false,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState()
+                )
+                && !GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: false,
+                    modelIsLoading: false,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState()
+                )
+                && !GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: true,
+                    modelIsLoading: false,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState(isQueueEditing: true)
+                )
+                && !GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: true,
+                    modelIsLoading: false,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState(isSearchFocused: true)
+                )
+                && !GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: true,
+                    modelIsLoading: true,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState()
+                )
+                && !GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: true,
+                    modelIsLoading: false,
+                    modelIsMutating: true,
+                    interactionState: GajendraCardInteractionState()
+                ),
+            "surface refresh must be visible-only and paused during queue interaction"
         )
+        try require(
+            GajendraSurfacePresentationPolicy.shouldStopRefreshOnPopoverClose(cardSurfaceVisible: false)
+                && !GajendraSurfacePresentationPolicy.shouldStopRefreshOnPopoverClose(cardSurfaceVisible: true),
+            "popover close must preserve refresh during a floating-card transition"
+        )
+        var refreshLifecycle = GajendraSurfaceRefreshLifecycle()
+        try require(
+            !refreshLifecycle.shouldPoll && !refreshLifecycle.surfaceIsVisible,
+            "surface refresh must start hidden and stopped"
+        )
+        refreshLifecycle.revealPopover()
+        try require(
+            refreshLifecycle.popoverVisible
+                && refreshLifecycle.shouldPoll
+                && GajendraSurfaceRefreshPolicy.shouldRefresh(
+                    surfaceIsVisible: refreshLifecycle.shouldPoll,
+                    modelIsLoading: false,
+                    modelIsMutating: false,
+                    interactionState: GajendraCardInteractionState()
+                ),
+            "visible status-item popover must own an active refresh surface"
+        )
+        refreshLifecycle.handoffToCard()
+        try require(
+            refreshLifecycle.cardSurfaceVisible
+                && !refreshLifecycle.popoverVisible
+                && refreshLifecycle.shouldPoll,
+            "popover-to-card handoff must preserve visible refresh ownership"
+        )
+        refreshLifecycle.closePopover(cardSurfaceVisible: true)
+        try require(refreshLifecycle.shouldPoll, "popover close must not stop a visible card refresh")
+        refreshLifecycle.reconcile(cardSurfaceVisible: false, popoverVisible: false)
+        try require(
+            !refreshLifecycle.shouldPoll,
+            "hidden card and popover must stop refresh polling"
+        )
+        let interactionSession = GajendraCardInteractionSession()
+        interactionSession.update(isQueueEditing: true, isSearchFocused: false, isDragging: true)
+        try require(interactionSession.state.blocksSurfaceRefresh, "active card interaction did not block surface refresh")
+        interactionSession.resetTransientState()
+        try require(!interactionSession.state.blocksSurfaceRefresh, "surface interaction state did not clear on hide/reset")
         try require(
             GajendraQueueInteractionTuning.reorderSpringResponse <= 0.24
                 && GajendraQueueInteractionTuning.reorderSpringDamping >= 0.88,
@@ -142,6 +229,13 @@ enum GajendraSelfTest {
         try require(
             reviewSnapshot.runningThreads.map(\.id) == [staleRunningReview.id],
             "Running must take precedence over stale review readiness"
+        )
+        try require(
+            snapshot.searchThreads("design").contains(where: { $0.id == snapshot.current?.id })
+                && inclusiveSnapshot.searchThreads("important").contains(where: { $0.id == activeImportant.id })
+                && inclusiveSnapshot.searchThreads("running").count == 3
+                && reviewSnapshot.searchThreads("ready for review").contains(where: { $0.id == reviewImportant.id }),
+            "local search must cover bounded context, placement, provider-running, and Ready metadata"
         )
         try require(
             reviewSnapshot.searchThreads("review agent").map(\.id).count == 4
@@ -410,6 +504,24 @@ enum GajendraSelfTest {
                 snapshot: queueSnapshot
             ) == nil,
             "self-drop must be an explicit no-op"
+        )
+        let queueRowFrames = [
+            queueFocusA.id: CGRect(x: 0, y: 0, width: 240, height: 40),
+            queueFocusB.id: CGRect(x: 0, y: 40, width: 240, height: 40),
+            queueFocusC.id: CGRect(x: 0, y: 80, width: 240, height: 40)
+        ]
+        try require(
+            GajendraQueueEditHitTesting.isSelfDrop(
+                at: CGPoint(x: 120, y: 60),
+                sourceThreadId: queueFocusB.id,
+                taskFrames: queueRowFrames
+            )
+                && !GajendraQueueEditHitTesting.isSelfDrop(
+                    at: CGPoint(x: 120, y: 100),
+                    sourceThreadId: queueFocusB.id,
+                    taskFrames: queueRowFrames
+                ),
+            "dropping on the source frame must be an explicit UI no-op"
         )
         try require(
             GajendraQueueMovePlanner.plan(
@@ -780,7 +892,7 @@ enum GajendraSelfTest {
             var settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .nativePopover, "Native Popover must be the default theme")
             try require(settings.appearance == .automatic, "Auto must be the default appearance")
-            try require(settings.hoverCardSize == .comfortable, "Comfortable must be the default hover-card size")
+            try require(settings.hoverCardSize == .compact, "Compact must be the default hover-card size")
             try require(settings.pillAnchor == .bottomTrailing, "Bottom Right must be the default launcher hotspot")
             settings.theme = .focusDeck
             settings.appearance = .dark
@@ -798,7 +910,7 @@ enum GajendraSelfTest {
             settings = GajendraVisualSettings(defaults: defaults)
             try require(settings.theme == .nativePopover, "invalid theme must fall back safely")
             try require(settings.appearance == .automatic, "invalid appearance must fall back safely")
-            try require(settings.hoverCardSize == .comfortable, "invalid hover-card size must fall back safely")
+            try require(settings.hoverCardSize == .compact, "invalid hover-card size must fall back safely")
             try require(settings.pillAnchor == .bottomTrailing, "invalid launcher hotspot must fall back safely")
             try require(GajendraAppearance.automatic.appKitName == nil, "Auto must follow the system appearance")
             try require(GajendraAppearance.light.appKitName == .aqua, "Light must map to Aqua")
@@ -1052,32 +1164,6 @@ enum GajendraSelfTest {
                 !GajendraDeepLinkPolicy.isPermitted(blocked, allowedSchemes: ["codex"]),
                 "blocked deep link was accepted: \(blocked)"
             )
-        }
-
-        try await MainActor.run {
-            let registry = GajendraQueueDragRegistry(lifetime: 1)
-            let payload = registry.issue(threadId: "codex:private-thread", now: Date(timeIntervalSince1970: 0))
-            let encoded = registry.encodedBytes(for: payload)
-            try require(!encoded.isEmpty, "drag payload did not encode")
-            try require(
-                String(data: encoded, encoding: .utf8)?.contains("codex:private-thread") != true,
-                "canonical thread ID entered the drag payload"
-            )
-            try require(
-                registry.resolve(payload, now: Date(timeIntervalSince1970: 0.5)) == "codex:private-thread",
-                "known drag token did not resolve in its session"
-            )
-            try require(
-                registry.resolve(payload, now: Date(timeIntervalSince1970: 0.5)) == nil,
-                "accepted drag token was replayable"
-            )
-            try require(
-                registry.resolve(GajendraQueueDragPayload(token: UUID().uuidString), now: Date()) == nil,
-                "foreign drag token was accepted"
-            )
-            let cancelled = registry.issue(threadId: "codex:cancelled", now: Date())
-            registry.cancel(cancelled)
-            try require(registry.resolve(cancelled, now: Date()) == nil, "cancelled drag token remained usable")
         }
     }
 

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import {
   CodexAppServerClient,
   DEFAULT_CODEX_APP_SERVER_MAX_LINE_BYTES,
+  enrichCodexReviewSignals,
   enrichCodexRuntimeStatuses,
   heldCodexThreadIds,
   isCodexActivityEnrichmentEnabled,
@@ -17,7 +18,7 @@ import {
   resolveCodexAppServerStdoutLineLimit,
   rolloutTailShowsActiveTurn,
 } from "../../src/server/codex-app-server.js";
-import { EMPTY_STORE } from "../../src/shared/contracts.js";
+import { EMPTY_STORE, type CodexThread } from "../../src/shared/contracts.js";
 import { GajendraStoreRepository } from "../../src/server/store.js";
 
 const syntheticThreadId = (index: number): string =>
@@ -72,6 +73,502 @@ describe("Codex desktop runtime status", () => {
     expect(isCodexActivityEnrichmentEnabled({})).toBe(true);
     expect(isCodexActivityEnrichmentEnabled({ GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: "off" })).toBe(false);
     expect(isCodexActivityEnrichmentEnabled({ GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: " false " })).toBe(false);
+  });
+
+  it("classifies only a completed newest metadata-only turn as live Ready for Review", async () => {
+    const id = syntheticThreadId(201);
+    const activeId = syntheticThreadId(202);
+    const systemErrorId = syntheticThreadId(203);
+    const calls: unknown[] = [];
+    const result = await enrichCodexReviewSignals([
+      { id, recencyAt: 20, status: "idle" },
+      { id: activeId, recencyAt: 30, status: "active" },
+      { id: systemErrorId, recencyAt: 40, status: "systemError" },
+    ], async (params) => {
+      calls.push(params);
+      return {
+        data: [{
+          status: "completed",
+          completedAt: 1_786_545_400,
+          itemsView: "notLoaded",
+          items: [],
+          error: null,
+        }],
+        nextCursor: null,
+      };
+    });
+
+    expect(calls).toEqual([{
+      threadId: id,
+      limit: 1,
+      sortDirection: "desc",
+      itemsView: "notLoaded",
+    }]);
+    expect(result).toEqual({
+      availability: "available",
+      threads: [
+        expect.objectContaining({
+          id,
+          gajendraReview: {
+            state: "ready",
+            kind: "result",
+            updatedAt: 1_786_545_400,
+            destination: { type: "thread", deepLink: `codex://threads/${id}` },
+            providerStatus: "completed",
+          },
+        }),
+        expect.objectContaining({ id: activeId }),
+        expect.objectContaining({ id: systemErrorId }),
+      ],
+    });
+    expect(result.threads[1]).not.toHaveProperty("gajendraReview");
+    expect(result.threads[2]).not.toHaveProperty("gajendraReview");
+  });
+
+  it("allows only documented idle/notLoaded thread states into Ready for Review", async () => {
+    const idleId = syntheticThreadId(204);
+    const notLoadedId = syntheticThreadId(205);
+    const unknownId = syntheticThreadId(206);
+    const missingId = syntheticThreadId(207);
+    const malformedId = syntheticThreadId(208);
+    const systemErrorId = syntheticThreadId(209);
+    const requestedIds: string[] = [];
+    const result = await enrichCodexReviewSignals([
+      { id: idleId, status: "idle" },
+      { id: notLoadedId, status: { type: "notLoaded" } },
+      { id: unknownId, status: "unknown" },
+      { id: missingId },
+      { id: malformedId, status: { type: 17 } },
+      { id: systemErrorId, status: "systemError" },
+    ] as unknown as CodexThread[], async ({ threadId }) => {
+      requestedIds.push(threadId);
+      return { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null }] };
+    });
+    expect(requestedIds).toEqual([idleId, notLoadedId]);
+    expect(result.threads[0]).toHaveProperty("gajendraReview.state", "ready");
+    expect(result.threads[1]).toHaveProperty("gajendraReview.state", "ready");
+    expect(result.threads.slice(2).every((thread) => !Object.hasOwn(thread, "gajendraReview"))).toBe(true);
+  });
+
+  it("keeps structurally valid non-ready turns out of Ready for Review", async () => {
+    const id = syntheticThreadId(203);
+    const base = [{ id, recencyAt: 20, status: "idle" }];
+    const completed = {
+      data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null }],
+    };
+    const initial = await enrichCodexReviewSignals(base, async () => completed);
+    expect(initial.threads[0]).toHaveProperty("gajendraReview.state", "ready");
+
+    const nonReadyPages: unknown[] = [
+      { data: [] },
+      { data: [{ status: "inProgress", completedAt: null, itemsView: "notLoaded", items: [], error: null }] },
+      { data: [{ status: "active", completedAt: null, itemsView: "notLoaded", items: [], error: null }] },
+      { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] },
+      { data: [{ status: "failed", completedAt: null, itemsView: "notLoaded", items: [], error: { message: "private failure detail" } }] },
+    ];
+    for (const page of nonReadyPages) {
+      const result = await enrichCodexReviewSignals(base, async () => page);
+      expect(result.availability).toBe("available");
+      expect(result.threads[0]).not.toHaveProperty("gajendraReview");
+      expect(JSON.stringify(result)).not.toContain("private failure detail");
+    }
+  });
+
+  it("fails an entire review batch closed when any turn summary is structurally invalid", async () => {
+    const validId = syntheticThreadId(210);
+    const invalidId = syntheticThreadId(211);
+    const privateItem = "private-turn-content-must-not-leak-from-a-batch";
+    const result = await enrichCodexReviewSignals([
+      { id: validId, recencyAt: 2, status: "idle" },
+      { id: invalidId, recencyAt: 1, status: "idle" },
+    ], async ({ threadId }) => threadId === validId
+      ? { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null }] }
+      : { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [{ content: privateItem }], error: null }] },
+    );
+    expect(result).toMatchObject({ availability: "transient" });
+    expect(result.threads.every((thread) => !Object.hasOwn(thread, "gajendraReview"))).toBe(true);
+    expect(JSON.stringify(result)).not.toContain(privateItem);
+  });
+
+  it("rejects malformed, millisecond, unrenderable, and future completion timestamps", async () => {
+    const id = syntheticThreadId(212);
+    const nowMs = 1_786_545_500_000;
+    const base = [{ id, recencyAt: 20, status: "idle" }];
+    const timestampPage = (completedAt: unknown) => ({
+      data: [{ status: "completed", completedAt, itemsView: "notLoaded", items: [], error: null }],
+    });
+    const invalidTimestamps: unknown[] = [
+      null,
+      "not-a-timestamp",
+      1_786_545_400_000,
+      1_786_545_501,
+      8_640_000_000_001,
+    ];
+    for (const completedAt of invalidTimestamps) {
+      const result = await enrichCodexReviewSignals(base, async () => timestampPage(completedAt), { now: () => nowMs });
+      expect(result.availability).toBe("transient");
+      expect(result.threads[0]).not.toHaveProperty("gajendraReview");
+    }
+
+    const unrenderableResult = await enrichCodexReviewSignals(
+      base,
+      async () => timestampPage(8_640_000_000_001),
+      { now: () => 8_640_000_000_002_000 },
+    );
+    expect(unrenderableResult.availability).toBe("transient");
+    expect(unrenderableResult.threads[0]).not.toHaveProperty("gajendraReview");
+
+    const valid = await enrichCodexReviewSignals(base, async () => timestampPage(1_786_545_400), { now: () => nowMs });
+    expect(valid.threads[0]).toHaveProperty("gajendraReview.updatedAt", 1_786_545_400);
+  });
+
+  it("treats malformed turn-page shape as invalid metadata evidence", async () => {
+    const id = syntheticThreadId(213);
+    const base = [{ id, recencyAt: 20, status: "idle" }];
+    const malformedPages: unknown[] = [
+      { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "summary", items: [], error: null }] },
+      { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: "malformed", error: null }] },
+      { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [] }] },
+      { data: [
+        { status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null },
+        { status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null },
+      ] },
+      { malformed: true },
+    ];
+    for (const page of malformedPages) {
+      const result = await enrichCodexReviewSignals(base, async () => page);
+      expect(result.availability).toBe("transient");
+      expect(result.threads[0]).not.toHaveProperty("gajendraReview");
+    }
+  });
+
+  it("requires zero not-loaded items and never returns hostile turn content", async () => {
+    const id = syntheticThreadId(204);
+    const secret = "private-turn-content-must-not-leak";
+    const result = await enrichCodexReviewSignals([{
+      id,
+      status: "idle",
+      unexpectedProviderPayload: secret,
+    }] as unknown as CodexThread[], async () => ({
+      data: [{
+        status: "completed",
+        completedAt: 1_786_545_400,
+        itemsView: "notLoaded",
+        items: [{ content: secret }],
+        error: null,
+      }],
+    }));
+    expect(result.threads[0]).not.toHaveProperty("gajendraReview");
+    expect(JSON.stringify(result)).not.toContain(secret);
+  });
+
+  it("fails closed on the shared review deadline before launching additional work", async () => {
+    const threads = Array.from({ length: 9 }, (_, index) => ({
+      id: syntheticThreadId(220 + index),
+      recencyAt: 100 - index,
+      status: "idle",
+    }));
+    let inFlight = 0;
+    let peak = 0;
+    let calls = 0;
+    const result = await enrichCodexReviewSignals(threads, async () => {
+      calls += 1;
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      return new Promise(() => undefined);
+    }, { maxConcurrency: 2, deadlineMs: 25 });
+    expect(calls).toBe(1);
+    expect(peak).toBe(1);
+    expect(result).toEqual({ availability: "transient", threads });
+  });
+
+  it("uses a small bounded review worker pool after the optional method probe", async () => {
+    const threads = Array.from({ length: 7 }, (_, index) => ({
+      id: syntheticThreadId(240 + index),
+      recencyAt: 100 - index,
+      status: "idle",
+    }));
+    let inFlight = 0;
+    let peak = 0;
+    let calls = 0;
+    const result = await enrichCodexReviewSignals(threads, async () => {
+      calls += 1;
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await delay(10);
+      inFlight -= 1;
+      return { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] };
+    }, { maxConcurrency: 2, deadlineMs: 500 });
+    expect(calls).toBe(threads.length);
+    expect(peak).toBe(2);
+    expect(result).toEqual({ availability: "available", threads });
+  });
+
+  it("hard-clamps review workers and deadline apart from activity-tail tuning", async () => {
+    const threads = Array.from({ length: 9 }, (_, index) => ({
+      id: syntheticThreadId(250 + index),
+      recencyAt: 100 - index,
+      status: "idle",
+    }));
+    let inFlight = 0;
+    let peak = 0;
+    const pooled = await enrichCodexReviewSignals(threads, async () => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await delay(10);
+      inFlight -= 1;
+      return { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] };
+    }, { maxConcurrency: 99, deadlineMs: 99_999 });
+    expect(peak).toBe(4);
+    expect(pooled).toEqual({ availability: "available", threads });
+
+    let clock = 0;
+    let calls = 0;
+    const deadline = await enrichCodexReviewSignals(threads, async () => {
+      calls += 1;
+      clock = 5_000;
+      return { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] };
+    }, { maxConcurrency: 99, deadlineMs: 99_999, now: () => clock });
+    expect(calls).toBe(1);
+    expect(deadline).toEqual({ availability: "transient", threads });
+  });
+
+  it("stops a transient experimental endpoint after the first metadata probe without treating it as unsupported", async () => {
+    const threads = Array.from({ length: 6 }, (_, index) => ({ id: syntheticThreadId(260 + index), status: "idle" }));
+    let calls = 0;
+    const result = await enrichCodexReviewSignals(threads, async () => {
+      calls += 1;
+      throw new Error("method not found");
+    }, { maxConcurrency: 4, deadlineMs: 500 });
+    expect(calls).toBe(1);
+    expect(result).toEqual({ availability: "transient", threads });
+  });
+
+  it("inspects at most the shared 200 newest Codex candidates", async () => {
+    const threads = Array.from({ length: 240 }, (_, index) => ({
+      id: syntheticThreadId(300 + index),
+      recencyAt: 240 - index,
+      status: "idle",
+    }));
+    const requestedIds: string[] = [];
+    const result = await enrichCodexReviewSignals(threads, async ({ threadId }) => {
+      requestedIds.push(threadId);
+      return { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] };
+    });
+    expect(requestedIds).toHaveLength(200);
+    expect(requestedIds).toEqual(threads.slice(0, 200).map((thread) => thread.id));
+    expect(result.threads.every((thread) => !Object.hasOwn(thread, "gajendraReview"))).toBe(true);
+  });
+
+  it("uses experimental turn metadata when supported and falls back without failing Codex listing", async () => {
+    if (process.platform === "win32") return;
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-codex-review-protocol-"));
+    const fakeCodex = path.join(directory, "fake-codex");
+    const id = syntheticThreadId(601);
+    try {
+      await writeFile(fakeCodex, `#!${process.execPath}
+const fs = require("node:fs");
+const readline = require("node:readline");
+const logPath = process.env.GAJENDRA_TEST_REVIEW_LOG;
+const threadId = process.env.GAJENDRA_TEST_REVIEW_THREAD_ID;
+const startsPath = process.env.GAJENDRA_TEST_REVIEW_STARTS;
+const turnsPath = process.env.GAJENDRA_TEST_REVIEW_TURNS;
+let starts = 0;
+try { starts = Number(fs.readFileSync(startsPath, "utf8")) || 0; } catch {}
+fs.writeFileSync(startsPath, String(starts + 1));
+let initialized = false;
+function record(request) { fs.appendFileSync(logPath, JSON.stringify({ pid: process.pid, ...request }) + "\\n"); }
+function response(request, result, error) {
+  process.stdout.write(JSON.stringify(error ? { id: request.id, error } : { id: request.id, result }) + "\\n");
+}
+readline.createInterface({ input: process.stdin }).on("line", (line) => {
+  const request = JSON.parse(line);
+  record(request);
+  if (typeof request.id !== "number") return;
+  if (request.method === "initialize") {
+    if (initialized) {
+      response(request, null, { code: -32000, message: "second initialize is forbidden" });
+    } else if (request.params?.capabilities?.experimentalApi && process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-capability" && starts === 0) {
+      response(request, null, { code: -32602, message: "unsupported experimental capability" });
+    } else if (request.params?.capabilities?.experimentalApi && starts === 0 && (process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-unknown-experimental-capability" || process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-unrecognized-experimental-capability")) {
+      response(request, null, { code: -32602, message: process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-unknown-experimental-capability" ? "Unknown experimental capability" : "Unrecognized experimental capability" });
+    } else if (request.params?.capabilities?.experimentalApi && process.env.GAJENDRA_TEST_REVIEW_MODE === "transient-initialize-then-supported" && starts === 0) {
+      response(request, null, { code: -32602, message: "Unknown internal capability failure; retry later" });
+    } else if (process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-other-initialize") {
+      response(request, null, { code: -32000, message: "server initialization unavailable" });
+    } else response(request, {});
+    initialized = true;
+    return;
+  }
+  if (request.method === "thread/list") {
+    response(request, { data: [{ id: threadId, name: "Safe metadata title", status: "idle", recencyAt: 2 }], nextCursor: null });
+    return;
+  }
+  if (request.method === "thread/turns/list") {
+    if (process.env.GAJENDRA_TEST_REVIEW_MODE === "reject-method") {
+      response(request, null, { code: -32601, message: "private experimental method failure" });
+    } else if (process.env.GAJENDRA_TEST_REVIEW_MODE === "transient-method-then-supported") {
+      let turns = 0;
+      try { turns = Number(fs.readFileSync(turnsPath, "utf8")) || 0; } catch {}
+      fs.writeFileSync(turnsPath, String(turns + 1));
+      if (turns === 0) response(request, null, { code: -32000, message: "Unknown internal capability failure; retry later" });
+      else response(request, { data: [{ status: "completed", completedAt: 1786545400, itemsView: "notLoaded", items: [], error: null }], nextCursor: null });
+    } else if (process.env.GAJENDRA_TEST_REVIEW_MODE === "timeout-then-supported") {
+      let turns = 0;
+      try { turns = Number(fs.readFileSync(turnsPath, "utf8")) || 0; } catch {}
+      fs.writeFileSync(turnsPath, String(turns + 1));
+      if (turns > 0) response(request, { data: [{ status: "completed", completedAt: 1786545400, itemsView: "notLoaded", items: [], error: null }], nextCursor: null });
+    } else {
+      response(request, { data: [{ status: "completed", completedAt: 1786545400, itemsView: "notLoaded", items: [], error: null }], nextCursor: null });
+    }
+    return;
+  }
+  response(request, {});
+});
+`);
+      await chmod(fakeCodex, 0o700);
+
+      const run = async (mode: "supported" | "reject-capability" | "reject-unknown-experimental-capability" | "reject-unrecognized-experimental-capability" | "reject-method" | "timeout-then-supported" | "transient-initialize-then-supported" | "transient-method-then-supported"): Promise<{
+        threads: Awaited<ReturnType<CodexAppServerClient["listThreads"]>>;
+        retryThreads: Awaited<ReturnType<CodexAppServerClient["listThreads"]>> | null;
+        requests: Array<Record<string, unknown>>;
+        starts: number;
+      }> => {
+        const logPath = path.join(directory, `${mode}.jsonl`);
+        const startsPath = path.join(directory, `${mode}-starts`);
+        const turnsPath = path.join(directory, `${mode}-turns`);
+        // Keep the deliberate turn-metadata timeout comfortably above process startup under
+        // aggregate test load. The fake still withholds only the first turns response, so this
+        // exercises transient (not unsupported) retry semantics without racing initialize.
+        const client = new CodexAppServerClient(2_000, {
+          ...process.env,
+          GAJENDRA_CODEX_BIN: fakeCodex,
+          GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: "off",
+          GAJENDRA_TEST_REVIEW_LOG: logPath,
+          GAJENDRA_TEST_REVIEW_THREAD_ID: id,
+          GAJENDRA_TEST_REVIEW_MODE: mode,
+          GAJENDRA_TEST_REVIEW_STARTS: startsPath,
+          GAJENDRA_TEST_REVIEW_TURNS: turnsPath,
+        });
+        try {
+          let threads: Awaited<ReturnType<CodexAppServerClient["listThreads"]>>;
+          if (mode === "transient-initialize-then-supported") {
+            await expect(client.listThreads()).rejects.toThrow("Unknown internal capability failure; retry later");
+            threads = await client.listThreads();
+          } else {
+            threads = await client.listThreads();
+          }
+          let retryThreads: Awaited<ReturnType<CodexAppServerClient["listThreads"]>> | null = null;
+          // A cached unavailable endpoint must not keep trying on subsequent visible refreshes.
+          if (mode === "reject-method") await expect(client.listThreads()).resolves.toEqual(threads);
+          if (mode === "timeout-then-supported" || mode === "transient-method-then-supported") retryThreads = await client.listThreads();
+          const requests = (await readFile(logPath, "utf8")).trim().split(/\r?\n/u)
+            .filter(Boolean).map((line) => JSON.parse(line) as Record<string, unknown>);
+          return { threads, retryThreads, requests, starts: Number(await readFile(startsPath, "utf8")) };
+        } finally {
+          await client.close().catch(() => undefined);
+        }
+      };
+
+      // These fake app-server cases have independent state files and child processes. Running
+      // them together keeps the intentionally withheld 2 s response from accumulating with
+      // unrelated fallback teardown, while preserving every protocol deadline and assertion.
+      const [
+        supported,
+        capabilityFallback,
+        explicitCapabilityFallbacks,
+        methodFallback,
+        transientInitialize,
+        transientMethod,
+        transient,
+      ] = await Promise.all([
+        run("supported"),
+        run("reject-capability"),
+        Promise.all([
+          run("reject-unknown-experimental-capability"),
+          run("reject-unrecognized-experimental-capability"),
+        ]),
+        run("reject-method"),
+        run("transient-initialize-then-supported"),
+        run("transient-method-then-supported"),
+        run("timeout-then-supported"),
+      ]);
+      expect(supported.threads[0]).toMatchObject({
+        id,
+        gajendraReview: { destination: { type: "thread", deepLink: `codex://threads/${id}` }, providerStatus: "completed" },
+      });
+      const supportedInitialize = supported.requests.find((request) => request.method === "initialize");
+      expect(supportedInitialize).toMatchObject({ params: { capabilities: { experimentalApi: true, requestAttestation: false } } });
+      expect(supported.requests).toContainEqual(expect.objectContaining({
+        method: "thread/turns/list",
+        params: { threadId: id, limit: 1, sortDirection: "desc", itemsView: "notLoaded" },
+      }));
+
+      expect(capabilityFallback.threads).toEqual([expect.objectContaining({ id })]);
+      expect(capabilityFallback.threads[0]).not.toHaveProperty("gajendraReview");
+      expect(capabilityFallback.requests.filter((request) => request.method === "initialize")).toHaveLength(2);
+      expect(capabilityFallback.starts).toBe(2);
+      const fallbackInitializes = capabilityFallback.requests.filter((request) => request.method === "initialize");
+      expect(new Set(fallbackInitializes.map((request) => request.pid))).toHaveLength(2);
+      expect(fallbackInitializes).toEqual([
+        expect.objectContaining({ params: expect.objectContaining({ capabilities: { experimentalApi: true, requestAttestation: false } }) }),
+        expect.objectContaining({ params: expect.objectContaining({ capabilities: null }) }),
+      ]);
+      expect(capabilityFallback.requests.some((request) => request.method === "thread/turns/list")).toBe(false);
+
+      for (const explicitCapabilityFallback of explicitCapabilityFallbacks) {
+        expect(explicitCapabilityFallback.threads[0]).not.toHaveProperty("gajendraReview");
+        expect(explicitCapabilityFallback.starts).toBe(2);
+        expect(explicitCapabilityFallback.requests.filter((request) => request.method === "initialize")).toEqual([
+          expect.objectContaining({ params: expect.objectContaining({ capabilities: { experimentalApi: true, requestAttestation: false } }) }),
+          expect.objectContaining({ params: expect.objectContaining({ capabilities: null }) }),
+        ]);
+      }
+
+      expect(methodFallback.threads[0]).not.toHaveProperty("gajendraReview");
+      expect(methodFallback.requests.filter((request) => request.method === "thread/turns/list")).toHaveLength(1);
+      expect(JSON.stringify(methodFallback.threads)).not.toContain("private experimental method failure");
+
+      expect(transientInitialize.threads[0]).toMatchObject({ gajendraReview: { state: "ready" } });
+      expect(transientInitialize.starts).toBe(2);
+      const transientInitializes = transientInitialize.requests.filter((request) => request.method === "initialize");
+      expect(transientInitializes).toHaveLength(2);
+      expect(transientInitializes).toEqual([
+        expect.objectContaining({ params: expect.objectContaining({ capabilities: { experimentalApi: true, requestAttestation: false } }) }),
+        expect.objectContaining({ params: expect.objectContaining({ capabilities: { experimentalApi: true, requestAttestation: false } }) }),
+      ]);
+
+      expect(transientMethod.threads[0]).not.toHaveProperty("gajendraReview");
+      expect(transientMethod.retryThreads?.[0]).toMatchObject({ gajendraReview: { state: "ready", providerStatus: "completed" } });
+      expect(transientMethod.requests.filter((request) => request.method === "thread/turns/list")).toHaveLength(2);
+      expect(transientMethod.starts).toBe(1);
+
+      expect(transient.threads[0]).not.toHaveProperty("gajendraReview");
+      expect(transient.retryThreads?.[0]).toMatchObject({ gajendraReview: { state: "ready", providerStatus: "completed" } });
+      expect(transient.requests.filter((request) => request.method === "thread/turns/list")).toHaveLength(2);
+      expect(transient.starts).toBe(1);
+
+      const otherLogPath = path.join(directory, "reject-other-initialize.jsonl");
+      const otherStartsPath = path.join(directory, "reject-other-initialize-starts");
+      const other = new CodexAppServerClient(2_000, {
+        ...process.env,
+        GAJENDRA_CODEX_BIN: fakeCodex,
+        GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: "off",
+        GAJENDRA_TEST_REVIEW_LOG: otherLogPath,
+        GAJENDRA_TEST_REVIEW_THREAD_ID: id,
+        GAJENDRA_TEST_REVIEW_MODE: "reject-other-initialize",
+        GAJENDRA_TEST_REVIEW_STARTS: otherStartsPath,
+        GAJENDRA_TEST_REVIEW_TURNS: path.join(directory, "reject-other-initialize-turns"),
+      });
+      try {
+        await expect(other.listThreads()).rejects.toThrow("server initialization unavailable");
+        expect(await readFile(otherStartsPath, "utf8")).toBe("1");
+      } finally {
+        await other.close().catch(() => undefined);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("uses a small bounded rollout worker pool and abandons a whole timed-out enrichment", async () => {

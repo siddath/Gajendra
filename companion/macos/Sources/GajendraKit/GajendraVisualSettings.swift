@@ -148,14 +148,14 @@ public final class GajendraVisualSettings: ObservableObject {
         self.defaults = defaults
         theme = GajendraVisualTheme(rawValue: defaults.string(forKey: Self.themeKey) ?? "") ?? .nativePopover
         appearance = GajendraAppearance(rawValue: defaults.string(forKey: Self.appearanceKey) ?? "") ?? .automatic
-        hoverCardSize = GajendraHoverCardSize(rawValue: defaults.string(forKey: Self.hoverCardSizeKey) ?? "") ?? .comfortable
+        hoverCardSize = GajendraHoverCardSize(rawValue: defaults.string(forKey: Self.hoverCardSizeKey) ?? "") ?? .compact
         pillAnchor = GajendraPillAnchor(rawValue: defaults.string(forKey: Self.pillAnchorKey) ?? "") ?? .bottomTrailing
     }
 
     public init(
         theme: GajendraVisualTheme,
         appearance: GajendraAppearance,
-        hoverCardSize: GajendraHoverCardSize = .comfortable,
+        hoverCardSize: GajendraHoverCardSize = .compact,
         pillAnchor: GajendraPillAnchor = .bottomTrailing
     ) {
         defaults = nil

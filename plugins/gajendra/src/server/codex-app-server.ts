@@ -5,7 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
 
-import type { CodexThread } from "../shared/contracts.js";
+import {
+  isRunningThreadStatus,
+  MAX_BACKGROUND_THREADS_PER_SOURCE,
+  type CodexThread,
+  type ReviewSignal,
+} from "../shared/contracts.js";
 
 type JsonRpcResponse = { id: number; result?: unknown; error?: { code?: number; message?: string } };
 type OutputChildProcess = Pick<ChildProcess, "pid" | "kill"> & {
@@ -48,8 +53,20 @@ export const DEFAULT_CODEX_ENRICHMENT_CONCURRENCY = 4;
 export const MAX_CODEX_ENRICHMENT_CONCURRENCY = 8;
 export const DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS = 5_000;
 export const MAX_CODEX_ENRICHMENT_DEADLINE_MS = 10_000;
+/** Only the newest bounded Codex threads are eligible for a metadata-only review signal. */
+export const DEFAULT_CODEX_REVIEW_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE;
+export const MAX_CODEX_REVIEW_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE;
+/** Experimental turn summaries never inherit activity-tail tuning: their privacy boundary is fixed. */
+export const DEFAULT_CODEX_REVIEW_CONCURRENCY = 4;
+export const MAX_CODEX_REVIEW_CONCURRENCY = DEFAULT_CODEX_REVIEW_CONCURRENCY;
+export const DEFAULT_CODEX_REVIEW_DEADLINE_MS = 5_000;
+export const MAX_CODEX_REVIEW_DEADLINE_MS = DEFAULT_CODEX_REVIEW_DEADLINE_MS;
 
 type CodexThreadListPage = { data?: CodexThread[]; nextCursor?: string | null };
+type CodexTurnListPage = { data?: unknown };
+
+/** A transient provider projection. It is intentionally not part of the persisted Codex schema. */
+export type CodexThreadWithReview = CodexThread & { gajendraReview?: ReviewSignal };
 
 export type CodexThreadListBounds = {
   maxPages?: number;
@@ -68,6 +85,47 @@ export type CodexActivityEnrichmentOptions = {
   resolveSessionsDirectory?: (sessionsDirectory: string) => Promise<string>;
   readTail?: (filePath: string, sessionsDirectory: string) => Promise<{ text: string; truncated: boolean }>;
 };
+
+export type CodexReviewEnrichmentOptions = {
+  /** Bound the number of newest Codex candidates inspected during one visible source refresh. */
+  maxCandidates?: number;
+  /** Test seam; metadata-only turn summaries never exceed four concurrent requests. */
+  maxConcurrency?: number;
+  /** Test seam; one total metadata-only batch never exceeds five seconds. */
+  deadlineMs?: number;
+  /** Test seam for deterministic candidate ordering/deadline checks. */
+  now?: () => number;
+};
+
+export type CodexReviewEnrichmentResult = {
+  threads: CodexThreadWithReview[];
+  /** `unsupported` is cacheable; a deadline or ordinary RPC failure remains retryable next refresh. */
+  availability: "available" | "unsupported" | "transient";
+};
+
+class CodexAppServerRpcError extends Error {
+  constructor(readonly code: number | undefined, message: string) {
+    super(message);
+    this.name = "CodexAppServerRpcError";
+  }
+}
+
+/** Only an explicit protocol rejection may downgrade the optional experimental path. */
+function isUnsupportedExperimentalError(error: unknown): error is CodexAppServerRpcError {
+  if (!(error instanceof CodexAppServerRpcError)) return false;
+  if (error.code === -32601) return true; // JSON-RPC Method not found.
+  const message = error.message.toLowerCase();
+  // A generic server/invalid-params code is retryable unless its text explicitly rejects the
+  // experimental capability or method. In particular, "temporarily unavailable" must not turn
+  // off future visible-refresh attempts just because it mentions experimental/capability.
+  const experimentalTarget = /\b(?:method|capabilit(?:y|ies)|experimental(?:api|\s+(?:api|capability)))\b/u;
+  const explicitlyUnsupported = /\b(?:unsupported|not supported)\b/u.test(message)
+    && experimentalTarget.test(message);
+  const explicitUnknownTarget = /\b(?:unknown|unrecognized)\s+(?:experimental\s+)?(?:method|field|capabilit(?:y|ies)|parameter)\b/u.test(message);
+  const explicitMethodNotFound = /\bmethod[\s-]+not[\s-]+found\b/u.test(message);
+  return (error.code === -32602 || error.code === -32000)
+    && (explicitlyUnsupported || explicitUnknownTarget || explicitMethodNotFound);
+}
 
 export type ListOpenFilesOptions = {
   timeoutMs?: number;
@@ -90,6 +148,8 @@ export class CodexAppServerClient {
     { resolve(value: unknown): void; reject(error: Error): void; timeout: NodeJS.Timeout }
   >();
   private ready: Promise<void> | null = null;
+  private experimentalApiEnabled = false;
+  private experimentalTurnsUnsupported = false;
 
   constructor(
     private readonly requestTimeoutMs = resolveRpcTimeout(),
@@ -98,12 +158,20 @@ export class CodexAppServerClient {
     this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
 
-  async listThreads(): Promise<CodexThread[]> {
+  async listThreads(): Promise<CodexThreadWithReview[]> {
     await this.ensureReady();
     const threads = await listBoundedCodexThreads(async (params) => (
       this.request("thread/list", params) as Promise<CodexThreadListPage>
     ));
-    return enrichCodexRuntimeStatuses(threads, this.env);
+    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env);
+    if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
+
+    const reviews = await enrichCodexReviewSignals(
+      runtimeThreads,
+      (params) => this.request("thread/turns/list", params),
+    );
+    if (reviews.availability === "unsupported") this.experimentalTurnsUnsupported = true;
+    return reviews.threads;
   }
 
   async close(): Promise<void> {
@@ -114,7 +182,7 @@ export class CodexAppServerClient {
     this.closeEpoch += 1;
     const lifecycle = this.lifecycle;
     if (lifecycle) {
-      await this.shutdownAppServer(lifecycle, new Error("Codex app-server was closed."));
+      await this.shutdownAppServer(lifecycle, new Error("Codex app-server client is closed."));
       return;
     }
     if (this.teardown) await this.teardown;
@@ -136,7 +204,7 @@ export class CodexAppServerClient {
     return starting;
   }
 
-  private async start(epoch: number): Promise<void> {
+  private async start(epoch: number, initializeMode: "experimental" | "baseline" = "experimental"): Promise<void> {
     if (this.terminallyClosed || epoch !== this.closeEpoch) {
       throw new Error("Codex app-server client is closed.");
     }
@@ -164,10 +232,28 @@ export class CodexAppServerClient {
     child.once("close", () => this.handleAppServerClose(lifecycle));
     this.attachStdoutFraming(child);
 
-    await this.request("initialize", {
-      clientInfo: { name: "gajendra", title: "Gajendra", version: "0.3.1" },
-      capabilities: null,
-    });
+    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.3.1" };
+    try {
+      await this.request("initialize", {
+        clientInfo,
+        capabilities: initializeMode === "experimental"
+          ? { experimentalApi: true, requestAttestation: false }
+          : null,
+      });
+    } catch (error) {
+      if (initializeMode !== "experimental" || !isUnsupportedExperimentalError(error)) {
+        await this.shutdownAppServer(lifecycle, error instanceof Error ? error : new Error("Codex app-server initialize failed."));
+        throw error;
+      }
+      // App-server initialization is one-shot per connection. Tear down the capability-rejecting
+      // child before retrying baseline initialization, keeping the original ensureReady promise
+      // in place so no caller can start a second process during the handoff.
+      await this.shutdownAppServer(lifecycle, error, true);
+      if (this.terminallyClosed || epoch !== this.closeEpoch) throw new Error("Codex app-server client is closed.");
+      return this.start(epoch, "baseline");
+    }
+    this.experimentalApiEnabled = initializeMode === "experimental";
+    this.experimentalTurnsUnsupported = initializeMode !== "experimental";
     this.notify("initialized", {});
   }
 
@@ -243,13 +329,13 @@ export class CodexAppServerClient {
     };
   }
 
-  private shutdownAppServer(lifecycle: AppServerLifecycle, error: Error): Promise<void> {
+  private shutdownAppServer(lifecycle: AppServerLifecycle, error: Error, preserveReady = false): Promise<void> {
     if (lifecycle.closing) return lifecycle.closed;
     lifecycle.closing = true;
     lifecycle.terminationError = error;
     if (this.process === lifecycle.child) {
       this.process = null;
-      this.ready = null;
+      if (!preserveReady) this.ready = null;
     }
     this.stdoutCleanup?.();
     this.stdoutCleanup = null;
@@ -363,7 +449,10 @@ export class CodexAppServerClient {
     this.pending.delete(message.id);
     clearTimeout(pending.timeout);
     if (message.error) {
-      pending.reject(new Error(message.error.message || `Codex app-server error ${message.error.code ?? "unknown"}`));
+      pending.reject(new CodexAppServerRpcError(
+        typeof message.error.code === "number" ? message.error.code : undefined,
+        message.error.message || `Codex app-server error ${message.error.code ?? "unknown"}`,
+      ));
     } else {
       pending.resolve(message.result);
     }
@@ -371,7 +460,12 @@ export class CodexAppServerClient {
 
   private request(method: string, params: unknown): Promise<unknown> {
     const active = this.process;
-    if (!active) return Promise.reject(new Error("Codex app-server is not running."));
+    if (!active) {
+      // A hostile child can overflow stdout immediately after spawn, before start() has installed
+      // its first pending initialize request. Preserve that bounded protocol failure instead of
+      // replacing it with a generic race-dependent "not running" error.
+      return Promise.reject(this.lifecycle?.terminationError ?? new Error("Codex app-server is not running."));
+    }
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -442,6 +536,193 @@ export async function listBoundedCodexThreads(
     seenCursors.add(next);
     cursor = next;
   }
+}
+
+/**
+ * Projects the optional experimental turn-summary metadata into a live ReviewSignal. The request
+ * explicitly asks the app-server not to load turn items; this function never examines item
+ * content, and returns an unmodified base list when the experimental endpoint is unavailable.
+ */
+export async function enrichCodexReviewSignals(
+  threads: CodexThread[],
+  requestTurns: (params: {
+    threadId: string;
+    limit: 1;
+    sortDirection: "desc";
+    itemsView: "notLoaded";
+  }) => Promise<unknown>,
+  options: CodexReviewEnrichmentOptions = {},
+): Promise<CodexReviewEnrichmentResult> {
+  // Do not carry a provider-supplied or stale projection across refreshes. This one only exists
+  // in the current source collection and is deliberately constructed from strict metadata below.
+  const baseThreads = threads.map(codexBaseThread);
+  const now = options.now ?? Date.now;
+  const maxCandidates = boundedPositive(
+    options.maxCandidates,
+    DEFAULT_CODEX_REVIEW_CANDIDATES,
+    MAX_CODEX_REVIEW_CANDIDATES,
+  );
+  const maxConcurrency = boundedPositive(
+    options.maxConcurrency,
+    DEFAULT_CODEX_REVIEW_CONCURRENCY,
+    MAX_CODEX_REVIEW_CONCURRENCY,
+  );
+  const deadlineMs = boundedPositive(
+    options.deadlineMs,
+    DEFAULT_CODEX_REVIEW_DEADLINE_MS,
+    MAX_CODEX_REVIEW_DEADLINE_MS,
+  );
+  const deadline = now() + deadlineMs;
+  const candidates = [...baseThreads]
+    .filter((thread) => typeof thread.id === "string" && thread.id.length > 0 && isEligibleCodexReviewThread(thread))
+    .sort((left, right) => codexThreadRecency(right) - codexThreadRecency(left))
+    .slice(0, maxCandidates);
+  if (candidates.length === 0) return { threads: baseThreads, availability: "available" };
+
+  const signals = new Map<string, ReviewSignal>();
+  let nextCandidate = 0;
+  let availability: CodexReviewEnrichmentResult["availability"] = "available";
+  const inspectCandidate = async (thread: CodexThread): Promise<void> => {
+    try {
+      const response = await beforeDeadline(
+        requestTurns({ threadId: thread.id, limit: 1, sortDirection: "desc", itemsView: "notLoaded" }),
+        Math.max(1, deadline - now()),
+        "Codex review metadata exceeded its total deadline.",
+      );
+      const outcome = classifyCodexReviewTurnPage(thread, response, now());
+      if (outcome.kind === "ready") signals.set(thread.id, outcome.signal);
+      // An unexpected response shape could otherwise leave an earlier valid candidate visible
+      // as Ready. Abort the whole optional batch without retaining any turn-derived data.
+      else if (outcome.kind === "invalid") availability = "transient";
+    } catch (error) {
+      // A rejected experimental endpoint is not an ordinary source error. Treat the entire
+      // optional projection as unavailable so an older server cannot leave a partial claim.
+      availability = isUnsupportedExperimentalError(error) ? "unsupported" : "transient";
+    }
+  };
+
+  // Probe the optional method once before filling the pool. This lets a method-not-found or
+  // capability-rejecting app-server stop at one request rather than launching a needless burst.
+  const firstCandidate = candidates[nextCandidate++];
+  if (firstCandidate) await inspectCandidate(firstCandidate);
+  if (availability !== "available" || now() >= deadline) {
+    return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
+  }
+
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (availability !== "available" || now() >= deadline) {
+        if (availability === "available") availability = "transient";
+        return;
+      }
+      const thread = candidates[nextCandidate++];
+      if (!thread) return;
+      await inspectCandidate(thread);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
+  if (availability !== "available" || now() >= deadline) {
+    return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
+  }
+
+  return {
+    threads: baseThreads.map((thread) => {
+      const review = signals.get(thread.id);
+      return review && isEligibleCodexReviewThread(thread)
+        ? { ...thread, gajendraReview: review }
+        : thread;
+    }),
+    availability: "available",
+  };
+}
+
+function codexBaseThread(thread: CodexThread): CodexThread {
+  // `thread/list` is provider data. Copy only the established listing metadata so unexpected
+  // experimental fields (including a turn-like payload) cannot hitch a ride to a source adapter.
+  const base: CodexThread = { id: thread.id };
+  if (typeof thread.preview === "string") base.preview = thread.preview;
+  if (typeof thread.name === "string" || thread.name === null) base.name = thread.name;
+  if (typeof thread.cwd === "string") base.cwd = thread.cwd;
+  if (typeof thread.updatedAt === "number" && Number.isFinite(thread.updatedAt)) base.updatedAt = thread.updatedAt;
+  if (typeof thread.recencyAt === "number" && Number.isFinite(thread.recencyAt)) base.recencyAt = thread.recencyAt;
+  else if (thread.recencyAt === null) base.recencyAt = null;
+  if (typeof thread.status === "string") base.status = thread.status;
+  else if (thread.status && typeof thread.status === "object" && typeof thread.status.type === "string") {
+    base.status = { type: thread.status.type };
+  }
+  if (typeof thread.path === "string" || thread.path === null) base.path = thread.path;
+  return base;
+}
+
+function codexThreadRecency(thread: CodexThread): number {
+  const value = thread.recencyAt ?? thread.updatedAt ?? 0;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function isEligibleCodexReviewThread(thread: CodexThread): boolean {
+  // `thread/list` currently defines idle/notLoaded as the only non-active states suitable for a
+  // completion claim. Unknown, malformed, future, and system-error values stay fail-closed.
+  const status = normalizeCodexStatus(codexStatusType(thread.status));
+  return status === "idle" || status === "notloaded";
+}
+
+function normalizeCodexStatus(status: string): string {
+  return status.toLowerCase().replace(/[^a-z]/gu, "");
+}
+
+type CodexReviewTurnOutcome =
+  | { kind: "ready"; signal: ReviewSignal }
+  | { kind: "not-ready" }
+  | { kind: "invalid" };
+
+function classifyCodexReviewTurnPage(thread: CodexThread, response: unknown, nowMs: number): CodexReviewTurnOutcome {
+  if (!response || typeof response !== "object") return { kind: "invalid" };
+  const data = (response as CodexTurnListPage).data;
+  if (!Array.isArray(data)) return { kind: "invalid" };
+  // An empty newest-turn page is valid evidence that there is no reviewable turn, not malformed
+  // provider data. It emits no signal without suppressing other independently valid candidates.
+  if (data.length === 0) return { kind: "not-ready" };
+  if (data.length !== 1) return { kind: "invalid" };
+  const turn = data[0];
+  if (!turn || typeof turn !== "object") return { kind: "invalid" };
+  const summary = turn as {
+    status?: unknown;
+    completedAt?: unknown;
+    itemsView?: unknown;
+    items?: unknown;
+    error?: unknown;
+  };
+  // `notLoaded` and an empty item array prove that this classification used only summary
+  // metadata. A non-empty item list is rejected without being traversed or retained.
+  if (summary.itemsView !== "notLoaded" || !Array.isArray(summary.items) || summary.items.length !== 0) return { kind: "invalid" };
+  if (summary.status !== "completed" && summary.status !== "inProgress" && summary.status !== "active" && summary.status !== "interrupted" && summary.status !== "failed") {
+    return { kind: "invalid" };
+  }
+  // A valid newest non-completed turn is simply not review-ready. It must not poison an otherwise
+  // valid optional metadata batch, and no error/details are traversed or retained.
+  if (summary.status !== "completed") return { kind: "not-ready" };
+  if (summary.error !== null) return { kind: "invalid" };
+  const completedAt = codexCompletedAt(summary.completedAt, nowMs);
+  if (completedAt === null) return { kind: "invalid" };
+  return { kind: "ready", signal: {
+    state: "ready",
+    kind: "result",
+    updatedAt: completedAt,
+    destination: { type: "thread", deepLink: `codex://threads/${encodeURIComponent(thread.id)}` },
+    providerStatus: "completed",
+  } };
+}
+
+function codexCompletedAt(value: unknown, nowMs: number): number | null {
+  // `thread/turns/list` exposes Unix seconds. Do not guess alternate units or coerce strings:
+  // an unexpected, unrenderable, or future server timestamp must remain a no-signal rather than
+  // a synthetic completion time. Millisecond timestamps are far ahead of the current Unix-second
+  // clock and therefore also fail closed.
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) return null;
+  const renderedMs = value * 1_000;
+  if (!Number.isFinite(new Date(renderedMs).getTime())) return null;
+  const nowSeconds = Math.floor(nowMs / 1_000);
+  return Number.isSafeInteger(nowSeconds) && value <= nowSeconds ? value : null;
 }
 
 export async function enrichCodexRuntimeStatuses(

@@ -1,6 +1,6 @@
 # Developer-experience review
 
-**Scope:** the 2026-08-18 Gajendra source-review candidate based on `53e9855`.
+**Scope:** the 2026-08-19 dirty Gajendra working candidate.
 
 ## Current source-level expectations
 
@@ -17,7 +17,7 @@
 
 ## Current review boundary
 
-This source candidate is prepared on `codex/gajendra-public-release`; exact commit, push, PR, and
-hosted-CI receipts are recorded only after they exist. One exact ad-hoc installed build has a
-launcher-only interaction receipt. It is not a merged tag, clean-Mac result, or distributable
+This source candidate is prepared on `codex/fix-drag-dock-interactions`; exact commit, push, PR, and
+hosted-CI receipts are recorded only after they exist. One exact ad-hoc installed build has a full
+isolated automated interaction receipt. It is not a merged tag, clean-Mac result, or distributable
 binary. The open gates are listed in [STATUS.md](../STATUS.md).

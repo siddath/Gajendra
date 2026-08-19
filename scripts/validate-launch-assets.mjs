@@ -1,5 +1,6 @@
 import { access, readFile, stat } from "node:fs/promises";
 import { constants } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,17 +15,27 @@ const assets = new Map([
   ["gajendra-launch-queue-editing.png", [1320, 1220]],
   ["gajendra-launch-organizer.png", [1240, 1800]],
 ]);
+const assetHashes = new Map();
 
 for (const [name, expected] of assets) {
   const filePath = path.join(launchRoot, name);
   await access(filePath, constants.R_OK);
   const metadata = await stat(filePath);
   assert(metadata.size >= 10_000 && metadata.size <= 12_000_000, `${name} has an unsafe size`);
-  const actual = pngDimensions(await readFile(filePath));
+  const bytes = await readFile(filePath);
+  const actual = pngDimensions(bytes);
   assert(
     actual[0] === expected[0] && actual[1] === expected[1],
     `${name} must be ${expected[0]}x${expected[1]}, received ${actual[0]}x${actual[1]}`,
   );
+  assetHashes.set(name, createHash("sha256").update(bytes).digest("hex"));
+}
+
+const receipt = await readFile(path.join(launchRoot, "README.md"), "utf8");
+for (const [name, hash] of assetHashes) {
+  const line = receipt.split("\n").find((candidate) => candidate.startsWith(`| \`${name}\` |`));
+  assert(line, `launch receipt is missing ${name}`);
+  assert(line.includes(`\`${hash}\``), `launch receipt hash is stale for ${name}`);
 }
 
 const preview = await readFile(

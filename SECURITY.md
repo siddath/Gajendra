@@ -26,9 +26,12 @@ copy; otherwise it fails closed. `GAJENDRA_DATA_DIR` isolates a test/custom stor
   and close-settlement bounds.
 - Source URLs use per-source safe schemes. `javascript:`, `data:`, `file:`, malformed, encoded,
   whitespace-padded, and unallowlisted destinations are rejected at input and execution boundaries.
-- Configured review readiness is an optional validated live signal with a structured Task or URL
-  destination. It does not authorize remote access, credential storage, provider-content capture,
-  or persistence; built-in providers are not inferred ready from idle/resumable states.
+- Review readiness is an optional validated live signal with a structured Task or URL destination.
+  Configured sources may supply it explicitly. The current local Codex adapter may derive it only
+  from a bounded newest-turn response requested with `itemsView: notLoaded`, and requires zero
+  returned message items plus an unambiguous successful completion. It does not authorize remote
+  access, credential storage, provider-content capture, or persistence; no provider is inferred
+  ready from idle, age, or resumability.
 - Codex app-server activity enrichment is disabled by
   `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off`. When enabled on macOS it is the A4 bounded
   metadata-only tail inspection described in [README.md](README.md#codex-rollout-tail-boundary-a4),

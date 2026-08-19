@@ -4,7 +4,7 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-08-18
+**Reconciled:** 2026-08-19
 
 **Public state:** source is public on `main`; no binary release is claimed.
 
@@ -23,10 +23,10 @@ public green claim.
 
 | Area | Current source/local state | Boundary that remains open |
 | --- | --- | --- |
-| Focus surface | One NOW, ordered Focus and Important queues, compact overflow to Organizer, bounded context, search, and direct Open routes are implemented. | Physical installed-device journeys remain separate evidence. |
-| Running | Explicit provider-reported activity appears across every priority lane without changing priority. | Do not infer activity from age or resumability. |
-| Ready for Review | A validated configured catalog can provide a live-only review signal with Review/Task destinations and Running precedence. | Built-in providers do not emit or infer review readiness; remote credentials/network adapters do not exist. |
-| Launcher reopen | The real 60×60 macOS launcher passes stationary click, 2-pixel click, move/edit recovery, accessibility press, and outer-edge target automation. | This is isolated local automation, not every physical pointer or VoiceOver journey. |
+| Focus surface | The floating launcher, Dock reopen, and menu-bar item now lead to the compact focus card; Organizer is explicit. Compact rows show thread metadata without a permanent menu/drag handle. A quick task click remains Open; a stationary hold selects the row, and continuing the same press lifts its visible preview for full-row drag. Each successful drop remains one atomic `move-before` mutation. | The exact installed ad-hoc build passed the isolated pointer journey; physical human-pointer and VoiceOver journeys remain separate evidence. |
+| Running | Explicit provider-reported activity appears across every priority lane without changing priority. The count uses a high-visibility badge and the dock shrinks or expands on double-click. | Do not infer activity from age or resumability. |
+| Ready for Review | A validated configured catalog or the current local Codex app-server's zero-message newest-turn metadata can provide a live-only review signal with exact Review/Task destinations and Running precedence. Opening does not clear it; visible compact surfaces recheck while idle. The count uses a high-visibility badge and the dock shrinks or expands on double-click. | Claude Code, Cursor, and Grok are not guessed ready from recency, idle, or resumability; remote credentials/network adapters do not exist. |
+| Launcher reopen | The real 60×60 macOS launcher handles clicks directly in AppKit, prewarms the card, and refreshes after reveal. Stationary click, 2-pixel click, move/edit recovery, accessibility press, and outer-edge automation pass. Five consecutive fresh-process journeys measured 81–93 ms cold/warm and 25–62 ms prewarmed against a 200 ms budget, versus the reproduced 454–552 ms pre-fix baseline. | This is isolated local automation on the current host, not every physical pointer, machine-load profile, or VoiceOver journey. |
 | Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists its own priority metadata, not titles, prompts, transcripts, credentials, review content, or provider databases. | Installed-provider and clean-account proof remain separate. |
 | Native app | macOS 13.5 source build, bundled Node v24.19.0, notices, service parity, and strict ad-hoc codesign verification pass locally. | Developer ID, notarization, stapling, Gatekeeper, clean-Mac, and distribution are not complete. |
 | Mobile | A documentation-only transport/security plan exists. | No listener, relay, mobile app, credential, signing, or store submission exists. |
@@ -46,30 +46,41 @@ public green claim.
 
 ## Current local receipts
 
-The current launch-media/docs revision passed locally on 2026-08-18:
+The current working candidate passed locally on 2026-08-19:
 
 - `npm run launch:assets` — real SwiftUI screenshot suite and screenshot-led hero regenerated.
 - `npm run validate:launch-assets` — **7/7** expected privacy-safe assets validated.
-- `npm run check` — scripts, release-readiness regressions, TypeScript, **83/83** Vitest tests,
+- `npm run check` — scripts, release-readiness regressions, TypeScript, **98/98** Vitest tests,
   plugin build, and plugin validation passed.
 - `npm run test:e2e` — **17/17** browser journeys passed.
 - `npm run companion:test` — native self-test passed.
 - `npm run companion:build` — ad-hoc app with bundled runtime built and strict verification passed.
 - `npm run companion:ui-test` — stationary reopen, 2-pixel reopen, move/edit recovery, real macOS
-  accessibility press, and outer-edge target all passed.
+  accessibility press, outer-edge target, selected/lifted compact full-row drag, and Organizer cross-lane
+  pointer drags with exact persisted order, single-click dock guards, and Running/Ready double-click
+  collapse/expand passed on the current working candidate and its exact installed ad-hoc bundle.
+  The journey also enters and clears Search through real key events and proves filtered/default
+  content. The visible-only refresh lifecycle is covered by source wiring review and the native
+  lifecycle-policy self-test, not by runtime timer instrumentation in the installed journey.
+- `npm run companion:ui-performance-test` — the widget-only real-window journey passed its 200 ms
+  popup budget and emitted no SwiftUI dependency-cycle warning; the exact build measured 50 ms
+  prewarmed, 86 ms cold, and 87 ms warm. The installed full journey measured 56/90/89 ms.
 - `npm run companion:validate` and `npm run companion:bundle-readiness` passed; readiness reported
   `distributionReady:false` and ad-hoc signing.
-- `npm run gauntlet` — **19** gate receipts passed, including **85/85** repeated browser journeys,
-  five repeated unit runs, live MCP, native, bundle, final-artifact, and dependency-audit gates.
+- The installed executable matches the verified build, the prior app is preserved as a rollback,
+  and the private state hashes plus `0700`/`0600` modes stayed unchanged after relaunch.
+- `npm run gauntlet` — **20** gate receipts passed, including the measured widget-performance gate,
+  **85/85** repeated browser journeys, five repeated unit runs, live MCP, native, bundle,
+  final-artifact, and dependency-audit gates.
 
 These are local receipts and do not substitute for commit-scoped GitHub checks. A public green claim
 belongs only to a revision whose pull-request and merged-main CI are both green. The receipts do not
-close installed, physical accessibility, signed distribution, or publication gates.
+close clean-Mac, physical accessibility, signed distribution, or publication gates.
 
 ## Open gates
 
 - Clean-Mac installation and independent offline-path proof.
-- Physical VoiceOver, drag, keyboard/system-toggle, and login-item receipts.
+- Physical VoiceOver, manual drag, keyboard/system-toggle, and login-item receipts.
 - Developer ID signing, notarization, stapling, Gatekeeper, archive parity, and distribution proof.
 - Manual owner approval and publication of the LinkedIn post and image.
 - Mobile D01–D07 and D11 approvals before any relay or application implementation.

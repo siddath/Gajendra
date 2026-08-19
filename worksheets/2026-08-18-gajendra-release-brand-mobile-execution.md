@@ -54,21 +54,21 @@ writer begins.
 | ID | Acceptance gate | Required proof | State |
 | --- | --- | --- | --- |
 | A1 | Cross-process updates serialize; revisions are monotonic; stale writes return a typed conflict and fresh snapshot; retries are idempotent; legacy state migrates | Concurrent-process and migration tests | Current candidate local gauntlet and source check proven; external proof pending |
-| A2 | One atomic move-before operation handles same-lane reorder, cross-lane move, append, current-thread repair, and context retention | Domain/service tests plus native planner tests | Current candidate local gauntlet and source check proven; physical queue-mutation proof pending |
+| A2 | One atomic move-before operation handles same-lane reorder, cross-lane move, append, current-thread repair, and context retention | Domain/service and native planner tests plus persisted-state pointer journey | Current candidate local gauntlet/source checks and isolated compact/Organizer pointer mutation proof recorded; manual physical proof pending |
 | A3 | Launch at Login changes only after an explicit user action | Native self-test and source validator | Current local gauntlet plus native source/self-test/validator/bundle receipt proven; physical installed proof pending |
 | A4 | Codex runtime enrichment is bounded, metadata-only, kill-switchable, and disclosed exactly | Adapter tests, persistence scan, docs | Current candidate local gauntlet, source check, copy scan, and validator boundary proof; installed-provider proof pending |
 | A5 | Each source declares allowed deep-link schemes; unsafe or unknown schemes fail at parse and again at execution | Mixed-case, whitespace, encoded, and unknown-scheme tests in TS and Swift/web boundaries | Current local gauntlet plus source/E2E/validator proof; installed proof pending |
 | A6 | Unknown thread/source IDs fail closed; store/config reads are bounded; corrupt state is quarantined; last-known-good recovery is private and deterministic | Negative-path and recovery tests | Current candidate local gauntlet and source check proven; external proof pending |
-| B1 | Hold-to-edit cancels after movement beyond threshold and never fires after cancellation | Deterministic Swift gesture-state tests | Frozen local native source/self-test proof recorded; physical installed interaction proof pending |
-| B2 | Drag payload is process-private and opaque; canonical IDs are never exported | Source validator and Swift tests | Frozen local native source/self-test and validator proof recorded; physical installed drag proof pending |
+| B1 | Queue Open and edit/move are distinct: a quick row tap remains Open; a stationary hold selects/lifts the task and enables continued full-row drag; compact rows expose no permanent menu/drag handle | Native source/self-test plus real-window click/hold/lift/full-row journey | Current source/build, repeated isolated widget/Organizer pointer proof, and exact-installed automated interaction proof recorded; physical human interaction proof pending |
+| B2 | Queue drag remains app-local; no pasteboard payload or canonical thread ID is exported | Source validator, Swift source review, and persisted-state pointer journey | Local no-payload source boundary and isolated cross-lane drag/order proof recorded; manual physical drag proof pending |
 | B3 | Undo/redo registers only after success and restores exact order, tier, context, and NOW | Swift success/failure/redo tests | Frozen local native source/self-test proof recorded; physical installed interaction proof pending |
 | B4 | Busy and disabled states are visually distinct and announced without trapping controls | Swift state/accessibility tests and preview proof | Frozen local native source/self-test and generated-preview proof recorded; physical accessibility proof pending |
 | B5 | Source UI uses Choose/Manage terminology; Done completes onboarding; Not now/close defer it | Native self-tests and docs | Frozen local native source/self-test and companion-validator proof recorded; physical installed proof pending |
-| B6 | Keyboard, VoiceOver labels/order, hit targets, contrast, Reduce Motion, and light/dark states have automated proof; installed physical proof is separately gated | Self-test, validator, generated previews; process-level launcher UI; gate list for installed proof | Native source/self-test, validator, previews, three isolated UI runs, and an exact-installed tap/AX/edge receipt recorded; physical VoiceOver screen-reader/system-toggle proof pending |
+| B6 | Keyboard, VoiceOver labels/order, hit targets, contrast, Reduce Motion, light/dark states, and dock expand/shrink have automated proof; installed physical proof is separately gated | Self-test, validator, generated previews; process-level launcher/drag/dock UI; gate list for installed proof | Native source/self-test, validator, previews, repeated isolated tap/drag/dock UI runs, and an exact-installed tap/AX/edge receipt recorded; physical VoiceOver screen-reader/system-toggle/manual-drag proof pending |
 | C1 | App bundle carries a pinned, checksum-verified Node LTS runtime and required license notices; the client prefers it while retaining a development override | Build, offline PATH test, bundle inspection, codesign verification | Current local gauntlet/build/validator/readiness receipt proven; independent offline-path and distribution evidence pending |
 | C2 | Developer ID/notarization requirements are explicit and mechanically checkable without using credentials | Release script/checklist dry checks; external gate remains open | Local fail-closed tooling syntax proven; Developer ID/notarization/distribution pending |
 | C3 | Visible surfaces use Gajendra and the approved descriptor/promise while compatibility identifiers remain stable | Copy matrix validator and bundle/plugin checks | Local documentation/native validator/plugin validation copy proof; distribution aggregate pending |
-| D1 | Provider discovery is correct under large catalogs and has measured, bounded behavior | Synthetic-catalog correctness/performance test | Current candidate local gauntlet and source check proven; installed/provider and later external measurement pending |
+| D1 | Provider discovery is correct under large catalogs and bounded; native launcher presentation has a measured regression budget | Synthetic-catalog correctness/performance test plus real-window popup metric | Provider bounds, a 200 ms widget popup gate, five repeat runs, and an exact-installed local metric are recorded; provider-scale and cross-machine measurement remain pending |
 | D2 | User-visible diagnostics redact paths/content; temporary launch artifacts are owner-private and cleaned on startup/exit | Error-sanitization and file-lifecycle tests | Current local gauntlet and source error-sanitization/file-lifecycle proof recorded; installed/provider and external receipts pending |
 | D3 | Status, release, security, compatibility, architecture, and mobile docs describe current source truth without implementation claims for gated work | Documentation reconciliation review | Current documentation/link/copy reconciliation proven; future source changes reopen it |
 | D4 | CI runs behavior-level server/native/release validators and rejects missing privacy, identity, or bundle artifacts | Local CI-equivalent command set | Current local gates proven; merged baseline `b359ab6` passed both hosted jobs in [run 32148617813](https://github.com/siddath/Gajendra/actions/runs/32148617813); each later revision requires its own hosted receipt |
@@ -90,36 +90,43 @@ writer begins.
 
 ## Live evidence boundary
 
-- The candidate was committed and pushed on `codex/gajendra-public-release` from baseline
-  `53e9855`. [PR #12](https://github.com/siddath/Gajendra/pull/12) is open and unmerged. Product
-  head `1c322fc` passed the Linux plugin and macOS companion jobs in hosted
-  [CI run 32141824097](https://github.com/siddath/Gajendra/actions/runs/32141824097); this is not a
-  binary release artifact.
-- The server/web source lane recorded focused tests, `npm run check` (**80/80**), and E2E
-  (**16/16**) after the final cap/canon correction. Those source-lane receipts were subsequently
-  incorporated into the passed local gauntlet below.
-- Luna reported frozen native source with a green build, self-test, and preview. This lane then ran
+- The public-review candidate was committed and pushed on `codex/gajendra-public-release` from
+  baseline `53e9855`. [PR #12](https://github.com/siddath/Gajendra/pull/12) merged as `747b2c7` on
+  2026-08-18 after its Linux plugin and macOS companion checks passed. This is not a binary release
+  artifact, and the current dirty working candidate is not yet represented by that merge.
+- The final server/web source lane recorded focused tests, `npm run check` (**98/98**), and E2E
+  (**17/17**) after the Ready-for-Review and exact-open corrections. Those source-lane receipts were
+  subsequently incorporated into the passed local gauntlet below.
+- The native lane froze with a green build, self-test, preview, and five consecutive fresh-process
+  full UI journeys. This lane then ran
   `npm run companion:build`, `node scripts/validate-companion.mjs`, and
   `npm run companion:bundle-readiness` successfully against the frozen source. The validator
   inspected Gajendra identity, macOS 13.5, bundled Node v24.19.0/notices, strict codesign, service
   parity, and an isolated configured-source mutation persisting only `context: design` at revision 1.
-- This lane reran `npm run check` successfully (**80 tests**), ran the Codex app-server focused
-  suite successfully (**17 tests**), and ran `npm run test:e2e` successfully (**16 tests**). The
+- This lane reran `npm run check` successfully (**98 tests**) and ran `npm run test:e2e`
+  successfully (**17 tests**). The
   focused suite proves the measured 383,665-byte Codex `thread/list limit=100` response fits the
   new 512 KiB default, while default-plus-one and over-1 MiB frames fail generically without a
-  content leak. `npm run probe:live` then observed 8 tools, a reachable Codex app-server, 137
+  content leak. `npm run probe:live` then observed 8 tools, a reachable Codex app-server, 139
   available threads at that run, and 4 sources without emitting thread content. One earlier aggregate attempt
   timed out a frame-overflow assertion under load; the subsequent focused and full success is
   current local evidence, not a reason to weaken the bound.
 - `npm run gauntlet` then produced a passing current-candidate
-  [report](../evidence/gauntlet/report.json) on 2026-08-18: all 19 result records passed across
-  repository/static/behavior/build/plugin/live-MCP, companion, real-window launcher UI, browser UI,
-  reliability, final-artifact, and dependency-audit checks. This is not clean-Mac, physical
+  [report](../evidence/gauntlet/report.json) on 2026-08-19: all 20 result records passed across
+  repository/static/behavior/build/plugin/live-MCP, companion, real-window launcher UI, measured
+  widget performance, browser UI, reliability, final-artifact, and dependency-audit checks. This is
+  not clean-Mac, physical
   VoiceOver, Developer-ID, notarization, binary distribution, LinkedIn-publication, or mobile proof.
-- The exact ad-hoc build was installed with the prior app retained as a rollback. A fresh-launch
-  process-level journey passed stationary reopen, 2 px reopen, move/hide recovery, AX press, and
-  edge target; executable/service parity passed and the private state hash plus `0700`/`0600` modes
-  stayed unchanged. This is a launcher-only installed receipt.
+- The exact ad-hoc current build was installed with the prior app retained as a rollback. Its
+  isolated process-level journey passed stationary reopen, 2 px reopen, move/hide recovery, AX
+  press, edge target, quick task click, stationary hold, full-row movement, compact and Organizer
+  cross-lane drops with exact persisted order, Search filter/clear, and Running/Ready dock controls.
+  Its full installed journey
+  measured 56 ms prewarmed, 90 ms cold, and 89 ms warm against the 200 ms budget. The exact build's
+  cycle-sensitive performance journey measured 50/86/87 ms with a cycle-free log. The installed
+  executable matches the verified build, and the private state hashes plus `0700`/`0600` modes
+  stayed unchanged after relaunch. This is still not clean-Mac, manual human drag, physical
+  VoiceOver, Developer-ID, notarization, distribution, or publication proof.
 - Earlier historical installed records are not reused as proof for this candidate. The synthetic
   image and post drafts remain creative artifacts, not binary-distribution or LinkedIn-publication
   proof.

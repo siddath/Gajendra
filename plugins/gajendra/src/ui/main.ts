@@ -30,6 +30,9 @@ type HostTestHooks = {
   createApp?: () => App;
   navigate?: (url: string) => void;
 };
+type OpenRouteIntent = "thread" | "review";
+type AuthoritativeOpenTarget = { url: string; thread: DeckThread };
+type CapturedOpenIntent = { threadId: string; route: OpenRouteIntent; destination: string };
 
 const themeStorageKey = "gajendra.ui.theme.v1";
 const appearanceStorageKey = "gajendra.ui.appearance.v1";
@@ -287,10 +290,33 @@ function threadSearchFooter(deck: DeckSnapshot, visibleCount: number): string {
 }
 
 function availableRow(thread: DeckThread, isRecent: boolean): string {
-  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(`${thread.title} ${thread.project} ${thread.sourceName} ${thread.sourceId} ${thread.id} ${thread.status}`.toLowerCase())}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
+  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(searchableThreadMetadata(thread))}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
     <div><a ${openThreadAttributes(thread)}>${reviewMark(thread)}${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
+}
+
+/** Search stays local to the rendered metadata snapshot; it never fetches a provider or turn. */
+function searchableThreadMetadata(thread: DeckThread): string {
+  const placement = thread.isCurrent ? "now current" : thread.level ?? "";
+  const activity = isRunningThreadStatus(thread.status) ? "running active" : thread.status;
+  const review = thread.review?.state === "ready" && !isRunningThreadStatus(thread.status)
+    ? `ready review ${thread.review.providerStatus}`
+    : "";
+  const context = thread.context ? `context ${thread.context} tag ${thread.context} label ${thread.context}` : "context tag label";
+  return [
+    thread.title,
+    "provider",
+    thread.sourceName,
+    thread.sourceId,
+    "project",
+    thread.project,
+    thread.id,
+    activity,
+    placement,
+    review,
+    context,
+  ].join(" ").toLowerCase();
 }
 
 function placementBadge(thread: DeckThread): string {
@@ -342,7 +368,7 @@ function sourceBadge(thread: DeckThread): string {
 
 function openThreadAttributes(thread: DeckThread): string {
   const permitted = isPermittedDeepLink(thread.deepLink, thread.allowedDeepLinkSchemes ?? []);
-  return `href="${permitted ? escapeAttribute(thread.deepLink) : "#"}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-open-thread-id="${escapeAttribute(thread.id)}"${permitted ? "" : ' aria-disabled="true"'}`;
+  return `href="${permitted ? escapeAttribute(thread.deepLink) : "#"}" data-open-thread="${escapeAttribute(thread.deepLink)}" data-open-thread-id="${escapeAttribute(thread.id)}" data-open-route="thread"${permitted ? "" : ' aria-disabled="true"'}`;
 }
 
 function openReviewAttributes(thread: DeckThread): string {
@@ -352,7 +378,7 @@ function openReviewAttributes(thread: DeckThread): string {
   const permitted = thread.review?.state === "ready"
     && !isRunningThreadStatus(thread.status)
     && isPermittedDeepLink(destination, thread.allowedDeepLinkSchemes ?? []);
-  return `href="${permitted ? escapeAttribute(destination) : "#"}" data-open-thread="${escapeAttribute(destination)}" data-open-thread-id="${escapeAttribute(thread.id)}"${permitted ? "" : ' aria-disabled="true"'}`;
+  return `href="${permitted ? escapeAttribute(destination) : "#"}" data-open-thread="${escapeAttribute(destination)}" data-open-thread-id="${escapeAttribute(thread.id)}" data-open-route="review"${permitted ? "" : ' aria-disabled="true"'}`;
 }
 
 function contextBadge(thread: DeckThread): string {
@@ -453,13 +479,20 @@ function bindInteractions(): void {
   });
 
   root.querySelectorAll<HTMLAnchorElement>("a[data-open-thread]").forEach((anchor) => {
+    // The three data attributes are display output and can be edited together after render. Keep
+    // the snapshot-authorized intent in this listener closure, then reject any subsequent DOM
+    // drift before asking either the host or browser to open anything.
+    const capturedIntent = captureOpenIntent(anchor);
     anchor.addEventListener("click", async (event) => {
       event.preventDefault();
-      const url = anchor.dataset.openThread;
-      if (url) {
-        await motion.acknowledgeOpen(anchor);
-        await openThreadLink(url, threadForOpenLink(anchor.dataset.openThreadId));
-      }
+      if (!resolveCapturedOpenTarget(anchor, capturedIntent)) return rejectOpenDestination();
+      await motion.acknowledgeOpen(anchor);
+      // The acknowledgement is asynchronous. Re-resolve immediately before the host/browser
+      // boundary so a refresh that removed readiness, changed destination, or removed the thread
+      // cannot turn a stale press into navigation.
+      const target = resolveCapturedOpenTarget(anchor, capturedIntent);
+      if (!target) return rejectOpenDestination();
+      await openThreadLink(target.url, target.thread);
     });
   });
 
@@ -734,9 +767,54 @@ async function refresh(): Promise<void> {
   }
 }
 
-function threadForOpenLink(threadId: string | undefined): DeckThread | null {
-  if (!snapshot || !threadId) return null;
-  return allDeckThreads(snapshot).find((thread) => thread.id === threadId) ?? null;
+function resolveAuthoritativeOpenTarget(
+  threadId: string | undefined,
+  route: string | undefined,
+  requestedUrl: string | undefined,
+): AuthoritativeOpenTarget | null {
+  if (!snapshot || !threadId || !requestedUrl || !isOpenRouteIntent(route)) return null;
+  const thread = allDeckThreads(snapshot).find((candidate) => candidate.id === threadId);
+  if (!thread) return null;
+  const expectedUrl = route === "thread" ? thread.deepLink : currentReviewDestination(thread);
+  if (!expectedUrl || requestedUrl !== expectedUrl) return null;
+  if (!isPermittedDeepLink(expectedUrl, thread.allowedDeepLinkSchemes ?? ["https"])) return null;
+  return { url: expectedUrl, thread };
+}
+
+function captureOpenIntent(anchor: HTMLAnchorElement): CapturedOpenIntent | null {
+  const route = anchor.dataset.openRoute;
+  const target = resolveAuthoritativeOpenTarget(anchor.dataset.openThreadId, route, anchor.dataset.openThread);
+  if (!target || !isOpenRouteIntent(route) || anchor.getAttribute("href") !== target.url) return null;
+  return { threadId: target.thread.id, route, destination: target.url };
+}
+
+function hasOpenAttributeDrift(anchor: HTMLAnchorElement, captured: CapturedOpenIntent): boolean {
+  return anchor.dataset.openThreadId !== captured.threadId
+    || anchor.dataset.openRoute !== captured.route
+    || anchor.dataset.openThread !== captured.destination
+    || anchor.getAttribute("href") !== captured.destination;
+}
+
+function resolveCapturedOpenTarget(anchor: HTMLAnchorElement, captured: CapturedOpenIntent | null): AuthoritativeOpenTarget | null {
+  if (!captured || hasOpenAttributeDrift(anchor, captured)) return null;
+  // The current snapshot can change after render. It must still authorize the original captured
+  // destination, rather than whichever values mutable DOM or an old card now advertises.
+  return resolveAuthoritativeOpenTarget(captured.threadId, captured.route, captured.destination);
+}
+
+function isOpenRouteIntent(value: string | undefined): value is OpenRouteIntent {
+  return value === "thread" || value === "review";
+}
+
+function currentReviewDestination(thread: DeckThread): string | null {
+  const review = thread.review;
+  if (!review || review.state !== "ready" || isRunningThreadStatus(thread.status)) return null;
+  if (review.destination.type === "thread") return typeof review.destination.deepLink === "string" ? review.destination.deepLink : null;
+  return review.destination.type === "url" && typeof review.destination.url === "string" ? review.destination.url : null;
+}
+
+function rejectOpenDestination(): void {
+  renderRecoverableError(new Error("Gajendra blocked an unsafe thread destination."), motion.captureLayout());
 }
 
 function mutationKey(): string {
@@ -744,12 +822,8 @@ function mutationKey(): string {
   return `gaja-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-async function openThreadLink(url: string, thread: DeckThread | null): Promise<void> {
-  if (!thread || !isPermittedDeepLink(url, thread.allowedDeepLinkSchemes ?? ["https"])) {
-    const layoutState = motion.captureLayout();
-    renderRecoverableError(new Error("Gajendra blocked an unsafe thread destination."), layoutState);
-    return;
-  }
+async function openThreadLink(url: string, thread: DeckThread): Promise<void> {
+  if (!isPermittedDeepLink(url, thread.allowedDeepLinkSchemes ?? ["https"])) return rejectOpenDestination();
   if (!app && shouldUseFixture()) {
     root.dataset.lastOpenedThread = url;
     return;

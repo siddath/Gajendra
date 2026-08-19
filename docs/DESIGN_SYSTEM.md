@@ -21,6 +21,9 @@
    visible product names in new UI, docs, status text, accessibility labels, or errors.
 5. **Accessible restraint.** Semantic colors, legible labels, keyboard operation, and Reduce Motion
    are source requirements. Physical accessibility evidence remains a separate pending gate.
+6. **Metadata-first rows.** Compact tasks show the thread title, project, context/tag when present,
+   provider, and an applicable Running/Review mark. Hover and hold create selection feedback; a
+   selected row lifts for app-local drag instead of carrying permanent menu/drag chrome.
 
 Green is reserved for provider-confirmed activity. System orange supports Ready for Review and is
 always paired with a static `checkmark.bubble` glyph, the visible status label, ready time, and
@@ -35,5 +38,5 @@ trailing actions without relying on a live implementation claim. The web app fol
 and queue vocabulary.
 
 The current source-review candidate has a passing local gauntlet receipt, generated synthetic
-previews, and a narrow installed launcher tap/AX/edge receipt. It has no clean-Mac or physical
-VoiceOver screen-reader evidence; those remain release gates, not design-system facts.
+previews, and an exact-installed automated tap/drag/Search/dock receipt. It has no clean-Mac or
+physical VoiceOver screen-reader evidence; those remain release gates, not design-system facts.

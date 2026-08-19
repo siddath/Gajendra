@@ -3,6 +3,8 @@ export const MUTATION_PROTOCOL_VERSION = 1 as const;
 export const FOCUS_GUIDE = 5;
 export const DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
 export const DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"] as const;
+/** One bounded recent-history ceiling shared by provider selection and optional metadata enrichments. */
+export const MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 
 export type PriorityLevel = "focus" | "important";
 export type ThreadContext = "design" | "engineering" | "life";

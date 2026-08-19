@@ -1,16 +1,17 @@
 # Focus card design case study
 
-Gajendra's card is designed to answer five questions without becoming a second full organizer:
+Gajendra's card is designed to answer six questions without becoming a second full organizer:
 
 1. What is NOW?
 2. Is it provider-reported Running or otherwise resumable?
 3. What are the next Focus and Important threads?
 4. What work is explicitly Running across lanes?
-5. Can the user return to the exact source thread?
+5. What completed work is explicitly Ready for Review?
+6. Can the user return to the exact source thread or review destination?
 
 The answer is a compact hierarchy: NOW first; Focus and Important next; explicit Running as a
-separate disclosure; and Organizer for full retrieval and queue management. Compact lanes show at
-most five rows and route the remaining count to Organizer.
+separate disclosure; Ready for Review immediately below it; and Organizer for full retrieval and
+queue management. Compact lanes show at most five rows and route the remaining count to Organizer.
 
 ## Interaction rationale
 
@@ -26,6 +27,6 @@ back to the exact thread.**
 ## Evidence boundary
 
 This document records the intended hierarchy and source contracts. The current candidate has a
-passing local gauntlet, synthetic screenshots, and a launcher-only installed interaction receipt;
-this page is not clean-Mac, physical VoiceOver, full installed-card, or external performance proof.
+passing local gauntlet, synthetic screenshots, and an exact-installed automated card interaction
+receipt; this page is not clean-Mac, physical VoiceOver/human drag, or cross-machine performance proof.
 Those gates remain in [Status](../STATUS.md) and [Gauntlet](GAUNTLET.md).

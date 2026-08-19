@@ -387,6 +387,54 @@ describe("Gajendra mutation service", () => {
     });
   });
 
+  it("keeps a live Codex review projection out of persistence and discards it on a changed source generation", async () => {
+    const directory = await temporaryDirectory();
+    const repository = new GajendraStoreRepository(directory);
+    const contender = new GajendraService(repository, {
+      collect: async (preferences) => preferenceCollection(preferences),
+      close: async () => undefined,
+    });
+    let collections = 0;
+    const service = new GajendraService(repository, {
+      collect: async (preferences) => {
+        collections += 1;
+        if (collections === 1) {
+          await contender.mutate({ mutation: { type: "set-source-enabled", sourceId: "codex", enabled: false } });
+          const collection = preferenceCollection(preferences);
+          return {
+            ...collection,
+            threads: collection.threads.map((candidate) => ({
+              ...candidate,
+              review: {
+                state: "ready" as const,
+                kind: "result" as const,
+                updatedAt: 1_786_545_400,
+                destination: { type: "thread" as const, deepLink: "codex://threads/thread-0" },
+                providerStatus: "completed",
+              },
+            })),
+          };
+        }
+        return preferenceCollection(preferences);
+      },
+      close: async () => undefined,
+    });
+
+    const snapshot = await service.snapshot();
+    expect(collections).toBe(2);
+    expect(snapshot).toMatchObject({
+      revision: 1,
+      sources: [expect.objectContaining({ id: "codex", enabled: false, state: "disabled" })],
+      focus: [],
+      important: [],
+      available: [],
+    });
+    expect(JSON.stringify(snapshot)).not.toContain("completed");
+    const persisted = await readFile(path.join(directory, "gajendra.v2.json"), "utf8");
+    expect(persisted).not.toContain("gajendraReview");
+    expect(persisted).not.toContain("completed");
+  });
+
   it("derives a priority-only concurrent generation from the transaction without recollecting sources", async () => {
     const directory = await temporaryDirectory();
     const contender = createService(directory);

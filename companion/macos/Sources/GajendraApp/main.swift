@@ -6,6 +6,8 @@ import SwiftUI
 
 private final class GajendraOverlayPanel: NSPanel {
     private let acceptsKeyboardInput: Bool
+    var onPointerEvent: ((NSEvent) -> Void)?
+    var cardAnimationGeneration = 0
 
     init(contentRect: NSRect, acceptsKeyboardInput: Bool) {
         self.acceptsKeyboardInput = acceptsKeyboardInput
@@ -24,6 +26,16 @@ private final class GajendraOverlayPanel: NSPanel {
 
     override var canBecomeKey: Bool { acceptsKeyboardInput }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown, .leftMouseDragged, .leftMouseUp:
+            onPointerEvent?(event)
+        default:
+            break
+        }
+        super.sendEvent(event)
+    }
 }
 
 private final class GajendraFirstMouseHostingView<Content: View>: NSHostingView<Content> {
@@ -55,6 +67,7 @@ private final class GajendraPillHostingView<Content: View>: NSHostingView<Conten
             }
         ]
     }
+
 }
 
 private struct GajendraSMAppServiceAdapter: GajendraLaunchAtLoginServicing {
@@ -109,7 +122,7 @@ enum GajendraMenuBarMain {
 }
 
 @MainActor
-final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     let model = DeckViewModel()
     let visualSettings = GajendraVisualSettings()
     let pillEditController = GajendraPillEditController()
@@ -117,12 +130,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var organizerWindow: NSWindow?
     private var sourceOnboardingWindow: NSWindow?
     private var pillWindow: NSPanel?
-    private var cardWindow: NSPanel?
+    private var cardWindow: GajendraOverlayPanel?
     private var statusItem: NSStatusItem?
     private var workspaceActivationObserver: NSObjectProtocol?
     private var screenParametersObserver: NSObjectProtocol?
     private var cardPresentation = GajendraCardPresentationState()
-    private var cardAnimationGeneration = 0
     private var launchAtLoginItem: NSMenuItem?
     private var undoMenuItem: NSMenuItem?
     private var redoMenuItem: NSMenuItem?
@@ -133,6 +145,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var pillAnchorCancellable: AnyCancellable?
     private var pillEditCancellable: AnyCancellable?
     private var historyCancellable: AnyCancellable?
+    private var surfaceRefreshTimer: Timer?
+    private var surfaceRefreshLifecycle = GajendraSurfaceRefreshLifecycle()
     private var localCardDismissMonitor: Any?
     private var globalCardDismissMonitor: Any?
     private var localEditDismissMonitor: Any?
@@ -142,6 +156,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var pillDragStart: CGPoint?
     private var pillDragPointerStart: CGPoint?
     private var pillDragDidMove = false
+    private var pillPointerDownLocation: NSPoint?
+    private var pillPointerMoved = false
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
     private let pillHiddenKey = "gajendra.pill.hidden"
@@ -165,6 +181,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         configurePillInteraction()
         configureStatusItem()
         configurePopover()
+        // Construct and lay out the hidden card before the first provider refresh and before
+        // Launch Services can deliver a reopen event. Reopen latency is a visible-surface
+        // contract, so the first card reveal must not pay SwiftUI hosting/layout cost.
+        prepareCardPanel()
         observeDesktopChanges()
         model.cleanupResumeScripts()
         configureLaunchAtLogin()
@@ -178,6 +198,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        stopSurfaceRefresh()
         removeCardDismissalMonitors()
         removePillEditDismissalMonitors()
         let center = NSWorkspace.shared.notificationCenter
@@ -190,7 +211,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showOrganizer()
+        recordUIReopenProbe()
+        presentCardFromPillOrReopen(prewarmed: true)
         return true
     }
 
@@ -280,14 +302,24 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         if popover.isShown {
             popover.performClose(sender)
         } else {
-            model.refresh()
-            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
-            popover.contentViewController?.view.window?.makeKey()
+            presentStatusPopover(from: sender)
         }
+    }
+
+    private func presentStatusPopover(from button: NSStatusBarButton) {
+        dismissPresentedCard(animated: false)
+        updatePopoverSize(for: preferredScreen())
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.contentViewController?.view.window?.makeKey()
+        surfaceRefreshLifecycle.revealPopover()
+        startSurfaceRefresh()
+        model.refresh()
     }
 
     private func showOrganizer() {
         dismissPresentedCard(animated: false)
+        popover.performClose(nil)
+        stopSurfaceRefresh()
         let window = organizerWindow ?? makeOrganizerWindow()
         organizerWindow = window
         window.makeKeyAndOrderFront(nil)
@@ -297,6 +329,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func showSourceOnboarding(refresh: Bool = true) {
         dismissPresentedCard(animated: false)
         popover.performClose(nil)
+        stopSurfaceRefresh()
         if refresh { model.refresh() }
         let window = sourceOnboardingWindow ?? makeSourceOnboardingWindow()
         sourceOnboardingWindow = window
@@ -453,13 +486,35 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func toggleCardFromPill() {
         guard !pillEditController.isEditing else { return }
         if cardPresentation.toggle() {
-            model.refresh()
-            showCard()
-            installCardDismissalMonitors()
+            presentCardSurface()
         } else {
             removeCardDismissalMonitors()
             hideCard()
         }
+    }
+
+    private func presentCardFromPillOrReopen(prewarmed: Bool = false) {
+        guard !pillEditController.isEditing else { return }
+        if UserDefaults.standard.bool(forKey: pillHiddenKey),
+           let button = statusItem?.button {
+            presentStatusPopover(from: button)
+            return
+        }
+        if !cardPresentation.isPresented {
+            _ = cardPresentation.toggle()
+        }
+        presentCardSurface(animated: !prewarmed)
+    }
+
+    private func presentCardSurface(animated: Bool = true) {
+        if popover.isShown {
+            popover.performClose(nil)
+        }
+        showCard(animated: animated)
+        surfaceRefreshLifecycle.handoffToCard()
+        installCardDismissalMonitors()
+        refreshPresentedCardAfterReveal()
+        startSurfaceRefresh()
     }
 
     private func dismissPresentedCard(animated: Bool = true) {
@@ -473,16 +528,16 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
     }
 
-    private func showCard() {
+    private func showCard(animated: Bool = true) {
         guard !pillEditController.isEditing else { return }
         cardInteractionSession.resetTransientState()
         let panel = cardWindow ?? makeCardPanel()
         let wasVisible = panel.isVisible
         cardWindow = panel
-        cardAnimationGeneration += 1
+        panel.cardAnimationGeneration += 1
         resizeCard(for: pillWindow?.screen ?? preferredScreen(), animated: false)
         positionCard()
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || !animated {
             panel.alphaValue = 1
             panel.orderFrontRegardless()
         } else {
@@ -496,11 +551,47 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
     }
 
+    private func prepareCardPanel() {
+        guard cardWindow == nil else { return }
+        let panel = makeCardPanel()
+        panel.contentView?.layoutSubtreeIfNeeded()
+        cardWindow = panel
+    }
+
+    private func recordUIReopenProbe() {
+        guard ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_PROBE"] == "1",
+              let dataDirectory = ProcessInfo.processInfo.environment["GAJENDRA_DATA_DIR"] else {
+            return
+        }
+        let marker = URL(fileURLWithPath: dataDirectory)
+            .appendingPathComponent(".gajendra-ui-reopen-received", isDirectory: false)
+        let value = String(ProcessInfo.processInfo.systemUptime)
+        try? Data(value.utf8).write(to: marker, options: .atomic)
+    }
+
+    private func refreshPresentedCardAfterReveal() {
+        let generation = cardWindow?.cardAnimationGeneration ?? 0
+        let delay = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self,
+                  self.cardPresentation.isPresented,
+                  self.cardWindow?.cardAnimationGeneration == generation,
+                  !self.model.isLoading else { return }
+            self.model.refresh()
+        }
+    }
+
+    private func togglePillEditModeFromPointer() {
+        dismissPresentedCard(animated: false)
+        pillEditController.toggle()
+    }
+
     private func hideCard() {
+        stopSurfaceRefresh()
         cardInteractionSession.resetTransientState()
         guard let panel = cardWindow, panel.isVisible else { return }
-        cardAnimationGeneration += 1
-        let generation = cardAnimationGeneration
+        panel.cardAnimationGeneration += 1
+        let generation = panel.cardAnimationGeneration
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             panel.orderOut(nil)
             panel.alphaValue = 1
@@ -510,20 +601,20 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             context.duration = 0.14
             context.allowsImplicitAnimation = true
             panel.animator().alphaValue = 0
-        } completionHandler: { [weak self, weak panel] in
-            Task { @MainActor in
-                guard let self, let panel,
-                      generation == self.cardAnimationGeneration,
-                      !self.cardPresentation.isPresented else { return }
-                panel.orderOut(nil)
-                panel.alphaValue = 1
-            }
+        } completionHandler: { [weak panel] in
+            guard let panel, panel.cardAnimationGeneration == generation else { return }
+            // The AX/UI harness (and a real user) may act as soon as the fade reaches zero.
+            // Complete the visibility transition in this main-thread callback so a following
+            // click cannot observe a transparent-but-still-ordered panel as the warm surface.
+            panel.orderOut(nil)
+            panel.alphaValue = 1
         }
     }
 
     private func hideCardImmediately() {
+        stopSurfaceRefresh()
         cardInteractionSession.resetTransientState()
-        cardAnimationGeneration += 1
+        cardWindow?.cardAnimationGeneration += 1
         cardWindow?.orderOut(nil)
         cardWindow?.alphaValue = 1
     }
@@ -636,7 +727,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
         let appMenu = NSMenu()
         let organizerItem = NSMenuItem(
-            title: "Open Gajendra",
+            title: "Open Organizer",
             action: #selector(showOrganizerFromMenu(_:)),
             keyEquivalent: "o"
         )
@@ -809,6 +900,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.resizeCard(for: self.pillWindow?.screen ?? self.preferredScreen(), animated: true)
+                self.updatePopoverSize(for: self.preferredScreen())
             }
     }
 
@@ -847,6 +939,45 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                     self.removePillEditDismissalMonitors()
                 }
             }
+    }
+
+    private func handlePillPointerEvent(_ event: NSEvent) {
+        // This callback is installed only on the pill panel.  For synthetic CGEvents and
+        // non-activating panels AppKit may leave NSEvent.window nil (or provide a transient
+        // wrapper) even though the panel delivered sendEvent.  Binding the state machine to
+        // that identity drops the matching mouse-up and turns a tiny drag into a lost click.
+        guard pillWindow != nil else { return }
+        switch event.type {
+        case .leftMouseDown:
+            pillPointerDownLocation = event.locationInWindow
+            pillPointerMoved = false
+        case .leftMouseDragged:
+            guard let pillPointerDownLocation else { return }
+            if hypot(
+                event.locationInWindow.x - pillPointerDownLocation.x,
+                event.locationInWindow.y - pillPointerDownLocation.y
+            ) >= GajendraOverlayPlacement.dragThreshold {
+                pillPointerMoved = true
+            }
+        case .leftMouseUp:
+            // A non-activating panel can deliver the up event without the matching down state
+            // after a tiny synthetic movement. The event is still scoped to this panel, and the
+            // global pointer must still be inside its frame before accepting that safe fallback.
+            let hasPointerContext = pillPointerDownLocation != nil
+                || pillWindow?.frame.contains(NSEvent.mouseLocation) == true
+            let shouldClick = hasPointerContext && !pillPointerMoved
+            let clickCount = max(1, event.clickCount)
+            pillPointerDownLocation = nil
+            pillPointerMoved = false
+            guard shouldClick else { return }
+            if clickCount == 2 {
+                togglePillEditModeFromPointer()
+            } else if clickCount == 1 {
+                pillEditController.performPrimaryAction { toggleCardFromPill() }
+            }
+        default:
+            break
+        }
     }
 
     private func installPillEditDismissalMonitors() {
@@ -935,14 +1066,83 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func configurePopover() {
         popover.behavior = .transient
         popover.animates = true
-        popover.contentSize = NSSize(width: 520, height: 650)
+        popover.delegate = self
+        updatePopoverSize(for: preferredScreen())
         popover.contentViewController = NSHostingController(
-            rootView: DeckContentView(
+            rootView: GajendraHoverCardView(
                 model: model,
                 visualSettings: visualSettings,
-                onManageSources: { [weak self] in self?.showSourceOnboarding() }
+                interactionSession: cardInteractionSession,
+                onOpenOrganizer: { [weak self] in self?.showOrganizer() },
+                onManageSources: { [weak self] in self?.showSourceOnboarding() },
+                onDismiss: { [weak self] in self?.dismissPopover() },
+                onSearchFocusRequested: { [weak self] in
+                    self?.popover.contentViewController?.view.window?.makeKey()
+                }
             )
         )
+    }
+
+    private func updatePopoverSize(for screen: NSScreen) {
+        let size = GajendraHoverCardSizing.size(
+            for: visualSettings.hoverCardSize,
+            visibleFrame: screen.visibleFrame
+        )
+        popover.contentSize = NSSize(width: size.width, height: size.height)
+    }
+
+    private func dismissPopover() {
+        popover.performClose(nil)
+        stopSurfaceRefresh()
+    }
+
+    private func startSurfaceRefresh() {
+        surfaceRefreshLifecycle.reconcile(
+            cardSurfaceVisible: cardWindow?.isVisible == true,
+            popoverVisible: popover.isShown
+        )
+        surfaceRefreshTimer?.invalidate()
+        surfaceRefreshTimer = nil
+        guard surfaceRefreshLifecycle.shouldPoll else { return }
+        surfaceRefreshTimer = Timer.scheduledTimer(
+            withTimeInterval: GajendraSurfaceRefreshPolicy.interval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshPresentedSurfaceIfIdle()
+            }
+        }
+    }
+
+    private func stopSurfaceRefresh() {
+        surfaceRefreshLifecycle.stop()
+        surfaceRefreshTimer?.invalidate()
+        surfaceRefreshTimer = nil
+    }
+
+    private func refreshPresentedSurfaceIfIdle() {
+        surfaceRefreshLifecycle.reconcile(
+            cardSurfaceVisible: cardWindow?.isVisible == true,
+            popoverVisible: popover.isShown
+        )
+        guard GajendraSurfaceRefreshPolicy.shouldRefresh(
+            surfaceIsVisible: surfaceRefreshLifecycle.shouldPoll,
+            modelIsLoading: model.isLoading,
+            modelIsMutating: model.isMutating,
+            interactionState: cardInteractionSession.state
+        ) else { return }
+        model.refresh()
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        guard notification.object as? NSPopover === popover else { return }
+        let cardSurfaceVisible = cardWindow?.isVisible == true
+        surfaceRefreshLifecycle.closePopover(cardSurfaceVisible: cardSurfaceVisible)
+        guard GajendraSurfacePresentationPolicy.shouldStopRefreshOnPopoverClose(
+            cardSurfaceVisible: cardSurfaceVisible
+        ) else { return }
+        cardInteractionSession.resetTransientState()
+        stopSurfaceRefresh()
     }
 
     private func makeOrganizerWindow() -> NSWindow {
@@ -996,6 +1196,9 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func makePillPanel() -> NSPanel {
         let panel = makeOverlayPanel(title: "Gajendra Focus Pill", size: pillSize, acceptsKeyboardInput: false)
+        panel.onPointerEvent = { [weak self] event in
+            self?.handlePillPointerEvent(event)
+        }
         panel.setAccessibilityLabel("Gajendra focus pill")
         let hostingView = GajendraPillHostingView(
             rootView: GajendraPillView(
@@ -1025,7 +1228,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return panel
     }
 
-    private func makeCardPanel() -> NSPanel {
+    private func makeCardPanel() -> GajendraOverlayPanel {
         let screen = pillWindow?.screen ?? preferredScreen()
         let preferredSize = GajendraHoverCardSizing.size(
             for: visualSettings.hoverCardSize,
@@ -1062,7 +1265,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         return panel
     }
 
-    private func makeOverlayPanel(title: String, size: NSSize, acceptsKeyboardInput: Bool) -> NSPanel {
+    private func makeOverlayPanel(title: String, size: NSSize, acceptsKeyboardInput: Bool) -> GajendraOverlayPanel {
         let panel = GajendraOverlayPanel(
             contentRect: NSRect(origin: .zero, size: size),
             acceptsKeyboardInput: acceptsKeyboardInput

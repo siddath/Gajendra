@@ -27,8 +27,9 @@ const viewModelSource = path.resolve("companion/macos/Sources/GajendraKit/DeckVi
 const deckClientSource = path.resolve("companion/macos/Sources/GajendraKit/DeckClient.swift");
 const uiTestSource = path.resolve("companion/macos/Sources/GajendraUITest/main.swift");
 const uiTestScript = path.resolve("companion/macos/scripts/test-ui.zsh");
-const emptyStoreFixture = path.resolve("plugins/gajendra/tests/fixtures/empty-store.json");
-const emptySourcesFixture = path.resolve("plugins/gajendra/tests/fixtures/empty-sources.json");
+const uiStoreFixture = path.resolve("plugins/gajendra/tests/fixtures/ui-interactions-store.json");
+const uiSourcesFixture = path.resolve("plugins/gajendra/tests/fixtures/ui-interactions-sources.json");
+const uiThreadsFixture = path.resolve("plugins/gajendra/tests/fixtures/ui-interactions-threads.json");
 const codexSource = path.resolve("plugins/gajendra/src/server/codex-app-server.ts");
 const threadSourcesSource = path.resolve("plugins/gajendra/src/server/thread-sources.ts");
 
@@ -50,8 +51,9 @@ await Promise.all([
   access(deckClientSource, constants.R_OK),
   access(uiTestSource, constants.R_OK),
   access(uiTestScript, constants.R_OK),
-  access(emptyStoreFixture, constants.R_OK),
-  access(emptySourcesFixture, constants.R_OK),
+  access(uiStoreFixture, constants.R_OK),
+  access(uiSourcesFixture, constants.R_OK),
+  access(uiThreadsFixture, constants.R_OK),
   access(codexSource, constants.R_OK),
   access(threadSourcesSource, constants.R_OK),
 ]);
@@ -82,10 +84,31 @@ const [menuBar, content, overlay, sourceOnboarding, models, viewModel, deckClien
   readFile(codexSource, "utf8"),
   readFile(threadSourcesSource, "utf8"),
 ]);
-const [uiTest, uiTestHarness] = await Promise.all([
+const [uiTest, uiTestHarness, uiStore, uiSources, uiThreads] = await Promise.all([
   readFile(uiTestSource, "utf8"),
   readFile(uiTestScript, "utf8"),
+  readFile(uiStoreFixture, "utf8"),
+  readFile(uiSourcesFixture, "utf8"),
+  readFile(uiThreadsFixture, "utf8"),
 ]);
+for (const [name, fixture] of [
+  ["store", uiStore],
+  ["sources", uiSources],
+  ["threads", uiThreads],
+]) {
+  assert(Buffer.byteLength(fixture) <= 128 * 1024, `UI ${name} fixture exceeds 128 KiB`);
+  JSON.parse(fixture);
+  assertNoPrivateFixtureData(fixture, `UI ${name} fixture`);
+}
+assertContains(uiSources, [
+  '"id": "ui-agent"',
+  '"name": "Synthetic UI Agent"',
+  '"catalog": "plugins/gajendra/tests/fixtures/ui-interactions-threads.json"',
+], "synthetic UI source fixture");
+assertContains(uiThreads, [
+  '"project": "Synthetic UI fixture"',
+  '"deepLink": "ui-agent://threads/',
+], "synthetic UI thread fixture");
 
 assertNoRetiredCopy([menuBar, content, overlay, sourceOnboarding, models, viewModel], "native source");
 assertContains(models, [
@@ -100,6 +123,8 @@ assertContains(models, [
   '["javascript", "data", "file"]',
   "public struct ReviewSignal",
   "public var reviewReadyThreads",
+  "public static let stationaryPressMilliseconds = 280",
+  "public static let movementTolerance: CGFloat = 4",
 ], "native identity and mutation contract");
 assertContains(menuBar, [
   "configureLaunchAtLogin()",
@@ -109,6 +134,13 @@ assertContains(menuBar, [
   "Gajendra Details",
   "GajendraPillHostingView",
   "accessibilityPerformPress",
+  "override func sendEvent(_ event: NSEvent)",
+  "prepareCardPanel()",
+  "refreshPresentedCardAfterReveal()",
+  "GajendraHoverCardView(",
+  'title: "Open Organizer"',
+  "GajendraSurfaceRefreshPolicy.interval",
+  "GajendraSurfacePresentationPolicy.shouldStopRefreshOnPopoverClose",
 ], "native menu and explicit-login contract");
 const launchConfiguration = menuBar.slice(
   menuBar.indexOf("private func configureLaunchAtLogin"),
@@ -146,17 +178,59 @@ assertContains(overlay, [
   "performPrimaryAction",
   "DragGesture(minimumDistance: GajendraOverlayPlacement.dragThreshold)",
   "Click to open priorities and finish moving",
+  "GajendraStatusCountBadge",
+  "GajendraQueueDragPreview",
+  "GajendraQueueInteractionTuning",
+  "selectedQueueThreadId",
+  "GajendraSurfaceRefreshPolicy",
+  "LongPressGesture(",
+  "directQueueDragSurface",
+  "Hold to select; keep holding to drag",
+  '? "Dragging"',
+  '? "Drop target"',
+  ".onTapGesture(count: 2)",
 ], "launcher tap recovery contract");
+assertContains(content, [
+  "GajendraOrganizerTaskFramePreferenceKey",
+  'DragGesture(minimumDistance: 3, coordinateSpace: .named("gajendra-organizer"))',
+  "queueDragHandle",
+  "GajendraStatusCountBadge",
+  ".onTapGesture(count: 2)",
+], "organizer drag and dock contract");
+assertNotContains([content, overlay, models], [
+  "GajendraQueueDragPayload",
+  "GajendraQueueDragRegistry",
+  "GajendraOrganizerDragCapture",
+  "CoreTransferable",
+  "NSPasteboard",
+], "app-local queue drag contract");
 assertContains(uiTest, [
   "microMovementTap",
   "edit-mode tap recovery",
   "AXUIElementPerformAction",
   "outer-edge open",
+  "taskTapPreservesOpenMode",
+  "taskLongPressSelected",
+  "continuousHoldDrag",
+  "dragWithIntermediateEvidence",
+  "value: \"Dragging\"",
+  "value: \"Drop target\"",
+  "taskRowDragInEditMode",
+  "queueDragAndDrop",
+  "organizerQueueDragAndDrop",
+  "dockSingleClickGuard",
+  "runningDockDoubleClick",
+  "reviewDockDoubleClick",
+  "popupLatencyBudgetMet",
+  "popupLatencyBudgetMilliseconds = 200",
+  "waitForState",
 ], "process-level launcher UI regression");
 assertContains(uiTestHarness, [
   "GAJENDRA_DATA_DIR",
-  "empty-store.json",
-  "empty-sources.json",
+  "ui-interactions-store.json",
+  "ui-interactions-sources.json",
+  "ui-interactions-threads.json",
+  "GAJENDRA_UI_TEST_ASSERT_NO_ATTRIBUTE_CYCLES",
 ], "isolated launcher UI harness");
 
 assertContains(codex, [
@@ -169,6 +243,15 @@ assertContains(codex, [
   'event.payload?.type === "task_complete"',
   "MAX_CODEX_ENRICHMENT_CONCURRENCY",
   "MAX_CODEX_ENRICHMENT_DEADLINE_MS",
+  '"thread/turns/list"',
+  'itemsView: "notLoaded"',
+  "requestAttestation: false",
+  "isEligibleCodexReviewThread",
+  "MAX_CODEX_REVIEW_CONCURRENCY",
+  "MAX_CODEX_REVIEW_DEADLINE_MS",
+  "classifyCodexReviewTurnPage",
+  'summary.status !== "completed") return { kind: "not-ready" }',
+  'summary.error !== null) return { kind: "invalid" }',
 ], "Codex enrichment boundary");
 assertContains(threadSources, [
   "RESERVED_SOURCE_IDS",
@@ -178,6 +261,7 @@ assertContains(threadSources, [
   "SIGTERM",
   "SIGKILL",
   "MAX_CURSOR_OUTPUT_BYTES",
+  "MAX_BACKGROUND_THREADS_PER_SOURCE",
   "reviewSignalSchema",
   "Configured agent catalog contains a disallowed review destination.",
 ], "configured-source bounds");
@@ -331,6 +415,10 @@ console.log(JSON.stringify({
     codexEnrichmentKillSwitch: "GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off",
     configuredSourcesBoundedAndReservedIdsRejected: true,
     configuredReviewSignalsValidatedAndLiveOnly: true,
+    appLocalQueueDragWithoutPasteboard: true,
+    taskLongPressAndFullRowDrag: true,
+    measuredWidgetPopupBudgetMilliseconds: 200,
+    dockDoubleClickContract: true,
   },
   syntheticValidation: {
     configuredSourceOnly: true,
@@ -340,9 +428,10 @@ console.log(JSON.stringify({
     privateState: true,
     privateContentRecorded: false,
     reviewSignalPersisted: false,
+    isolatedPointerFixturesPrivacyChecked: true,
   },
   evidenceBoundary: [
-    "This validator does not assert installed-app, clean-Mac, physical accessibility, login-item, or drag proof.",
+    "This validator does not assert installed-app, clean-Mac, physical accessibility, login-item, or manual human drag proof.",
     "This validator does not assert Developer ID, notarization, Gatekeeper, distribution, or publication proof.",
   ],
 }));
@@ -350,6 +439,30 @@ console.log(JSON.stringify({
 function assertContains(source, required, label) {
   for (const value of required) {
     if (!source.includes(value)) throw new Error(label + " is missing: " + value);
+  }
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function assertNotContains(sources, forbidden, label) {
+  for (const value of forbidden) {
+    if (sources.some((source) => source.includes(value))) {
+      throw new Error(label + " contains forbidden value: " + value);
+    }
+  }
+}
+
+function assertNoPrivateFixtureData(source, label) {
+  const forbidden = [
+    /\/Users\//u,
+    /(?:^|\s)~\//mu,
+    /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/iu,
+    /https?:\/\//iu,
+  ];
+  for (const pattern of forbidden) {
+    if (pattern.test(source)) throw new Error(`${label} contains private or non-synthetic data: ${pattern}`);
   }
 }
 

@@ -157,6 +157,46 @@ describe("thread source adapters", () => {
     expect(result.sources).toContainEqual(expect.objectContaining({ id: "grok", state: "ready", threadCount: 1 }));
   });
 
+  it("projects a metadata-only Codex review signal to its exact owning task", async () => {
+    const id = "00000000-0000-7000-8000-000000000701";
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-codex-review-source-"));
+    temporaryDirectories.push(directory);
+    const codexStub = {
+      close: async () => undefined,
+      listThreads: async () => [{
+        id,
+        name: "Safe Codex metadata title",
+        status: "idle",
+        // An arbitrary raw property is ignored; only the app-server client's dedicated transient
+        // projection may reach an AgentThread review field.
+        review: { content: "private raw turn payload" },
+        gajendraReview: {
+          state: "ready" as const,
+          kind: "result" as const,
+          updatedAt: 1_786_545_400,
+          destination: { type: "thread" as const, deepLink: `codex://threads/${id}` },
+          providerStatus: "completed",
+        },
+      }],
+    } as unknown as CodexAppServerClient;
+    const registry = new ThreadSourceRegistry(codexStub, {
+      GAJENDRA_SOURCES_CONFIG: path.join(directory, "missing.json"),
+    });
+    const result = await registry.collect({ codex: true, claude: false, cursor: false, grok: false });
+    expect(result.threads).toEqual([expect.objectContaining({
+      id: `codex:${id}`,
+      deepLink: `codex://threads/${id}`,
+      review: {
+        state: "ready",
+        kind: "result",
+        updatedAt: 1_786_545_400,
+        destination: { type: "thread", deepLink: `codex://threads/${id}` },
+        providerStatus: "completed",
+      },
+    })]);
+    expect(JSON.stringify(result)).not.toContain("private raw turn payload");
+  });
+
   it("keeps Grok reads on the originally opened bounded handle when the path is replaced", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-grok-open-handle-"));
     temporaryDirectories.push(directory);

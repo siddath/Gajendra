@@ -1,7 +1,5 @@
-import CoreTransferable
 import Combine
 import Foundation
-import UniformTypeIdentifiers
 
 #if canImport(Darwin)
 import Darwin
@@ -233,7 +231,20 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
     public func matchesSearch(_ query: String) -> Bool {
         let terms = query.lowercased().split(whereSeparator: { $0.isWhitespace }).map(String.init)
         guard !terms.isEmpty else { return true }
-        let searchableMetadata = [title, project, sourceName, sourceId, id, status]
+        var searchableFields = [title, project, sourceName, sourceId, id, status]
+        if let context {
+            searchableFields.append(context.title)
+        }
+        if let placementLabel {
+            searchableFields.append(placementLabel)
+        }
+        if isRunning {
+            searchableFields.append(contentsOf: ["running", "active"])
+        }
+        if isReadyForReview {
+            searchableFields.append(contentsOf: ["ready", "review", "ready for review"])
+        }
+        let searchableMetadata = searchableFields
             .joined(separator: " ")
             .lowercased()
         return terms.allSatisfy(searchableMetadata.contains)
@@ -692,70 +703,9 @@ public enum GajendraQueueInteractionPolicy {
         competingDrag: Bool = false,
         viewVisible: Bool = true
     ) -> Bool {
-        competingDrag || !viewVisible || hypot(current.x - start.x, current.y - start.y) > movementTolerance
-    }
-}
-
-public struct GajendraQueueDragPayload: Codable, Hashable, Sendable, Transferable {
-    public let token: String
-
-    public init(token: String) {
-        self.token = token
-    }
-
-    public static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: GajendraDragTransfer.contentType)
-    }
-}
-
-public enum GajendraDragTransfer {
-    public static let contentType = UTType(exportedAs: "dev.sid.gajendra.queue-token", conformingTo: .data)
-}
-
-@MainActor
-public final class GajendraQueueDragRegistry: ObservableObject {
-    public static let shared = GajendraQueueDragRegistry()
-
-    private struct Entry {
-        let threadId: String
-        let expiresAt: Date
-    }
-
-    private var entries: [String: Entry] = [:]
-    private let lifetime: TimeInterval
-
-    public init(lifetime: TimeInterval = 300) {
-        self.lifetime = lifetime
-    }
-
-    public func issue(threadId: String, now: Date = Date()) -> GajendraQueueDragPayload {
-        prune(now: now)
-        let token = UUID().uuidString.lowercased()
-        entries[token] = Entry(threadId: threadId, expiresAt: now.addingTimeInterval(lifetime))
-        return GajendraQueueDragPayload(token: token)
-    }
-
-    public func resolve(_ payload: GajendraQueueDragPayload, now: Date = Date()) -> String? {
-        prune(now: now)
-        guard let entry = entries.removeValue(forKey: payload.token), entry.expiresAt > now else { return nil }
-        return entry.threadId
-    }
-
-    /// Explicit cancellation is useful when a drag leaves the app without a drop.
-    public func cancel(_ payload: GajendraQueueDragPayload) {
-        entries[payload.token] = nil
-    }
-
-    public func cancelAll() {
-        entries.removeAll(keepingCapacity: false)
-    }
-
-    public func encodedBytes(for payload: GajendraQueueDragPayload) -> Data {
-        (try? JSONEncoder().encode(payload)) ?? Data()
-    }
-
-    private func prune(now: Date) {
-        entries = entries.filter { $0.value.expiresAt > now }
+        competingDrag
+            || !viewVisible
+            || hypot(current.x - start.x, current.y - start.y) > movementTolerance
     }
 }
 

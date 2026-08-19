@@ -28,22 +28,33 @@ explicit active rows when applying background/result caps.
 
 ## Ready for Review
 
-Ready for Review is also derived live metadata, not a priority tier. A thread appears only when an
-enabled adapter supplies the bounded `review.state = "ready"` structure, a supported kind, a valid
-timestamp, a single-line provider status, and a structured Task or Review destination. Running
-takes precedence if a stale source reports both states. The projection is ordered by the review
-timestamp and retained outside the ordinary 200-row background cap.
+Ready for Review is also derived live metadata, not a priority tier or unread marker. A thread
+appears only when an enabled adapter supplies the bounded `review.state = "ready"` structure, a
+supported kind, a valid timestamp, a single-line provider status, and a structured Task or Review
+destination. Running takes precedence if a stale source reports both states. The projection is
+ordered by the review timestamp and retained outside the ordinary 200-row background cap.
 
-The first supported adapter path is an explicitly configured catalog; see
+An explicitly configured catalog remains a supported path; see
 [the synthetic catalog](../examples/review-catalog.json). The configured source's declared safe
 schemes are checked when the catalog is read and again when the destination opens. A URL destination
 is labeled **Review**; a thread fallback is labeled **Task**, while the provider badge continues to
 open the owning task.
 
-Built-in Codex, Claude Code, Cursor, and Grok adapters do not currently emit review readiness.
-Gajendra does not translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review
-signal. Remote provider APIs, tokens, and network access remain outside this local implementation.
-Review signals, provider statuses, destinations, results, diffs, and PR content are never written to
+The current local Codex app-server is the only built-in review path. Gajendra opts into its guarded
+experimental API and asks `thread/turns/list` for at most the newest turn with
+`itemsView: "notLoaded"`. A candidate is ready only when the response is structurally exact, returns
+zero items, reports terminal `completed` with no error and a valid completion time, and the thread
+is not Running. Up to the existing 200 newest background candidates are checked by a four-worker,
+five-second bounded pass. An unsupported method, deadline, malformed response, returned item, or
+invalid/future timestamp suppresses the whole built-in review batch. A structurally valid empty,
+active, interrupted, or failed newest turn contributes no Ready signal without poisoning other
+valid candidates.
+
+Claude Code, Cursor, and Grok do not currently emit built-in review readiness. Gajendra does not
+translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review signal. Remote
+provider APIs, tokens, and network access remain outside this local implementation. Opening a
+thread does not clear review readiness; only newer provider evidence changes it. Review signals,
+provider statuses, destinations, results, diffs, and PR content are never written to
 `gajendra.v2.json`.
 
 ## Codex activity enrichment
@@ -76,5 +87,5 @@ Every source has an allow-listed scheme set. Gajendra rejects unknown, malformed
 whitespace-padded, `javascript:`, `data:`, and `file:` destinations at catalog parse and again when
 the host/native client opens a link. A source catalog cannot bypass this execution check.
 
-These are source contracts for the current local candidate. Final provider and installed-app proof
-remains governed by [Status](../STATUS.md) and [Gauntlet](GAUNTLET.md).
+These are source contracts for the current local candidate. Final installed-provider, clean-account,
+and clean-Mac proof remains governed by [Status](../STATUS.md) and [Gauntlet](GAUNTLET.md).

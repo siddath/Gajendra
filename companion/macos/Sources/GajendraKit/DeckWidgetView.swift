@@ -542,18 +542,6 @@ public struct GajendraPillView: View {
                 .contentShape(Rectangle())
                 .opacity(model.isLoading ? 0.72 : 1)
                 .scaleEffect(isHovered && !editController.isEditing ? 1.05 : 1)
-                .gesture(
-                    TapGesture(count: 2)
-                        .exclusively(before: TapGesture(count: 1))
-                        .onEnded { result in
-                            switch result {
-                            case .first:
-                                editController.toggle()
-                            case .second:
-                                editController.performPrimaryAction(onActivate)
-                            }
-                        }
-                )
 
             if editController.isEditing {
                 Group {
@@ -899,6 +887,14 @@ struct GajendraSearchTextField: NSViewRepresentable {
 }
 
 public enum GajendraQueueEditHitTesting {
+    public static func isSelfDrop(
+        at point: CGPoint,
+        sourceThreadId: String,
+        taskFrames: [String: CGRect]
+    ) -> Bool {
+        taskFrames[sourceThreadId]?.contains(point) == true
+    }
+
     public static func shouldExit(
         at point: CGPoint,
         taskFrames: [CGRect],
@@ -911,26 +907,155 @@ public enum GajendraQueueEditHitTesting {
 public enum GajendraQueueInteractionTuning {
     public static let stationaryPressMilliseconds = GajendraQueueInteractionPolicy.stationaryPressMilliseconds
     public static let movementTolerance = GajendraQueueInteractionPolicy.movementTolerance
+    public static let dragMinimumDistance: CGFloat = 3
+    public static let dragLiftScale: CGFloat = 1.035
+    public static let holdToDragInstruction = "Hold to select; keep holding to drag"
     public static let reorderSpringResponse = 0.22
     public static let reorderSpringDamping = 0.9
+
+    public static func dragPreviewScale(reduceMotion: Bool) -> CGFloat {
+        reduceMotion ? 1 : dragLiftScale
+    }
+}
+
+public struct GajendraCardInteractionState: Equatable, Sendable {
+    public var isQueueEditing = false
+    public var isSearchFocused = false
+    public var isDragging = false
+
+    public init(isQueueEditing: Bool = false, isSearchFocused: Bool = false, isDragging: Bool = false) {
+        self.isQueueEditing = isQueueEditing
+        self.isSearchFocused = isSearchFocused
+        self.isDragging = isDragging
+    }
+
+    public var blocksSurfaceRefresh: Bool {
+        isQueueEditing || isSearchFocused || isDragging
+    }
+}
+
+public enum GajendraSurfaceRefreshPolicy {
+    /// A conservative visible-surface cadence that avoids background provider polling while still
+    /// allowing Running/Ready metadata to settle during an open card or status-item popover.
+    public static let interval: TimeInterval = 30
+
+    public static func shouldRefresh(
+        surfaceIsVisible: Bool,
+        modelIsLoading: Bool,
+        modelIsMutating: Bool,
+        interactionState: GajendraCardInteractionState
+    ) -> Bool {
+        surfaceIsVisible
+            && !modelIsLoading
+            && !modelIsMutating
+            && !interactionState.blocksSurfaceRefresh
+    }
+}
+
+/// Small state machine shared by the app delegate and deterministic tests. Refresh ownership
+/// follows the actual visible surface: a floating card and a status-item popover are equivalent
+/// visible surfaces, and their handoff must not briefly tear down the timer.
+public struct GajendraSurfaceRefreshLifecycle: Equatable, Sendable {
+    public private(set) var cardSurfaceVisible = false
+    public private(set) var popoverVisible = false
+    public private(set) var timerActive = false
+
+    public init() {}
+
+    public var surfaceIsVisible: Bool {
+        cardSurfaceVisible || popoverVisible
+    }
+
+    public var shouldPoll: Bool {
+        timerActive && surfaceIsVisible
+    }
+
+    public mutating func revealCard() {
+        cardSurfaceVisible = true
+        timerActive = true
+    }
+
+    public mutating func revealPopover() {
+        popoverVisible = true
+        timerActive = true
+    }
+
+    public mutating func handoffToCard() {
+        popoverVisible = false
+        cardSurfaceVisible = true
+        timerActive = true
+    }
+
+    public mutating func closePopover(cardSurfaceVisible: Bool) {
+        popoverVisible = false
+        self.cardSurfaceVisible = cardSurfaceVisible
+        timerActive = cardSurfaceVisible
+    }
+
+    public mutating func reconcile(cardSurfaceVisible: Bool, popoverVisible: Bool) {
+        self.cardSurfaceVisible = cardSurfaceVisible
+        self.popoverVisible = popoverVisible
+        timerActive = cardSurfaceVisible || popoverVisible
+    }
+
+    public mutating func stop() {
+        cardSurfaceVisible = false
+        popoverVisible = false
+        timerActive = false
+    }
+}
+
+public enum GajendraSurfacePresentationPolicy {
+    /// Closing the status-item popover must not tear down the timer for a floating card that
+    /// is already being revealed during the same surface transition.
+    public static func shouldStopRefreshOnPopoverClose(cardSurfaceVisible: Bool) -> Bool {
+        !cardSurfaceVisible
+    }
 }
 
 public final class GajendraCardInteractionSession: ObservableObject {
     @Published public private(set) var resetRevision = 0
+    @Published public private(set) var state = GajendraCardInteractionState()
 
     public init() {}
 
+    public func update(
+        isQueueEditing: Bool,
+        isSearchFocused: Bool,
+        isDragging: Bool
+    ) {
+        state = GajendraCardInteractionState(
+            isQueueEditing: isQueueEditing,
+            isSearchFocused: isSearchFocused,
+            isDragging: isDragging
+        )
+    }
+
     public func resetTransientState() {
+        state = GajendraCardInteractionState()
         resetRevision &+= 1
     }
 }
 
 private struct GajendraQueueTaskFramePreferenceKey: PreferenceKey {
-    static var defaultValue: [CGRect] = []
+    static var defaultValue: [String: CGRect] = [:]
 
-    static func reduce(value: inout [CGRect], nextValue: () -> [CGRect]) {
-        value.append(contentsOf: nextValue())
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newest in newest })
     }
+}
+
+private struct GajendraQueueColumnFramePreferenceKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newest in newest })
+    }
+}
+
+private final class GajendraQueueDragGeometry: ObservableObject {
+    var taskFrames: [String: CGRect] = [:]
+    var columnFrames: [String: CGRect] = [:]
 }
 
 struct GajendraLiveActivityMark: View {
@@ -985,6 +1110,36 @@ struct GajendraReviewStatusMark: View {
     }
 }
 
+struct GajendraStatusCountBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let count: Int
+    let tint: Color
+    let scale: CGFloat
+
+    init(count: Int, tint: Color, scale: CGFloat = 1) {
+        self.count = count
+        self.tint = tint
+        self.scale = scale
+    }
+
+    var body: some View {
+        Text("\(count)")
+            .font(.system(size: 10 * scale, weight: .bold, design: .rounded).monospacedDigit())
+            .foregroundStyle(count > 0 ? tint : Color.secondary)
+            .frame(minWidth: 20 * scale, minHeight: 18 * scale)
+            .padding(.horizontal, 2 * scale)
+            .background(
+                tint.opacity(count > 0 ? (colorScheme == .dark ? 0.2 : 0.13) : 0.045),
+                in: Capsule()
+            )
+            .overlay(
+                Capsule()
+                    .stroke(tint.opacity(count > 0 ? 0.58 : 0.16), lineWidth: 1)
+            )
+            .accessibilityLabel("\(count)")
+    }
+}
+
 public struct GajendraHoverCardView: View {
     @ObservedObject private var model: DeckViewModel
     @ObservedObject private var visualSettings: GajendraVisualSettings
@@ -1003,10 +1158,13 @@ public struct GajendraHoverCardView: View {
     @State private var isQueueEditing: Bool
     @State private var targetedQueueThreadId: String?
     @State private var targetedQueueLevel: PriorityLevel?
-    @State private var queueTaskFrames: [CGRect] = []
+    @State private var draggingQueueThreadId: String?
+    @State private var queueDragLocation: CGPoint?
+    @State private var heldQueueThreadId: String?
+    @State private var selectedQueueThreadId: String?
+    @State private var suppressedQueueOpenThreadId: String?
     @State private var queueEditingAtPointerDown: Bool?
-    @State private var directQueueDragThreadId: String?
-    @StateObject private var dragRegistry = GajendraQueueDragRegistry()
+    @StateObject private var queueDragGeometry = GajendraQueueDragGeometry()
     private let isPreview: Bool
     private let onOpenOrganizer: () -> Void
     private let onManageSources: () -> Void
@@ -1039,20 +1197,36 @@ public struct GajendraHoverCardView: View {
 
     public var body: some View {
         GeometryReader { proxy in
-            cardLayout
-                .padding(contentInset)
-                .frame(
-                    width: max(0, proxy.size.width - 24),
-                    height: max(0, proxy.size.height - 24),
-                    alignment: .top
-                )
-                .background(
-                    GajendraGlassSurface(
-                        cornerRadius: visualSettings.theme == .focusDeck ? 14 : 16,
-                        theme: visualSettings.theme
+            ZStack(alignment: .topLeading) {
+                cardLayout
+                    .padding(contentInset)
+                    .frame(
+                        width: max(0, proxy.size.width - 24),
+                        height: max(0, proxy.size.height - 24),
+                        alignment: .top
                     )
-                )
-                .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    .background(
+                        GajendraGlassSurface(
+                            cornerRadius: visualSettings.theme == .focusDeck ? 14 : 16,
+                            theme: visualSettings.theme
+                        )
+                    )
+                    .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+
+                if let queueDragLocation,
+                   let draggingQueueThreadId,
+                   let thread = model.snapshot?.allThreads.first(where: { $0.id == draggingQueueThreadId }) {
+                    GajendraQueueDragPreview(thread: thread, scale: contentScale)
+                        .frame(width: min(260 * contentScale, max(220, proxy.size.width - 32)))
+                        .position(
+                            x: min(max(queueDragLocation.x + 118 * contentScale, 118 * contentScale), max(118 * contentScale, proxy.size.width - 118 * contentScale)),
+                            y: min(max(queueDragLocation.y - 22 * contentScale, 28 * contentScale), max(28 * contentScale, proxy.size.height - 28 * contentScale))
+                        )
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                        .transition(.opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.94)))
+                }
+            }
         }
         .coordinateSpace(name: "gajendra-hover-card")
         .contentShape(Rectangle())
@@ -1063,33 +1237,22 @@ public struct GajendraHoverCardView: View {
                         queueEditingAtPointerDown = isQueueEditing
                     }
                 }
-                .onEnded { _ in
-                    DispatchQueue.main.async {
-                        queueEditingAtPointerDown = nil
-                        if !isQueueEditing {
-                            directQueueDragThreadId = nil
-                            targetedQueueThreadId = nil
-                            targetedQueueLevel = nil
-                        }
-                    }
-                }
-        )
-        .simultaneousGesture(
-            SpatialTapGesture(count: 1, coordinateSpace: .named("gajendra-hover-card"))
                 .onEnded { event in
-                    let beganWhileEditing = queueEditingAtPointerDown == true
+                    let editingAtPointerDown = queueEditingAtPointerDown ?? isQueueEditing
                     queueEditingAtPointerDown = nil
-                    guard isQueueEditing,
-                          GajendraQueueEditHitTesting.shouldExit(
-                            at: event.location,
-                            taskFrames: queueTaskFrames,
-                            editingAtPointerDown: beganWhileEditing
-                          ) else { return }
+                    guard GajendraQueueEditHitTesting.shouldExit(
+                        at: event.location,
+                        taskFrames: Array(queueDragGeometry.taskFrames.values),
+                        editingAtPointerDown: editingAtPointerDown
+                    ) else { return }
                     setQueueEditing(false)
                 }
         )
         .onPreferenceChange(GajendraQueueTaskFramePreferenceKey.self) { frames in
-            queueTaskFrames = frames
+            queueDragGeometry.taskFrames = frames
+        }
+        .onPreferenceChange(GajendraQueueColumnFramePreferenceKey.self) { frames in
+            queueDragGeometry.columnFrames = frames
         }
         .onTapGesture(count: 2) {
             guard !isQueueEditing else { return }
@@ -1115,7 +1278,30 @@ public struct GajendraHoverCardView: View {
         .onChange(of: interactionSession.resetRevision) { _ in
             resetQueueEditing()
         }
+        .onAppear {
+            publishInteractionState()
+        }
+        .onDisappear {
+            interactionSession.update(isQueueEditing: false, isSearchFocused: false, isDragging: false)
+        }
+        .onChange(of: isQueueEditing) { _ in
+            publishInteractionState()
+        }
+        .onChange(of: searchFocused) { _ in
+            publishInteractionState()
+        }
+        .onChange(of: draggingQueueThreadId) { _ in
+            publishInteractionState()
+        }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.errorMessage)
+    }
+
+    private func publishInteractionState() {
+        interactionSession.update(
+            isQueueEditing: isQueueEditing,
+            isSearchFocused: searchFocused,
+            isDragging: draggingQueueThreadId != nil
+        )
     }
 
     private var cardLayout: some View {
@@ -1412,9 +1598,7 @@ public struct GajendraHoverCardView: View {
     private var queueSummary: some View {
         if let snapshot = model.snapshot {
             VStack(alignment: .leading, spacing: 6 * contentScale) {
-                if isQueueEditing {
-                    queueEditModeBar
-                }
+                queueInteractionBar
                 HStack(alignment: .top, spacing: 10 * contentScale) {
                     queueColumn(
                         title: "Focus",
@@ -1430,6 +1614,37 @@ public struct GajendraHoverCardView: View {
                     )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var queueInteractionBar: some View {
+        if isQueueEditing {
+            queueEditModeBar
+        } else {
+            HStack(spacing: 7 * contentScale) {
+                Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                    .font(scaledFont(10.5, weight: .semibold))
+                Text(GajendraQueueInteractionTuning.holdToDragInstruction)
+                    .font(scaledFont(10.5, weight: .medium))
+                Spacer(minLength: 8)
+                Button("Edit") {
+                    setQueueEditing(true)
+                }
+                .font(scaledFont(10.5, weight: .semibold))
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(model.isLoading)
+                .accessibilityLabel("Edit priorities")
+            }
+            .foregroundStyle(.secondary)
+            .padding(.leading, 10 * contentScale)
+            .padding(.trailing, 6 * contentScale)
+            .frame(maxWidth: .infinity, minHeight: 30 * contentScale)
+            .background(
+                Color.primary.opacity(0.025),
+                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+            )
         }
     }
 
@@ -1528,7 +1743,15 @@ public struct GajendraHoverCardView: View {
         )
         .animation(queueMovementAnimation, value: visibleThreads.map(\.id))
         .animation(reduceMotion ? nil : .spring(response: 0.18, dampingFraction: 0.9), value: targetedQueueLevel)
-        return queueDropColumn(column, level: level)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: GajendraQueueColumnFramePreferenceKey.self,
+                    value: [level.rawValue: proxy.frame(in: .named("gajendra-hover-card"))]
+                )
+            }
+        }
+        return column
     }
 
     private func queueRow(
@@ -1548,6 +1771,7 @@ public struct GajendraHoverCardView: View {
             accessibilityTargetLevel = .focus
             accessibilityMoveActionName = "Move to Focus"
         }
+        let isHeld = heldQueueThreadId == thread.id || selectedQueueThreadId == thread.id
         let rowLabel = VStack(alignment: .leading, spacing: 2 * contentScale) {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 if thread.isRunning {
@@ -1574,7 +1798,7 @@ public struct GajendraHoverCardView: View {
             }
         }
         .padding(.leading, (isQueueEditing ? 32 : 10) * contentScale)
-        .padding(.trailing, (isQueueEditing ? 34 : 10) * contentScale)
+        .padding(.trailing, 10 * contentScale)
         .padding(.vertical, 6 * contentScale)
         .frame(maxWidth: .infinity, minHeight: 39 * contentScale, alignment: .leading)
         .overlay(alignment: .top) {
@@ -1584,15 +1808,24 @@ public struct GajendraHoverCardView: View {
         }
         .contentShape(Rectangle())
 
-        let row = ZStack {
-            if isQueueEditing {
-                rowLabel
+        let visualRow = ZStack(alignment: .leading) {
+            // Keep the sequenced hold/drag gesture's source view alive while the pointer is
+            // down. Switching to the edit-only surface at recognition time would cancel the
+            // same-pointer hold-then-drag before it can reach its drop target.
+            let useDirectEditSurface = isQueueEditing
+                && heldQueueThreadId != thread.id
+            if useDirectEditSurface {
+                directQueueDragSurface(rowLabel, thread: thread)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(hoveredThreadId == thread.id ? rowHoverColor : Color.clear)
                     )
             } else {
                 Button {
+                    guard suppressedQueueOpenThreadId != thread.id else {
+                        suppressedQueueOpenThreadId = nil
+                        return
+                    }
                     model.open(thread)
                 } label: {
                     rowLabel
@@ -1601,12 +1834,61 @@ public struct GajendraHoverCardView: View {
                     GajendraThreadRowButtonStyle(
                         isHovered: hoveredThreadId == thread.id,
                         hoverColor: rowHoverColor,
-                        pressedColor: rowPressedColor,
-                        onStationaryPress: {
-                            guard !model.isLoading else { return }
-                            setQueueEditing(true)
-                        }
+                        pressedColor: rowPressedColor
                     )
+                )
+                .simultaneousGesture(
+                    LongPressGesture(
+                        minimumDuration: Double(GajendraQueueInteractionTuning.stationaryPressMilliseconds) / 1_000,
+                        maximumDistance: GajendraQueueInteractionTuning.movementTolerance
+                    )
+                    .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("gajendra-hover-card")))
+                    .onChanged { value in
+                        guard !model.isLoading,
+                              !isQueueEditing || heldQueueThreadId == thread.id || draggingQueueThreadId == thread.id else {
+                            return
+                        }
+                        switch value {
+                        case .first(true):
+                            if heldQueueThreadId != thread.id {
+                                heldQueueThreadId = thread.id
+                            }
+                            selectedQueueThreadId = thread.id
+                        case let .second(true, drag):
+                            heldQueueThreadId = thread.id
+                            selectedQueueThreadId = thread.id
+                            suppressedQueueOpenThreadId = thread.id
+                            setQueueEditing(true)
+                            if let drag {
+                                updateQueueDrag(threadId: thread.id, at: drag.location)
+                            }
+                        default:
+                            break
+                        }
+                    }
+                    .onEnded { value in
+                        guard !model.isLoading else {
+                            heldQueueThreadId = nil
+                            selectedQueueThreadId = nil
+                            return
+                        }
+                        switch value {
+                        case .first(true):
+                            selectedQueueThreadId = thread.id
+                            suppressedQueueOpenThreadId = thread.id
+                            setQueueEditing(true)
+                        case let .second(true, drag):
+                            selectedQueueThreadId = thread.id
+                            suppressedQueueOpenThreadId = thread.id
+                            setQueueEditing(true)
+                            if let drag {
+                                finishQueueDrag(threadId: thread.id, at: drag.location)
+                            }
+                        default:
+                            break
+                        }
+                        heldQueueThreadId = nil
+                    }
                 )
                 .disabled(model.isLoading)
             }
@@ -1645,110 +1927,162 @@ public struct GajendraHoverCardView: View {
                     .accessibilityLabel("Remove \(thread.title) from \(level.title)")
                 }
                 .padding(.leading, 6 * contentScale)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if isQueueEditing {
-                Image(systemName: "line.3.horizontal")
-                    .font(scaledFont(11, weight: .semibold))
-                    .foregroundStyle(targetedQueueThreadId == thread.id ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
-                    .frame(width: 22 * contentScale, height: 24 * contentScale)
-                    .padding(.trailing, 6 * contentScale)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .allowsHitTesting(false)
-                    .help("Drag anywhere on this task to reorder or move lanes")
-                    .accessibilityHidden(true)
-            }
         }
         .contentShape(Rectangle())
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .stroke(
-                    targetedQueueThreadId == thread.id
+                    targetedQueueThreadId == thread.id || isHeld
                         ? Color.gajendraAccent(for: colorScheme).opacity(0.9)
                         : Color.clear,
-                    lineWidth: 1.25
+                    lineWidth: isHeld ? 1.5 : 1.25
                 )
+                .allowsHitTesting(false)
+        )
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHeld ? rowPressedColor.opacity(0.9) : Color.clear)
                 .allowsHitTesting(false)
         )
         .onHover { hovered in
             hoveredThreadId = hovered ? thread.id : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: targetedQueueThreadId)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: heldQueueThreadId)
         .background {
             GeometryReader { proxy in
                 Color.clear.preference(
                     key: GajendraQueueTaskFramePreferenceKey.self,
-                    value: [proxy.frame(in: .named("gajendra-hover-card"))]
+                    value: [thread.id: proxy.frame(in: .named("gajendra-hover-card"))]
                 )
             }
         }
         .contextMenu {
-            Button(isQueueEditing ? "Done Editing" : "Edit Priorities") {
-                setQueueEditing(!isQueueEditing)
-            }
-            Divider()
-            Button("Move Up") {
-                model.apply(.move(threadId: thread.id, direction: .up))
-            }
-            .disabled(index == 0 || model.isLoading)
-            Button("Move Down") {
-                model.apply(.move(threadId: thread.id, direction: .down))
-            }
-            .disabled(index == count - 1 || model.isLoading)
-            Button(level == .focus ? "Move to Important" : "Move to Focus") {
-                model.moveToLevel(threadId: thread.id, level: level == .focus ? .important : .focus)
-            }
-            .disabled(model.isLoading)
-            Divider()
-            Button("Remove from \(level.title)", role: .destructive) {
-                removeQueueThread(thread, from: level)
-            }
-            .disabled(model.isLoading)
+            queueRowContextMenu(
+                thread: thread,
+                level: level,
+                index: index,
+                count: count,
+                targetLevel: accessibilityTargetLevel,
+                moveActionName: accessibilityMoveActionName
+            )
         }
-        .help(isQueueEditing ? "Drag anywhere to reorder, or use the X to remove from \(level.title)" : "Open \(thread.title) in \(thread.sourceName). Hold to edit priorities.")
+
+        let row = queueRowAccessibility(
+            visualRow,
+            thread: thread,
+            level: level,
+            index: index,
+            count: count,
+            targetLevel: accessibilityTargetLevel,
+            moveActionName: accessibilityMoveActionName
+        )
+
+        return row
+    }
+
+    private func queueRowAccessibility<Content: View>(
+        _ content: Content,
+        thread: DeckThread,
+        level: PriorityLevel,
+        index: Int,
+        count: Int,
+        targetLevel: PriorityLevel,
+        moveActionName: String
+    ) -> some View {
+        let canMoveUp = !model.isLoading && index > 0
+        let canMoveDown = !model.isLoading && index < count - 1
+
+        return content
+        .help(isQueueEditing ? "Drag anywhere on the task to reorder, or use the X to remove from \(level.title)" : "Open \(thread.title) in \(thread.sourceName). Hold to select; keep holding to drag.")
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(
             "\(thread.title), \(thread.sourceName)\(thread.isRunning ? ", Running now" : thread.isReadyForReview ? ", Ready for Review" : "")"
         )
-        .accessibilityValue(model.isLoading ? "Busy; unavailable" : "Ready")
+        .accessibilityValue(
+            model.isLoading
+                ? "Busy; unavailable"
+                : (draggingQueueThreadId == thread.id
+                    ? "Dragging"
+                    : (targetedQueueThreadId == thread.id
+                        ? "Drop target"
+                        : (selectedQueueThreadId == thread.id ? "Selected" : "Ready")))
+        )
         .accessibilityHint(
             model.isLoading
                 ? "Priority change in progress. This row is unavailable until it finishes."
-                : (isQueueEditing ? "Priority editing is active. Drag this task or use the remove action." : "Open this thread. Hold to edit all priorities.")
+                : (isQueueEditing ? "Priority editing is active. Drag this task or use the remove action." : "Open this thread. Hold to select; keep holding to drag.")
         )
         .disabled(model.isLoading)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            guard !model.isLoading, !isQueueEditing else { return }
+            model.open(thread)
+        }
         .accessibilityAction(named: Text(isQueueEditing ? "Done editing priorities" : "Edit priorities")) {
             guard !model.isLoading else { return }
             setQueueEditing(!isQueueEditing)
         }
         .accessibilityAction(named: Text("Move up")) {
-            guard !model.isLoading, index > 0 else { return }
+            guard canMoveUp else { return }
             _ = model.performAccessibilityMutation(
                 .move(threadId: thread.id, direction: .up),
                 actionName: "Move up"
             )
         }
         .accessibilityAction(named: Text("Move down")) {
-            guard !model.isLoading, index < count - 1 else { return }
+            guard canMoveDown else { return }
             _ = model.performAccessibilityMutation(
                 .move(threadId: thread.id, direction: .down),
                 actionName: "Move down"
             )
         }
-        .accessibilityAction(named: Text(level == .focus ? "Move to Important" : "Move to Focus")) {
+        .accessibilityAction(named: Text(moveActionName)) {
             guard !model.isLoading else { return }
             _ = model.performAccessibilityMove(
                 threadId: thread.id,
-                level: accessibilityTargetLevel,
-                actionName: accessibilityMoveActionName
+                level: targetLevel,
+                actionName: moveActionName
             )
         }
         .accessibilityAction(named: Text("Remove from \(level.title)")) {
             guard !model.isLoading else { return }
             removeQueueThread(thread, from: level)
         }
+    }
 
-        return queueDragRow(row, thread: thread, level: level)
+    @ViewBuilder
+    private func queueRowContextMenu(
+        thread: DeckThread,
+        level: PriorityLevel,
+        index: Int,
+        count: Int,
+        targetLevel: PriorityLevel,
+        moveActionName: String
+    ) -> some View {
+        Button(isQueueEditing ? "Done Editing" : "Edit Priorities") {
+            setQueueEditing(!isQueueEditing)
+        }
+        Divider()
+        Button("Move Up") {
+            model.apply(.move(threadId: thread.id, direction: .up))
+        }
+        .disabled(index == 0 || model.isLoading)
+        Button("Move Down") {
+            model.apply(.move(threadId: thread.id, direction: .down))
+        }
+        .disabled(index == count - 1 || model.isLoading)
+        Button(moveActionName) {
+            model.moveToLevel(threadId: thread.id, level: targetLevel)
+        }
+        .disabled(model.isLoading)
+        Divider()
+        Button("Remove from \(level.title)", role: .destructive) {
+            removeQueueThread(thread, from: level)
+        }
+        .disabled(model.isLoading)
     }
 
     @ViewBuilder
@@ -1765,11 +2099,17 @@ public struct GajendraHoverCardView: View {
         model.moveToLevel(threadId: thread.id, level: nil)
     }
 
-    private func setQueueEditing(_ editing: Bool) {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+    private func setQueueEditing(_ editing: Bool, animated: Bool = true) {
+        withAnimation(reduceMotion || !animated ? nil : .easeOut(duration: 0.16)) {
             isQueueEditing = editing
         }
         if !editing {
+            queueEditingAtPointerDown = nil
+            suppressedQueueOpenThreadId = nil
+            heldQueueThreadId = nil
+            selectedQueueThreadId = nil
+            draggingQueueThreadId = nil
+            queueDragLocation = nil
             targetedQueueThreadId = nil
             targetedQueueLevel = nil
         }
@@ -1777,21 +2117,23 @@ public struct GajendraHoverCardView: View {
 
     private func resetQueueEditing() {
         isQueueEditing = false
-        directQueueDragThreadId = nil
+        queueEditingAtPointerDown = nil
+        draggingQueueThreadId = nil
+        queueDragLocation = nil
+        heldQueueThreadId = nil
+        selectedQueueThreadId = nil
+        suppressedQueueOpenThreadId = nil
         targetedQueueThreadId = nil
         targetedQueueLevel = nil
     }
 
-    private func moveDroppedQueueThread(_ payload: GajendraQueueDragPayload, to level: PriorityLevel, before targetId: String?) -> Bool {
-        guard let threadId = dragRegistry.resolve(payload) else { return false }
+    private func moveQueueThread(_ threadId: String, to level: PriorityLevel, before targetId: String?) -> Bool {
         if threadId == targetId { return true }
         guard !model.isLoading,
               let snapshot = model.snapshot,
               !(targetId == nil
                 && snapshot.allThreads.first(where: { $0.id == threadId })?.level == level
                 && GajendraQueueMovePlanner.lane(for: level, snapshot: snapshot).last?.id == threadId) else { return false }
-        let enteredThroughDirectDrag = !isQueueEditing
-        directQueueDragThreadId = nil
         targetedQueueThreadId = nil
         targetedQueueLevel = nil
         model.moveToLevel(
@@ -1800,95 +2142,84 @@ public struct GajendraHoverCardView: View {
             beforeThreadId: targetId,
             actionName: "Move priority"
         )
-        if enteredThroughDirectDrag {
+        if !isQueueEditing {
             setQueueEditing(true)
         }
         return true
     }
 
-    @ViewBuilder
-    private func queueDropColumn<Content: View>(_ content: Content, level: PriorityLevel) -> some View {
-        if isPreview {
-            content
-        } else {
-            content.dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
-                targetedQueueLevel = nil
-                targetedQueueThreadId = nil
-                guard let payload = payloads.first else { return false }
-                return moveDroppedQueueThread(payload, to: level, before: nil)
-            } isTargeted: { targeted in
-                if targeted {
-                    targetedQueueLevel = level
-                } else if targetedQueueLevel == level {
-                    targetedQueueLevel = nil
-                }
-            }
+    private func updateQueueDrag(threadId: String, at point: CGPoint) {
+        guard !model.isLoading else { return }
+        selectedQueueThreadId = threadId
+        if draggingQueueThreadId != threadId {
+            draggingQueueThreadId = threadId
         }
+        queueDragLocation = point
+        updateQueueDropTarget(at: point, sourceThreadId: threadId)
     }
 
-    @ViewBuilder
-    private func queueDragRow<Content: View>(
+    private func directQueueDragSurface<Content: View>(
         _ content: Content,
-        thread: DeckThread,
-        level: PriorityLevel
+        thread: DeckThread
     ) -> some View {
-        if isPreview {
-            content
-        } else {
-            content
-                .contentShape(.dragPreview, RoundedRectangle(cornerRadius: 9, style: .continuous))
-                .draggable(queueDragPayload(thread.id)) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundStyle(Color.gajendraAccent(for: colorScheme))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(thread.title)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
-                            Text("Move in \(level.title) or drop in the other lane")
-                                .font(.system(size: 9.5))
-                                .foregroundStyle(.secondary)
-                        }
+        content
+            .highPriorityGesture(
+                DragGesture(minimumDistance: GajendraQueueInteractionTuning.dragMinimumDistance, coordinateSpace: .named("gajendra-hover-card"))
+                    .onChanged { value in
+                        guard !model.isLoading else { return }
+                        updateQueueDrag(threadId: thread.id, at: value.location)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(Color.gajendraAccent(for: colorScheme).opacity(0.42), lineWidth: 0.75)
-                    )
-                    .shadow(color: Color.black.opacity(0.16), radius: 8, y: 4)
-                    .scaleEffect(1.015)
-                }
-                .dropDestination(for: GajendraQueueDragPayload.self) { payloads, _ in
-                    targetedQueueThreadId = nil
-                    targetedQueueLevel = nil
-                    guard let payload = payloads.first else { return false }
-                    return moveDroppedQueueThread(payload, to: level, before: thread.id)
-                } isTargeted: { targeted in
-                    if targeted {
-                        targetedQueueThreadId = thread.id
-                        targetedQueueLevel = level
-                    } else if targetedQueueThreadId == thread.id {
-                        targetedQueueThreadId = nil
+                    .onEnded { value in
+                        finishQueueDrag(threadId: thread.id, at: value.location)
                     }
-                }
-        }
+            )
     }
 
-    private func queueDragPayload(_ threadId: String) -> GajendraQueueDragPayload {
-        if !isQueueEditing {
-            var transaction = Transaction()
-            transaction.animation = nil
-            withTransaction(transaction) {
-                directQueueDragThreadId = threadId
-            }
+    private func updateQueueDropTarget(at point: CGPoint, sourceThreadId: String) {
+        if GajendraQueueEditHitTesting.isSelfDrop(
+            at: point,
+            sourceThreadId: sourceThreadId,
+            taskFrames: queueDragGeometry.taskFrames
+        ) {
+            // A stationary hold that ends on its own row is a selection/no-op, never an
+            // implicit append to whichever column happens to contain that frame.
+            setQueueDropTarget(threadId: nil, level: nil)
+            return
         }
-        return dragRegistry.issue(threadId: threadId)
+        if let target = queueDragGeometry.taskFrames.first(where: {
+            $0.key != sourceThreadId && $0.value.contains(point)
+        }), let level = model.snapshot?.allThreads.first(where: { $0.id == target.key })?.level {
+            setQueueDropTarget(threadId: target.key, level: level)
+            return
+        }
+        if let column = queueDragGeometry.columnFrames.first(where: { $0.value.contains(point) }),
+           let level = PriorityLevel(rawValue: column.key) {
+            setQueueDropTarget(threadId: nil, level: level)
+            return
+        }
+        setQueueDropTarget(threadId: nil, level: nil)
+    }
+
+    private func setQueueDropTarget(threadId: String?, level: PriorityLevel?) {
+        if targetedQueueThreadId != threadId { targetedQueueThreadId = threadId }
+        if targetedQueueLevel != level { targetedQueueLevel = level }
+    }
+
+    private func finishQueueDrag(threadId: String, at point: CGPoint) {
+        updateQueueDropTarget(at: point, sourceThreadId: threadId)
+        let targetLevel = targetedQueueLevel
+        let targetThreadId = targetedQueueThreadId
+        draggingQueueThreadId = nil
+        queueDragLocation = nil
+        heldQueueThreadId = nil
+        targetedQueueThreadId = nil
+        targetedQueueLevel = nil
+        guard let targetLevel else { return }
+        _ = moveQueueThread(threadId, to: targetLevel, before: targetThreadId)
     }
 
     private var queueDragIsActive: Bool {
-        isQueueEditing || directQueueDragThreadId != nil
+        isQueueEditing || draggingQueueThreadId != nil
     }
 
     private var queueMovementAnimation: Animation? {
@@ -1990,23 +2321,25 @@ public struct GajendraHoverCardView: View {
                     .padding(.horizontal, 10 * contentScale)
                     .padding(.vertical, 8 * contentScale)
             } else {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                        isRunningExpanded.toggle()
+                runningDisclosureHeader(count: threads.count, expanded: isRunningExpanded)
+                    .contentShape(Rectangle())
+                    .background(
+                        isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .onHover { isRunningHeaderHovered = $0 }
+                    .onTapGesture(count: 2) {
+                        toggleRunningDock()
                     }
-                } label: {
-                    runningDisclosureHeader(count: threads.count, expanded: isRunningExpanded)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background(
-                    isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                )
-                .onHover { isRunningHeaderHovered = $0 }
-                .accessibilityLabel("Running, \(threads.count) active threads")
-                .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint(isRunningExpanded ? "Collapse the running thread list" : "Expand the running thread list")
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction {
+                        toggleRunningDock()
+                    }
+                    .accessibilityLabel("Running, \(threads.count) active threads")
+                    .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
+                    .accessibilityHint("Double-click to \(isRunningExpanded ? "collapse" : "expand") the running thread list")
+                    .help("Double-click to \(isRunningExpanded ? "shrink" : "expand") Running")
 
                 Divider()
                 if isRunningExpanded {
@@ -2039,7 +2372,12 @@ public struct GajendraHoverCardView: View {
                 .stroke(Color.green.opacity(0.2), lineWidth: 0.75)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Running, \(threads.count) active threads across all priority lanes")
+    }
+
+    private func toggleRunningDock() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+            isRunningExpanded.toggle()
+        }
     }
 
     private func runningDisclosureHeader(count: Int, expanded: Bool) -> some View {
@@ -2049,9 +2387,7 @@ public struct GajendraHoverCardView: View {
                 .foregroundStyle(Color.green)
             Text("Running")
                 .font(scaledFont(11.5, weight: .semibold))
-            Text("\(count)")
-                .font(scaledFont(9.5, weight: .medium).monospacedDigit())
-                .foregroundStyle(.secondary)
+            GajendraStatusCountBadge(count: count, tint: .green, scale: contentScale)
             Spacer(minLength: 8)
             HStack(spacing: 5 * contentScale) {
                 Text("All priority lanes")
@@ -2106,23 +2442,27 @@ public struct GajendraHoverCardView: View {
                     .padding(.horizontal, 10 * contentScale)
                     .padding(.vertical, 8 * contentScale)
             } else {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-                        isReviewExpanded.toggle()
+                reviewDisclosureHeader(count: threads.count, expanded: isReviewExpanded)
+                    .contentShape(Rectangle())
+                    .background(
+                        isReviewHeaderHovered ? Color.orange.opacity(colorScheme == .dark ? 0.12 : 0.08) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    )
+                    .onHover { isReviewHeaderHovered = $0 }
+                    .onTapGesture(count: 2) {
+                        toggleReviewDock()
                     }
-                } label: {
-                    reviewDisclosureHeader(count: threads.count, expanded: isReviewExpanded)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .background(
-                    isReviewHeaderHovered ? Color.orange.opacity(colorScheme == .dark ? 0.12 : 0.08) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                )
-                .onHover { isReviewHeaderHovered = $0 }
-                .accessibilityLabel("Ready for Review, \(threads.count) threads")
-                .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint(isReviewExpanded ? "Collapse the review-ready thread list" : "Expand the review-ready thread list")
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction {
+                        toggleReviewDock()
+                    }
+                    .accessibilityLabel(
+                        "Ready for Review, \(threads.count) \(threads.count == 1 ? "thread" : "threads")"
+                    )
+                    .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
+                    .accessibilityHint("Double-click to \(isReviewExpanded ? "collapse" : "expand") the review-ready thread list")
+                    .help("Double-click to \(isReviewExpanded ? "shrink" : "expand") Ready for Review")
 
                 Divider()
                 if isReviewExpanded {
@@ -2131,7 +2471,11 @@ public struct GajendraHoverCardView: View {
                         if index < threads.count - 1 { Divider() }
                     }
                 } else {
-                    Text("\(threads.count) threads need your review")
+                Text(
+                    threads.count == 1
+                        ? "1 thread needs your review"
+                        : "\(threads.count) threads need your review"
+                )
                         .font(scaledFont(10.5, weight: .regular))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -2148,7 +2492,12 @@ public struct GajendraHoverCardView: View {
                 .stroke(Color.orange.opacity(0.24), lineWidth: 0.75)
         )
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Ready for Review, \(threads.count) threads needing human attention")
+    }
+
+    private func toggleReviewDock() {
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
+            isReviewExpanded.toggle()
+        }
     }
 
     private func reviewDisclosureHeader(count: Int, expanded: Bool) -> some View {
@@ -2156,9 +2505,7 @@ public struct GajendraHoverCardView: View {
             GajendraReviewStatusMark(scale: contentScale)
             Text("Ready for Review")
                 .font(scaledFont(11.5, weight: .semibold))
-            Text("\(count)")
-                .font(scaledFont(9.5, weight: .medium).monospacedDigit())
-                .foregroundStyle(.secondary)
+            GajendraStatusCountBadge(count: count, tint: .orange, scale: contentScale)
             Spacer(minLength: 8)
             HStack(spacing: 5 * contentScale) {
                 Text("Needs your review")
@@ -2336,6 +2683,8 @@ public struct GajendraHoverCardView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .background(queueSurfaceColor("Search"), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 0.5))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Search results")
     }
 
     private func searchResultRow(_ thread: DeckThread, showsTopDivider: Bool) -> some View {
@@ -2360,10 +2709,8 @@ public struct GajendraHoverCardView: View {
                             .font(scaledFont(9.5, weight: .regular))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        if let placement = thread.placementLabel {
-                            Text(placement)
-                                .font(scaledFont(8.5, weight: .bold))
-                                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                        if let context = thread.context {
+                            contextBadge(context, compact: true)
                         }
                     }
                 }
@@ -2372,54 +2719,42 @@ public struct GajendraHoverCardView: View {
             }
             .buttonStyle(.plain)
             .help("Open \(thread.title) in \(thread.sourceName)")
-
-            if isPreview {
-                Image(systemName: "ellipsis.circle")
-                    .foregroundStyle(.secondary)
-                    .frame(width: 28, height: 28)
-            } else {
-                searchActions(thread)
-            }
         }
         .padding(.horizontal, 10 * contentScale)
         .padding(.vertical, 5 * contentScale)
         .frame(maxWidth: .infinity, minHeight: 42 * contentScale)
         .overlay(alignment: .top) { if showsTopDivider { Divider() } }
+        .contextMenu {
+            if !isPreview {
+                searchActions(thread)
+            }
+        }
     }
 
+    @ViewBuilder
     private func searchActions(_ thread: DeckThread) -> some View {
-        Menu {
-            if !thread.isCurrent {
-                Button("Make NOW") { model.makeNow(threadId: thread.id) }
-            }
-            if thread.level != .focus {
-                Button("Move to Focus") { model.moveToLevel(threadId: thread.id, level: .focus) }
-            }
-            if thread.level != .important {
-                Button("Move to Important") { model.moveToLevel(threadId: thread.id, level: .important) }
-            }
-            if thread.level != nil {
-                Button("Remove from priorities") { model.moveToLevel(threadId: thread.id, level: nil) }
-            }
-            Divider()
-            Menu("Context") {
-                ForEach(ThreadContext.allCases) { context in
-                    Button(context.title) { model.apply(.setContext(threadId: thread.id, context: context)) }
-                }
-                if thread.context != nil {
-                    Button("Clear context") { model.apply(.setContext(threadId: thread.id, context: nil)) }
-                }
-            }
-            Button("Open in \(thread.sourceName)") { model.open(thread) }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-                .frame(width: 28, height: 28)
+        if !thread.isCurrent {
+            Button("Make NOW") { model.makeNow(threadId: thread.id) }
         }
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .disabled(model.isLoading)
-        .help("Organize \(thread.title)")
-        .accessibilityLabel("Organize \(thread.title)")
+        if thread.level != .focus {
+            Button("Move to Focus") { model.moveToLevel(threadId: thread.id, level: .focus) }
+        }
+        if thread.level != .important {
+            Button("Move to Important") { model.moveToLevel(threadId: thread.id, level: .important) }
+        }
+        if thread.level != nil {
+            Button("Remove from priorities") { model.moveToLevel(threadId: thread.id, level: nil) }
+        }
+        Divider()
+        Menu("Context") {
+            ForEach(ThreadContext.allCases) { context in
+                Button(context.title) { model.apply(.setContext(threadId: thread.id, context: context)) }
+            }
+            if thread.context != nil {
+                Button("Clear context") { model.apply(.setContext(threadId: thread.id, context: nil)) }
+            }
+        }
+        Button("Open in \(thread.sourceName)") { model.open(thread) }
     }
 
     private func relativeUpdateText(_ timestamp: Double) -> String {
@@ -2562,6 +2897,12 @@ public struct GajendraHoverCardView: View {
             : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.15 : 0.09)
     }
 
+    private var rowPressedColor: Color {
+        visualSettings.theme == .focusDeck
+            ? Color.gajendraAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.16)
+            : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.24 : 0.16)
+    }
+
     private var runningControlColor: Color {
         colorScheme == .dark
             ? Color(red: 0.38, green: 0.9, blue: 0.54)
@@ -2578,12 +2919,6 @@ public struct GajendraHoverCardView: View {
         colorScheme == .dark
             ? Color(red: 0.78, green: 0.1, blue: 0.14)
             : Color(red: 0.68, green: 0.035, blue: 0.075)
-    }
-
-    private var rowPressedColor: Color {
-        visualSettings.theme == .focusDeck
-            ? Color.gajendraAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.22 : 0.16)
-            : Color(nsColor: .controlAccentColor).opacity(colorScheme == .dark ? 0.24 : 0.16)
     }
 
     @ViewBuilder
@@ -2612,19 +2947,67 @@ public struct GajendraHoverCardView: View {
     }
 }
 
+private struct GajendraQueueDragPreview: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let thread: DeckThread
+    let scale: CGFloat
+
+    var body: some View {
+        HStack(spacing: 8 * scale) {
+            Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+                .font(.system(size: 11 * scale, weight: .semibold))
+                .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+            VStack(alignment: .leading, spacing: 2 * scale) {
+                Text(thread.title)
+                    .font(.system(size: 11.5 * scale, weight: .semibold))
+                    .lineLimit(1)
+                HStack(spacing: 5 * scale) {
+                    Text(thread.project)
+                        .font(.system(size: 9.5 * scale, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    if let context = thread.context {
+                        Text(context.title)
+                            .font(.system(size: 8.5 * scale, weight: .semibold))
+                            .foregroundStyle(Color.gajendraAccent(for: colorScheme))
+                            .lineLimit(1)
+                    }
+                    Text(thread.sourceName)
+                        .font(.system(size: 8.5 * scale, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10 * scale)
+        .padding(.vertical, 8 * scale)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.gajendraAccent(for: colorScheme).opacity(0.64), lineWidth: 1)
+        )
+        .shadow(
+            color: Color.black.opacity(colorScheme == .dark ? 0.34 : 0.18),
+            radius: reduceMotion ? 4 : 12,
+            y: reduceMotion ? 1 : 6
+        )
+        .scaleEffect(GajendraQueueInteractionTuning.dragPreviewScale(reduceMotion: reduceMotion))
+    }
+}
+
 private struct GajendraThreadRowButtonStyle: ButtonStyle {
     let isHovered: Bool
     let hoverColor: Color
     let pressedColor: Color
-    let onStationaryPress: () -> Void
 
     func makeBody(configuration: Configuration) -> some View {
         GajendraThreadRowButtonBody(
             configuration: configuration,
             isHovered: isHovered,
             hoverColor: hoverColor,
-            pressedColor: pressedColor,
-            onStationaryPress: onStationaryPress
+            pressedColor: pressedColor
         )
     }
 }
@@ -2635,10 +3018,6 @@ private struct GajendraThreadRowButtonBody: View {
     let isHovered: Bool
     let hoverColor: Color
     let pressedColor: Color
-    let onStationaryPress: () -> Void
-    @State private var stationaryPressTask: Task<Void, Never>?
-    @State private var stationaryPressStart: CGPoint?
-    @State private var stationaryPressCancelled = false
 
     var body: some View {
         configuration.label
@@ -2651,47 +3030,6 @@ private struct GajendraThreadRowButtonBody: View {
                 reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.82),
                 value: configuration.isPressed
             )
-            .onChange(of: configuration.isPressed) { isPressed in
-                stationaryPressTask?.cancel()
-                stationaryPressTask = nil
-                if !isPressed {
-                    stationaryPressStart = nil
-                    stationaryPressCancelled = false
-                    return
-                }
-                stationaryPressStart = nil
-                stationaryPressCancelled = false
-                stationaryPressTask = Task { @MainActor in
-                    try? await Task.sleep(
-                        for: .milliseconds(GajendraQueueInteractionTuning.stationaryPressMilliseconds)
-                    )
-                    guard !Task.isCancelled, !stationaryPressCancelled else { return }
-                    onStationaryPress()
-                }
-            }
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                    .onChanged { value in
-                        if stationaryPressStart == nil {
-                            stationaryPressStart = value.startLocation
-                        }
-                        guard let start = stationaryPressStart,
-                              GajendraQueueInteractionPolicy.cancelsStationaryPress(
-                                start: start,
-                                current: value.location
-                              ) else { return }
-                        stationaryPressCancelled = true
-                        stationaryPressTask?.cancel()
-                    }
-                    .onEnded { _ in
-                        stationaryPressStart = nil
-                    }
-            )
-            .onDisappear {
-                stationaryPressTask?.cancel()
-                stationaryPressTask = nil
-                stationaryPressCancelled = true
-            }
     }
 }
 

@@ -6,8 +6,8 @@ The current delivery order is constrained by one source authority and one eviden
    recovery, isolated state, bounded source collection, safe destination schemes, and A4 enrichment
    privacy.
 2. **Native source:** explicit Login choice, accessibility/interaction contracts, source build and
-   bundle runtime requirements. The native source has 2026-08-18 self-test, build, isolated
-   real-window launcher, validator, bundle-readiness, and exact-installed launcher receipts;
+   bundle runtime requirements. The native source has 2026-08-19 self-test, build, isolated
+   real-window card, validator, bundle-readiness, and exact-installed automated interaction receipts;
    remaining physical/clean-Mac proof stays separately gated.
 3. **Canon and validation:** the current docs and companion validator reflect the frozen source
    contract; source evidence remains distinct from installed or release claims and must be reopened

@@ -1,8 +1,10 @@
 # Gajendra LinkedIn series
 
 - **Status:** ten local drafts for maintainer approval; none is published or scheduled
-- **Public review:** <https://github.com/siddath/Gajendra/pull/12>
-- **Product boundary:** public source-review candidate with a narrow installed launcher receipt; no signed or notarized download
+- **Historical public baseline:** <https://github.com/siddath/Gajendra/pull/12>; the current dirty
+  candidate has no current PR or hosted-CI receipt
+- **Product boundary:** local working candidate with an exact-installed automated interaction receipt;
+  no current PR and no signed or notarized download
 - **Natural series size:** ten posts. Beyond these ten, the current evidence starts repeating the same lessons rather than adding a distinct story.
 
 The order deliberately starts with the product problem, then moves through engineering decisions,
@@ -31,17 +33,19 @@ The harder work started when I treated it like a release candidate.
 when it became several writes. “Local-first” required an audit of every metadata read and every
 error. A Mac app was not self-contained if a clean machine still needed Homebrew and Node.
 
-The current source-review candidate passes the repository gauntlet, native build and validator,
-isolated real-window launcher automation, and hosted Linux and macOS checks. The exact ad-hoc build
-also passed a launcher journey after local installation.
+The current working candidate passes the local repository gauntlet, native build and validator,
+and isolated real-window launcher automation. Its exact ad-hoc build also passed the complete
+automated interaction journey after local installation. Historical PR #12 passed hosted Linux and
+macOS checks; a PR and hosted-CI receipt for the current dirty candidate are still pending.
 
-It is still not a signed, notarized download. Physical VoiceOver, login-item, drag, and clean-Mac
-checks remain open.
+It is still not a signed, notarized download. Physical VoiceOver, login-item, manual human-drag,
+and clean-Mac checks remain open.
 
 📱 A mobile companion is planned, not shipped. I am keeping that boundary explicit until pairing,
 transport, lifecycle, privacy, and real-device evidence exist.
 
-Source review: <https://github.com/siddath/Gajendra/pull/12>
+Historical public baseline: <https://github.com/siddath/Gajendra/pull/12>. Current candidate review
+is pending.
 
 *Image uses synthetic demo data.*
 
@@ -121,9 +125,11 @@ I changed the interaction contract:
 
 The more important change was the test.
 
-The macOS UI driver now launches the actual app window with an isolated empty store and checks a
-stationary click, a two-pixel click, edit-mode recovery, an Accessibility press, and a near-edge
-placement. I ran that journey repeatedly and once against the freshly installed ad-hoc candidate.
+The macOS UI driver now launches the actual app window with isolated synthetic state. It checks a
+stationary click, a two-pixel click, edit-mode recovery, an Accessibility press, near-edge
+placement, card and Organizer queue drags with exact persisted order, and the Running/Ready
+single-click and double-click contract. I ran the complete interaction journey against the exact
+installed ad-hoc candidate; the source build also passed five consecutive fresh-process journeys.
 
 Hosted CI compiles the UI target, but it does not pretend a headless runner has proved macOS
 permissions or physical input. The real interaction receipt remains a logged-in-Mac test.
@@ -300,8 +306,8 @@ keep an idea from being described as shipped software.
 ## Approval and publication notes
 
 - Review every draft independently; approving one does not approve the series.
-- Keep the source-review link until the candidate is merged. Do not imply that the PR is already on
-  `main`.
+- PR #12 is the historical public baseline. Do not describe the current dirty candidate as merged
+  or hosted-green; add its current PR only after one exists and passes.
 - Do not add a download link until Developer ID, notarization, Gatekeeper, archive, clean-Mac, and
   distribution receipts exist.
 - Do not publish automatically. Timing, edits, image selection, and publication remain the

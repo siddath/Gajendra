@@ -19,11 +19,11 @@ import {
   DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES,
   isPermittedDeepLink,
   isRunningThreadStatus,
+  MAX_BACKGROUND_THREADS_PER_SOURCE,
 } from "../shared/contracts.js";
 import { canonicalThreadId } from "./domain.js";
 import { CodexAppServerClient } from "./codex-app-server.js";
 
-const MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 const MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 const MAX_GROK_METADATA_BYTES = 128 * 1024;
 const MAX_CATALOG_BYTES = 2 * 1024 * 1024;
@@ -531,8 +531,9 @@ async function readBoundedGrokSummary(
   }
 }
 
-function codexThread(thread: CodexThread): AgentThread {
+function codexThread(thread: CodexThread & { gajendraReview?: ReviewSignal }): AgentThread {
   const id = canonicalThreadId("codex", thread.id);
+  const review = thread.gajendraReview;
   return {
     id,
     sourceId: "codex",
@@ -543,6 +544,7 @@ function codexThread(thread: CodexThread): AgentThread {
     status: typeof thread.status === "string" ? thread.status : thread.status?.type ?? "unknown",
     deepLink: `codex://threads/${encodeURIComponent(thread.id)}`,
     allowedDeepLinkSchemes: ["codex"],
+    ...(review ? { review } : {}),
   };
 }
 
