@@ -12,7 +12,8 @@
 
 **Latest public source change:** [PR #21](https://github.com/siddath/Gajendra/pull/21) adds the
 explicit Running **All priority lanes** control and public-contribution reconciliation. Its checks
-page is the commit-scoped hosted receipt.
+page and merged-main [CI run 32244790765](https://github.com/siddath/Gajendra/actions/runs/32244790765)
+both passed the plugin/browser/audit and macOS companion jobs.
 
 **Prior hosted baseline receipt:** [CI run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
 passed the Linux plugin/browser/audit job and macOS companion job.
@@ -20,7 +21,7 @@ passed the Linux plugin/browser/audit job and macOS companion job.
 PRs [#12](https://github.com/siddath/Gajendra/pull/12) through
 [#20](https://github.com/siddath/Gajendra/pull/20) are the preceding merged history. PR #17 added
 the compact interaction and Ready-for-Review implementation; PR #18 added portable process proof;
-PRs #19 and #20 reconciled public launch evidence. PR #21 carries the latest user-facing and
+PRs #19 and #20 reconciled public launch evidence. PR #21 merged the latest user-facing and
 open-source-readiness delta. Hosted proof remains commit-scoped.
 
 ## Current user-facing state
@@ -45,8 +46,8 @@ open-source-readiness delta. Hosted proof remains commit-scoped.
   a text-free generated backdrop and visibly labels the data synthetic.
 - The [launch media receipt](evidence/launch/README.md) records dimensions, hashes, generation
   boundaries, reproduction commands, and privacy validation.
-- The [concise LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends Wednesday,
-  2026-08-19 at 16:00 IST as a first timing experiment. It is not published.
+- The [concise LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends Thursday,
+  2026-08-20 at 17:00 IST as a first timing experiment. It is not published.
 
 ## Current implementation receipts
 

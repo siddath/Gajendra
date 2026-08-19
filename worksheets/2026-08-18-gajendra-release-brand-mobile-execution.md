@@ -98,8 +98,9 @@ writer begins.
   and CI-hardening baseline, `9e989e9`,
   passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
   PRs #19 and #20 reconciled the public launch evidence; [PR #21](https://github.com/siddath/Gajendra/pull/21)
-  carries the explicit Running **All priority lanes** control and public-contribution reconciliation.
-  Each PR page remains the source of truth for its own merge state and hosted checks.
+  merged the explicit Running **All priority lanes** control and public-contribution reconciliation.
+  Its pull-request checks and merged-main
+  [run 32244790765](https://github.com/siddath/Gajendra/actions/runs/32244790765) passed both jobs.
   This is public source, not a signed or notarized binary release.
 - The final server/web source lane recorded focused tests, `npm run check` (**98/98**), and E2E
   (**17/17**) after the Ready-for-Review and exact-open corrections. Those source-lane receipts were

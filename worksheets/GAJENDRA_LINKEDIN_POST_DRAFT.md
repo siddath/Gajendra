@@ -2,23 +2,24 @@
 
 - **Status:** final draft for owner review — repository gate satisfied; not published
 - **Primary image:** [`evidence/launch/gajendra-hero.png`](../evidence/launch/gajendra-hero.png)
-- **Publish:** **Wednesday, 19 August 2026 at 4:00 PM IST**. If manual final review is not complete
-  by 3:45 PM, use **Thursday, 20 August 2026 at 4:00 PM IST**.
-- **Repository gate:** PRs [#17](https://github.com/siddath/Gajendra/pull/17) and
-  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; their implementation/CI baseline
-  passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
+- **Publish:** **Thursday, 20 August 2026 at 5:00 PM IST**. If manual final review is not complete
+  by 4:45 PM, use **Friday, 21 August 2026 at 3:00 PM IST**.
+- **Repository gate:** [PR #21](https://github.com/siddath/Gajendra/pull/21) is merged; its pull-request
+  checks and the merged-main [CI run 32244790765](https://github.com/siddath/Gajendra/actions/runs/32244790765)
+  both passed the plugin/browser/audit and macOS companion jobs.
 - **Availability boundary:** source is public and buildable; there is no signed/notarized download
 
 ## Why this time
 
-Buffer's 2026 analysis places LinkedIn's higher-performing window at 3:00–8:00 PM on weekdays,
-peaking Wednesday at 4:00 PM in the audience's local timezone. Treat this as a first experiment,
-not a guarantee, and prefer your own profile analytics once there is enough history:
-[Buffer's 2026 timing analysis](https://buffer.com/resources/state-of-social-media-engagement-2026/).
+Buffer's 2026 analysis of 4.8 million LinkedIn posts places Thursday's strongest slot at 5:00 PM
+and Friday's at 3:00 PM in the audience's local timezone. Treat this as a first experiment, not a
+guarantee, and prefer your own profile analytics once there is enough history:
+[Buffer's 2026 LinkedIn timing analysis](https://buffer.com/resources/best-time-to-post-on-linkedin/).
 
-Post manually and keep 4:00–5:00 PM free for real replies. LinkedIn says its feed is reducing generic
-content, engagement bait, automated comments, and engagement pods in favor of authentic professional
-conversation: [LinkedIn's 2026 feed update](https://news.linkedin.com/2026/ImprovingTheFeed).
+Post manually and keep the following hour free for real replies. LinkedIn says its feed is reducing
+generic content, engagement bait, automated comments, and engagement pods in favor of authentic
+professional conversation:
+[LinkedIn's 2026 feed update](https://news.linkedin.com/2026/ImprovingTheFeed).
 
 ## Ready-to-paste post
 
