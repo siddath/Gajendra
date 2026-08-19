@@ -97,6 +97,9 @@ writer begins.
   added portable process-proof and hosted-CI reliability corrections. That verified implementation
   and CI-hardening baseline, `9e989e9`,
   passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
+  PRs #19 and #20 reconciled the public launch evidence; [PR #21](https://github.com/siddath/Gajendra/pull/21)
+  carries the explicit Running **All priority lanes** control and public-contribution reconciliation.
+  Each PR page remains the source of truth for its own merge state and hosted checks.
   This is public source, not a signed or notarized binary release.
 - The final server/web source lane recorded focused tests, `npm run check` (**98/98**), and E2E
   (**17/17**) after the Ready-for-Review and exact-open corrections. Those source-lane receipts were
@@ -121,16 +124,19 @@ writer begins.
   widget performance, browser UI, reliability, final-artifact, and dependency-audit checks. This is
   not clean-Mac, physical
   VoiceOver, Developer-ID, notarization, binary distribution, LinkedIn-publication, or mobile proof.
-- The exact ad-hoc current build was installed with the prior app retained as a rollback. Its
+- The exact ad-hoc PR #17 build was installed with the prior app retained as a rollback. Its
   isolated process-level journey passed stationary reopen, 2 px reopen, move/hide recovery, AX
   press, edge target, quick task click, stationary hold, full-row movement, compact and Organizer
   cross-lane drops with exact persisted order, Search filter/clear, and Running/Ready dock controls.
   Its full installed journey
-  measured 56 ms prewarmed, 90 ms cold, and 89 ms warm against the 200 ms budget. The exact build's
+  measured 56 ms prewarmed, 90 ms cold, and 89 ms warm against the 200 ms budget. That build's
   cycle-sensitive performance journey measured 50/86/87 ms with a cycle-free log. The installed
   executable matches the verified build, and the private state hashes plus `0700`/`0600` modes
   stayed unchanged after relaunch. This is still not clean-Mac, manual human drag, physical
   VoiceOver, Developer-ID, notarization, distribution, or publication proof.
+- The later PR #21 source candidate passed a fresh 20-receipt gauntlet, including the explicit
+  Running control in both native surfaces. Its full source journey measured 64/84/82 ms and the
+  widget performance journey measured 59/83/91 ms; it does not reuse the PR #17 installed receipt.
 - Earlier historical installed records are not reused as proof for this candidate. The synthetic
   image and post drafts remain creative artifacts, not binary-distribution or LinkedIn-publication
   proof.

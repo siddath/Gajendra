@@ -8,19 +8,20 @@
 
 **Public state:** source is public on `main`; no binary release is claimed.
 
-**Verified implementation/CI-hardening baseline:** `9e989e91bcdb28b298db20ad2ab01b6e610febb2`
+**Prior implementation/CI-hardening baseline:** `9e989e91bcdb28b298db20ad2ab01b6e610febb2`
 
-**Last merged user-facing implementation:** `51f38c36530e894db2e03c7059dc69cf7eb4ac72`
-via [PR #17](https://github.com/siddath/Gajendra/pull/17).
+**Latest public source change:** [PR #21](https://github.com/siddath/Gajendra/pull/21) adds the
+explicit Running **All priority lanes** control and public-contribution reconciliation. Its checks
+page is the commit-scoped hosted receipt.
 
-**Hosted implementation-baseline receipt:** [CI run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
+**Prior hosted baseline receipt:** [CI run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
 passed the Linux plugin/browser/audit job and macOS companion job.
 
 PRs [#12](https://github.com/siddath/Gajendra/pull/12) through
-[#18](https://github.com/siddath/Gajendra/pull/18) are merged. PR #17 carries the current compact
-interaction, Ready-for-Review, documentation, and launch-media implementation; PR #18 adds only
-portable process-proof and hosted-CI reliability corrections. Later documentation-only
-reconciliations do not change that implementation baseline. Hosted proof remains commit-scoped.
+[#20](https://github.com/siddath/Gajendra/pull/20) are the preceding merged history. PR #17 added
+the compact interaction and Ready-for-Review implementation; PR #18 added portable process proof;
+PRs #19 and #20 reconciled public launch evidence. PR #21 carries the latest user-facing and
+open-source-readiness delta. Hosted proof remains commit-scoped.
 
 ## Current user-facing state
 
@@ -49,7 +50,7 @@ reconciliations do not change that implementation baseline. Hosted proof remains
 
 ## Current implementation receipts
 
-The implementation now merged through PR #17 passed locally on 2026-08-19:
+The source candidate in PR #21 passed locally on 2026-08-19:
 
 - `npm run launch:assets` — real SwiftUI screenshot suite and screenshot-led hero regenerated.
 - `npm run validate:launch-assets` — **7/7** expected privacy-safe assets validated.
@@ -59,22 +60,23 @@ The implementation now merged through PR #17 passed locally on 2026-08-19:
 - `npm run companion:test` — native self-test passed.
 - `npm run companion:build` — ad-hoc app with bundled runtime built and strict verification passed.
 - `npm run companion:ui-test` — stationary reopen, 2-pixel reopen, move/edit recovery, real macOS
-  accessibility press, outer-edge target, selected/lifted compact full-row drag, and Organizer cross-lane
-  pointer drags with exact persisted order, single-click dock guards, and Running/Ready double-click
-  collapse/expand passed on the exact PR #17 implementation candidate and its installed ad-hoc bundle.
-  The current local build additionally proves pointer collapse/expand through the explicit Running
-  **All priority lanes** control in both the compact card and Organizer while retaining the header
-  double-click route.
+  accessibility press, outer-edge target, selected/lifted compact full-row drag, and Organizer
+  cross-lane pointer drags with exact persisted order passed. The current source build also proves
+  pointer collapse/expand through the explicit Running **All priority lanes** control in both the
+  compact card and Organizer, single-click header guards, and Running/Ready double-click routes.
+  The earlier PR #17 exact installed ad-hoc build retains its separate full interaction receipt.
   The journey also enters and clears Search through real key events and proves filtered/default
   content. The visible-only refresh lifecycle is covered by source wiring review and the native
   lifecycle-policy self-test, not by runtime timer instrumentation in the installed journey.
 - `npm run companion:ui-performance-test` — the widget-only real-window journey passed its 200 ms
-  popup budget and emitted no SwiftUI dependency-cycle warning; the exact build measured 50 ms
-  prewarmed, 86 ms cold, and 87 ms warm. The installed full journey measured 56/90/89 ms.
+  popup budget and emitted no SwiftUI dependency-cycle warning. In the final gauntlet, the widget
+  journey measured 59 ms prewarmed, 83 ms cold, and 91 ms warm; the full source journey measured
+  64/84/82 ms. The earlier PR #17 installed journey remains a separate receipt.
 - `npm run companion:validate` and `npm run companion:bundle-readiness` passed; readiness reported
   `distributionReady:false` and ad-hoc signing.
-- The installed executable matches the verified build, the prior app is preserved as a rollback,
-  and the private state hashes plus `0700`/`0600` modes stayed unchanged after relaunch.
+- The earlier PR #17 installed executable matched its verified build, preserved a rollback, and
+  left the private state hashes plus `0700`/`0600` modes unchanged after relaunch. PR #21 does not
+  reuse that receipt as installed proof.
 - `npm run gauntlet` — **20** gate receipts passed, including the measured widget-performance gate,
   **85/85** repeated browser journeys, five repeated unit runs, live MCP, native, bundle,
   final-artifact, and dependency-audit gates.

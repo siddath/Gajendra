@@ -2,9 +2,9 @@
 
 - **Status:** ten local drafts for maintainer approval; none is published or scheduled
 - **Historical public baseline:** <https://github.com/siddath/Gajendra/pull/12>
-- **Current public source:** PRs [#17](https://github.com/siddath/Gajendra/pull/17) and
-  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; public `main` passed both hosted jobs
-  in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
+- **Latest public source change:** [PR #21](https://github.com/siddath/Gajendra/pull/21) carries the
+  explicit Running control and public-source reconciliation; its PR page is authoritative for
+  merge state and commit-scoped hosted checks
 - **Product boundary:** public, buildable source with an exact-installed automated interaction
   receipt; no signed or notarized download
 - **Natural series size:** ten posts. Beyond these ten, the current evidence starts repeating the same lessons rather than adding a distinct story.
@@ -38,7 +38,8 @@ error. A Mac app was not self-contained if a clean machine still needed Homebrew
 The current public source passes the local repository gauntlet, native build and validator, and
 isolated real-window launcher automation. Its exact ad-hoc implementation build also passed the
 complete automated interaction journey after local installation. PR #17 merged that user-facing
-implementation, and the PR #18 implementation/CI baseline passed hosted Linux and macOS checks.
+implementation, the PR #18 baseline passed hosted Linux and macOS checks, and PR #21 records the
+latest explicit Running control and public-source readiness change with its own checks page.
 
 It is still not a signed, notarized download. Physical VoiceOver, login-item, manual human-drag,
 and clean-Mac checks remain open.
@@ -309,9 +310,10 @@ keep an idea from being described as shipped software.
 ## Approval and publication notes
 
 - Review every draft independently; approving one does not approve the series.
-- PR #12 is the historical first public-review baseline. The current source is merged and
-  hosted-green through PR #18 and run 32233868042; do not extend that claim to later revisions
-  without their own pull-request and merged-main receipts.
+- PR #12 is the historical first public-review baseline. PR #18 and run 32233868042 are the prior
+  hosted-green implementation baseline; PR #21 is the source of truth for the latest change and
+  its checks. Do not extend a green claim to later revisions without their own pull-request and
+  merged-main receipts.
 - Do not add a download link until Developer ID, notarization, Gatekeeper, archive, clean-Mac, and
   distribution receipts exist.
 - Do not publish automatically. Timing, edits, image selection, and publication remain the
