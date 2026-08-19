@@ -5,8 +5,8 @@
 - **Publish:** **Wednesday, 19 August 2026 at 4:00 PM IST**. If manual final review is not complete
   by 3:45 PM, use **Thursday, 20 August 2026 at 4:00 PM IST**.
 - **Repository gate:** PRs [#17](https://github.com/siddath/Gajendra/pull/17) and
-  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; public `main` passed both hosted
-  jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
+  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; their implementation/CI baseline
+  passed both hosted jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
 - **Availability boundary:** source is public and buildable; there is no signed/notarized download
 
 ## Why this time

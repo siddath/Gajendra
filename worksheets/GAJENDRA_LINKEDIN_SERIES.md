@@ -38,7 +38,7 @@ error. A Mac app was not self-contained if a clean machine still needed Homebrew
 The current public source passes the local repository gauntlet, native build and validator, and
 isolated real-window launcher automation. Its exact ad-hoc implementation build also passed the
 complete automated interaction journey after local installation. PR #17 merged that user-facing
-implementation, and the current public `main` passed hosted Linux and macOS checks after PR #18.
+implementation, and the PR #18 implementation/CI baseline passed hosted Linux and macOS checks.
 
 It is still not a signed, notarized download. Physical VoiceOver, login-item, manual human-drag,
 and clean-Mac checks remain open.
