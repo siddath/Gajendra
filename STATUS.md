@@ -8,16 +8,18 @@
 
 **Public state:** source is public on `main`; no binary release is claimed.
 
-**Last merged implementation baseline:** `b359ab61c730ce7c8ee5e282c154ecfdfdff001e`
+**Current public `main`:** `9e989e91bcdb28b298db20ad2ab01b6e610febb2`
 
-**Hosted baseline receipt:** [CI run 32148617813](https://github.com/siddath/Gajendra/actions/runs/32148617813) passed both jobs.
+**Last merged user-facing implementation:** `51f38c36530e894db2e03c7059dc69cf7eb4ac72`
+via [PR #17](https://github.com/siddath/Gajendra/pull/17).
 
-PRs [#12](https://github.com/siddath/Gajendra/pull/12),
-[#13](https://github.com/siddath/Gajendra/pull/13),
-[#14](https://github.com/siddath/Gajendra/pull/14), and
-[#15](https://github.com/siddath/Gajendra/pull/15) are merged. Hosted proof remains commit-scoped;
-every later revision must pass its own pull-request and merged-main checks before it inherits a
-public green claim.
+**Hosted current-main receipt:** [CI run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
+passed the Linux plugin/browser/audit job and macOS companion job.
+
+PRs [#12](https://github.com/siddath/Gajendra/pull/12) through
+[#18](https://github.com/siddath/Gajendra/pull/18) are merged. PR #17 carries the current compact
+interaction, Ready-for-Review, documentation, and launch-media implementation; PR #18 adds only
+portable process-proof and hosted-CI reliability corrections. Hosted proof remains commit-scoped.
 
 ## Current user-facing state
 
@@ -44,9 +46,9 @@ public green claim.
 - The [concise LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends Wednesday,
   2026-08-19 at 16:00 IST as a first timing experiment. It is not published.
 
-## Current local receipts
+## Current implementation receipts
 
-The current working candidate passed locally on 2026-08-19:
+The implementation now merged through PR #17 passed locally on 2026-08-19:
 
 - `npm run launch:assets` — real SwiftUI screenshot suite and screenshot-led hero regenerated.
 - `npm run validate:launch-assets` — **7/7** expected privacy-safe assets validated.
@@ -58,7 +60,7 @@ The current working candidate passed locally on 2026-08-19:
 - `npm run companion:ui-test` — stationary reopen, 2-pixel reopen, move/edit recovery, real macOS
   accessibility press, outer-edge target, selected/lifted compact full-row drag, and Organizer cross-lane
   pointer drags with exact persisted order, single-click dock guards, and Running/Ready double-click
-  collapse/expand passed on the current working candidate and its exact installed ad-hoc bundle.
+  collapse/expand passed on the exact PR #17 implementation candidate and its installed ad-hoc bundle.
   The journey also enters and clears Search through real key events and proves filtered/default
   content. The visible-only refresh lifecycle is covered by source wiring review and the native
   lifecycle-policy self-test, not by runtime timer instrumentation in the installed journey.

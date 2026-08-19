@@ -1,10 +1,12 @@
 # Gajendra LinkedIn series
 
 - **Status:** ten local drafts for maintainer approval; none is published or scheduled
-- **Historical public baseline:** <https://github.com/siddath/Gajendra/pull/12>; the current dirty
-  candidate has no current PR or hosted-CI receipt
-- **Product boundary:** local working candidate with an exact-installed automated interaction receipt;
-  no current PR and no signed or notarized download
+- **Historical public baseline:** <https://github.com/siddath/Gajendra/pull/12>
+- **Current public source:** PRs [#17](https://github.com/siddath/Gajendra/pull/17) and
+  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; public `main` passed both hosted jobs
+  in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042)
+- **Product boundary:** public, buildable source with an exact-installed automated interaction
+  receipt; no signed or notarized download
 - **Natural series size:** ten posts. Beyond these ten, the current evidence starts repeating the same lessons rather than adding a distinct story.
 
 The order deliberately starts with the product problem, then moves through engineering decisions,
@@ -33,10 +35,10 @@ The harder work started when I treated it like a release candidate.
 when it became several writes. “Local-first” required an audit of every metadata read and every
 error. A Mac app was not self-contained if a clean machine still needed Homebrew and Node.
 
-The current working candidate passes the local repository gauntlet, native build and validator,
-and isolated real-window launcher automation. Its exact ad-hoc build also passed the complete
-automated interaction journey after local installation. Historical PR #12 passed hosted Linux and
-macOS checks; a PR and hosted-CI receipt for the current dirty candidate are still pending.
+The current public source passes the local repository gauntlet, native build and validator, and
+isolated real-window launcher automation. Its exact ad-hoc implementation build also passed the
+complete automated interaction journey after local installation. PR #17 merged that user-facing
+implementation, and the current public `main` passed hosted Linux and macOS checks after PR #18.
 
 It is still not a signed, notarized download. Physical VoiceOver, login-item, manual human-drag,
 and clean-Mac checks remain open.
@@ -44,8 +46,8 @@ and clean-Mac checks remain open.
 📱 A mobile companion is planned, not shipped. I am keeping that boundary explicit until pairing,
 transport, lifecycle, privacy, and real-device evidence exist.
 
-Historical public baseline: <https://github.com/siddath/Gajendra/pull/12>. Current candidate review
-is pending.
+Repository: <https://github.com/siddath/Gajendra>. Historical first public-review baseline:
+<https://github.com/siddath/Gajendra/pull/12>.
 
 *Image uses synthetic demo data.*
 
@@ -306,8 +308,9 @@ keep an idea from being described as shipped software.
 ## Approval and publication notes
 
 - Review every draft independently; approving one does not approve the series.
-- PR #12 is the historical public baseline. Do not describe the current dirty candidate as merged
-  or hosted-green; add its current PR only after one exists and passes.
+- PR #12 is the historical first public-review baseline. The current source is merged and
+  hosted-green through PR #18 and run 32233868042; do not extend that claim to later revisions
+  without their own pull-request and merged-main receipts.
 - Do not add a download link until Developer ID, notarization, Gatekeeper, archive, clean-Mac, and
   distribution receipts exist.
 - Do not publish automatically. Timing, edits, image selection, and publication remain the

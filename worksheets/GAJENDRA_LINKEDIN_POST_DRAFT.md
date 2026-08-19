@@ -1,9 +1,12 @@
 # Gajendra LinkedIn launch post
 
-- **Status:** final draft for owner review — not published
+- **Status:** final draft for owner review — repository gate satisfied; not published
 - **Primary image:** [`evidence/launch/gajendra-hero.png`](../evidence/launch/gajendra-hero.png)
-- **Publish:** **Wednesday, 19 August 2026 at 4:00 PM IST**, after the current repository update is
-  visible on `main`. If that gate misses 3:45 PM, use **Thursday, 20 August 2026 at 4:00 PM IST**.
+- **Publish:** **Wednesday, 19 August 2026 at 4:00 PM IST**. If manual final review is not complete
+  by 3:45 PM, use **Thursday, 20 August 2026 at 4:00 PM IST**.
+- **Repository gate:** PRs [#17](https://github.com/siddath/Gajendra/pull/17) and
+  [#18](https://github.com/siddath/Gajendra/pull/18) are merged; public `main` passed both hosted
+  jobs in [run 32233868042](https://github.com/siddath/Gajendra/actions/runs/32233868042).
 - **Availability boundary:** source is public and buildable; there is no signed/notarized download
 
 ## Why this time

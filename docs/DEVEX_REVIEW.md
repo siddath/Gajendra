@@ -1,6 +1,6 @@
 # Developer-experience review
 
-**Scope:** the 2026-08-19 dirty Gajendra working candidate.
+**Scope:** public `main` after PR #18 on 2026-08-19.
 
 ## Current source-level expectations
 
