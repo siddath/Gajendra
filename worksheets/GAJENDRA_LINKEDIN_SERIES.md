@@ -2,9 +2,9 @@
 
 - **Status:** ten local drafts for maintainer approval; none is published or scheduled
 - **Historical public baseline:** <https://github.com/siddath/Gajendra/pull/12>
-- **Latest public source change:** [PR #21](https://github.com/siddath/Gajendra/pull/21) carries the
-  explicit Running control and public-source reconciliation; its PR page is authoritative for
-  merge state and commit-scoped hosted checks
+- **Latest public source change:** [PR #21](https://github.com/siddath/Gajendra/pull/21) merged the
+  explicit Running control and public-source reconciliation; its pull-request checks and merged-main
+  [CI run 32244790765](https://github.com/siddath/Gajendra/actions/runs/32244790765) passed
 - **Product boundary:** public, buildable source with an exact-installed automated interaction
   receipt; no signed or notarized download
 - **Natural series size:** ten posts. Beyond these ten, the current evidence starts repeating the same lessons rather than adding a distinct story.
@@ -311,9 +311,9 @@ keep an idea from being described as shipped software.
 
 - Review every draft independently; approving one does not approve the series.
 - PR #12 is the historical first public-review baseline. PR #18 and run 32233868042 are the prior
-  hosted-green implementation baseline; PR #21 is the source of truth for the latest change and
-  its checks. Do not extend a green claim to later revisions without their own pull-request and
-  merged-main receipts.
+  hosted-green implementation baseline; PR #21 and merged-main run 32244790765 are the green
+  receipts for the latest change. Do not extend that claim to later revisions without their own
+  pull-request and merged-main receipts.
 - Do not add a download link until Developer ID, notarization, Gatekeeper, archive, clean-Mac, and
   distribution receipts exist.
 - Do not publish automatically. Timing, edits, image selection, and publication remain the

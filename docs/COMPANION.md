@@ -8,7 +8,7 @@ For a short build, first-launch, daily-use, and troubleshooting path, start with
 [user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
 
 This page records the **source/build contract** and the exact-installed automated interaction
-receipt. On 2026-08-19, the source candidate in
+receipt. On 2026-08-19, the source merged in
 [PR #21](https://github.com/siddath/Gajendra/pull/21) passed the real-window
 `npm run companion:ui-test` and `npm run companion:ui-performance-test` journeys,
 `npm run companion:test`, `npm run companion:build`, `npm run companion:validate`, and
