@@ -41,7 +41,7 @@ thread content is used.
 
 | Search | Edit priorities |
 | --- | --- |
-| ![Gajendra filtered search results for Codex threads](evidence/launch/gajendra-launch-search.png) | ![Gajendra priority editing with remove controls and drag handles](evidence/launch/gajendra-launch-queue-editing.png) |
+| ![Gajendra filtered search results for Codex threads](evidence/launch/gajendra-launch-search.png) | ![Gajendra priority editing with a selected task and remove controls](evidence/launch/gajendra-launch-queue-editing.png) |
 
 ![Gajendra Organizer showing sources, NOW, ordered queues, Running, and Ready for Review](evidence/launch/gajendra-launch-organizer.png)
 
@@ -50,18 +50,22 @@ thread content is used.
 | Capability | What it is for |
 | --- | --- |
 | **NOW** | Keep exactly one current thread visible and open it immediately. NOW always belongs to Focus. |
-| **Focus and Important** | Maintain short ordered queues, move work between them, add bounded Design/Engineering/Life context, and keep the full list in Organizer. |
-| **Running** | See provider-reported active work across every priority lane. It is live status, not a guessed priority or a recency label. |
-| **Ready for Review** | See an explicit live review signal and open its Review or Task destination. Running takes precedence if a source reports both. |
-| **Search** | Filter local thread metadata across enabled sources without copying conversation bodies. |
+| **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact rows stay focused on thread metadata instead of showing a permanent drag/menu handle. Organizer retains explicit queue controls. |
+| **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label. |
+| **Ready for Review** | See a proven completed result awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled; a newer provider turn changes the live signal. Its highlighted count stays visible, and Running takes precedence. |
+| **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
 | **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
 | **Adapt the surface** | Choose compact, comfortable, or expanded cards; light, dark, or system appearance; native or Focus Deck styling; and a preferred screen position. |
+| **Open quickly** | The floating launcher, Dock reopen, and menu-bar item lead to the compact focus card. Organizer remains an explicit management destination. The card is prebuilt before first use and refreshes immediately, then only while a Gajendra surface is visible. |
 | **Start quietly** | Choose sources on first launch and enable Launch at Login only through an explicit action. |
 
-Built-in Codex, Claude Code, Cursor, and Grok adapters currently provide thread metadata. Ready for
-Review is available through an explicitly configured bounded catalog that supplies a validated live
-review signal; the built-in adapters do not infer it from idle time or recency.
+Built-in Codex, Claude Code, Cursor, and Grok adapters provide bounded thread metadata. The current
+local Codex app-server can additionally supply a zero-message newest-turn summary: Gajendra maps
+only a valid terminal `completed` turn to Ready for Review and fails closed when that experimental
+metadata method is absent or ambiguous. Claude Code, Cursor, and Grok are never guessed ready from
+idle time, recency, or resumability. An explicitly configured bounded catalog can also supply a
+validated live review signal.
 
 ## Set it up on macOS
 
@@ -96,6 +100,10 @@ Node binary.
 
 For the full daily workflow, interaction reference, configured review example, and troubleshooting,
 read the [user guide](docs/USER_GUIDE.md).
+
+To verify the real floating window with privacy-safe synthetic tasks, run `npm run
+companion:ui-test`. `npm run companion:ui-performance-test` separately enforces the measured
+launcher budget and checks the widget journey for SwiftUI dependency cycles.
 
 ### Optional: add the Codex plugin
 

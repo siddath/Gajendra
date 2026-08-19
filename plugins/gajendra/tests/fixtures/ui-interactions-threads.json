@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "threads": [
+    {
+      "id": "focus-a",
+      "title": "Shape the interaction contract",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:10:00Z",
+      "status": "idle",
+      "deepLink": "ui-agent://threads/focus-a"
+    },
+    {
+      "id": "focus-b",
+      "title": "Run the drag regression",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:09:00Z",
+      "status": "running",
+      "deepLink": "ui-agent://threads/focus-b"
+    },
+    {
+      "id": "focus-c",
+      "title": "Verify queue ordering",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:08:00Z",
+      "status": "idle",
+      "deepLink": "ui-agent://threads/focus-c"
+    },
+    {
+      "id": "important-a",
+      "title": "Review the dock behavior",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:07:00Z",
+      "status": "idle",
+      "deepLink": "ui-agent://threads/important-a"
+    },
+    {
+      "id": "available-a",
+      "title": "Add a recent task",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:06:00Z",
+      "status": "idle",
+      "deepLink": "ui-agent://threads/available-a"
+    },
+    {
+      "id": "running-a",
+      "title": "Build the isolated app",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:05:00Z",
+      "status": "active",
+      "deepLink": "ui-agent://threads/running-a"
+    },
+    {
+      "id": "review-a",
+      "title": "Inspect the finished UI proof",
+      "project": "Synthetic UI fixture",
+      "updatedAt": "2026-08-18T10:04:00Z",
+      "status": "idle",
+      "deepLink": "ui-agent://threads/review-a",
+      "review": {
+        "state": "ready",
+        "kind": "result",
+        "updatedAt": "2026-08-18T10:11:00Z",
+        "destination": {
+          "type": "thread",
+          "deepLink": "ui-agent://threads/review-a"
+        },
+        "providerStatus": "READY"
+      }
+    }
+  ]
+}

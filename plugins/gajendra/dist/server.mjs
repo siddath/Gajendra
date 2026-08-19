@@ -31703,6 +31703,7 @@ var MUTATION_PROTOCOL_VERSION = 1;
 var FOCUS_GUIDE = 5;
 var DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
 var DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"];
+var MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
   "active",
   "busy",
@@ -32528,6 +32529,29 @@ var DEFAULT_CODEX_ENRICHMENT_CONCURRENCY = 4;
 var MAX_CODEX_ENRICHMENT_CONCURRENCY = 8;
 var DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS = 5e3;
 var MAX_CODEX_ENRICHMENT_DEADLINE_MS = 1e4;
+var DEFAULT_CODEX_REVIEW_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE;
+var MAX_CODEX_REVIEW_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE;
+var DEFAULT_CODEX_REVIEW_CONCURRENCY = 4;
+var MAX_CODEX_REVIEW_CONCURRENCY = DEFAULT_CODEX_REVIEW_CONCURRENCY;
+var DEFAULT_CODEX_REVIEW_DEADLINE_MS = 5e3;
+var MAX_CODEX_REVIEW_DEADLINE_MS = DEFAULT_CODEX_REVIEW_DEADLINE_MS;
+var CodexAppServerRpcError = class extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.name = "CodexAppServerRpcError";
+  }
+};
+function isUnsupportedExperimentalError(error51) {
+  if (!(error51 instanceof CodexAppServerRpcError)) return false;
+  if (error51.code === -32601) return true;
+  const message = error51.message.toLowerCase();
+  const experimentalTarget = /\b(?:method|capabilit(?:y|ies)|experimental(?:api|\s+(?:api|capability)))\b/u;
+  const explicitlyUnsupported = /\b(?:unsupported|not supported)\b/u.test(message) && experimentalTarget.test(message);
+  const explicitUnknownTarget = /\b(?:unknown|unrecognized)\s+(?:experimental\s+)?(?:method|field|capabilit(?:y|ies)|parameter)\b/u.test(message);
+  const explicitMethodNotFound = /\bmethod[\s-]+not[\s-]+found\b/u.test(message);
+  return (error51.code === -32602 || error51.code === -32e3) && (explicitlyUnsupported || explicitUnknownTarget || explicitMethodNotFound);
+}
 var CodexAppServerClient = class {
   constructor(requestTimeoutMs = resolveRpcTimeout(), env = process.env) {
     this.requestTimeoutMs = requestTimeoutMs;
@@ -32544,17 +32568,26 @@ var CodexAppServerClient = class {
   stdoutLineLimit;
   pending = /* @__PURE__ */ new Map();
   ready = null;
+  experimentalApiEnabled = false;
+  experimentalTurnsUnsupported = false;
   async listThreads() {
     await this.ensureReady();
     const threads = await listBoundedCodexThreads(async (params) => this.request("thread/list", params));
-    return enrichCodexRuntimeStatuses(threads, this.env);
+    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env);
+    if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
+    const reviews = await enrichCodexReviewSignals(
+      runtimeThreads,
+      (params) => this.request("thread/turns/list", params)
+    );
+    if (reviews.availability === "unsupported") this.experimentalTurnsUnsupported = true;
+    return reviews.threads;
   }
   async close() {
     this.terminallyClosed = true;
     this.closeEpoch += 1;
     const lifecycle = this.lifecycle;
     if (lifecycle) {
-      await this.shutdownAppServer(lifecycle, new Error("Codex app-server was closed."));
+      await this.shutdownAppServer(lifecycle, new Error("Codex app-server client is closed."));
       return;
     }
     if (this.teardown) await this.teardown;
@@ -32570,7 +32603,7 @@ var CodexAppServerClient = class {
     });
     return starting;
   }
-  async start(epoch) {
+  async start(epoch, initializeMode = "experimental") {
     if (this.terminallyClosed || epoch !== this.closeEpoch) {
       throw new Error("Codex app-server client is closed.");
     }
@@ -32594,10 +32627,23 @@ var CodexAppServerClient = class {
     });
     child.once("close", () => this.handleAppServerClose(lifecycle));
     this.attachStdoutFraming(child);
-    await this.request("initialize", {
-      clientInfo: { name: "gajendra", title: "Gajendra", version: "0.3.1" },
-      capabilities: null
-    });
+    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.3.1" };
+    try {
+      await this.request("initialize", {
+        clientInfo,
+        capabilities: initializeMode === "experimental" ? { experimentalApi: true, requestAttestation: false } : null
+      });
+    } catch (error51) {
+      if (initializeMode !== "experimental" || !isUnsupportedExperimentalError(error51)) {
+        await this.shutdownAppServer(lifecycle, error51 instanceof Error ? error51 : new Error("Codex app-server initialize failed."));
+        throw error51;
+      }
+      await this.shutdownAppServer(lifecycle, error51, true);
+      if (this.terminallyClosed || epoch !== this.closeEpoch) throw new Error("Codex app-server client is closed.");
+      return this.start(epoch, "baseline");
+    }
+    this.experimentalApiEnabled = initializeMode === "experimental";
+    this.experimentalTurnsUnsupported = initializeMode !== "experimental";
     this.notify("initialized", {});
   }
   /**
@@ -32666,13 +32712,13 @@ var CodexAppServerClient = class {
       postKillCloseTimer: null
     };
   }
-  shutdownAppServer(lifecycle, error51) {
+  shutdownAppServer(lifecycle, error51, preserveReady = false) {
     if (lifecycle.closing) return lifecycle.closed;
     lifecycle.closing = true;
     lifecycle.terminationError = error51;
     if (this.process === lifecycle.child) {
       this.process = null;
-      this.ready = null;
+      if (!preserveReady) this.ready = null;
     }
     this.stdoutCleanup?.();
     this.stdoutCleanup = null;
@@ -32774,14 +32820,19 @@ var CodexAppServerClient = class {
     this.pending.delete(message.id);
     clearTimeout(pending.timeout);
     if (message.error) {
-      pending.reject(new Error(message.error.message || `Codex app-server error ${message.error.code ?? "unknown"}`));
+      pending.reject(new CodexAppServerRpcError(
+        typeof message.error.code === "number" ? message.error.code : void 0,
+        message.error.message || `Codex app-server error ${message.error.code ?? "unknown"}`
+      ));
     } else {
       pending.resolve(message.result);
     }
   }
   request(method, params) {
     const active = this.process;
-    if (!active) return Promise.reject(new Error("Codex app-server is not running."));
+    if (!active) {
+      return Promise.reject(this.lifecycle?.terminationError ?? new Error("Codex app-server is not running."));
+    }
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -32837,6 +32888,130 @@ async function listBoundedCodexThreads(request, bounds = {}) {
     seenCursors.add(next);
     cursor = next;
   }
+}
+async function enrichCodexReviewSignals(threads, requestTurns, options = {}) {
+  const baseThreads = threads.map(codexBaseThread);
+  const now = options.now ?? Date.now;
+  const maxCandidates = boundedPositive(
+    options.maxCandidates,
+    DEFAULT_CODEX_REVIEW_CANDIDATES,
+    MAX_CODEX_REVIEW_CANDIDATES
+  );
+  const maxConcurrency = boundedPositive(
+    options.maxConcurrency,
+    DEFAULT_CODEX_REVIEW_CONCURRENCY,
+    MAX_CODEX_REVIEW_CONCURRENCY
+  );
+  const deadlineMs = boundedPositive(
+    options.deadlineMs,
+    DEFAULT_CODEX_REVIEW_DEADLINE_MS,
+    MAX_CODEX_REVIEW_DEADLINE_MS
+  );
+  const deadline = now() + deadlineMs;
+  const candidates = [...baseThreads].filter((thread) => typeof thread.id === "string" && thread.id.length > 0 && isEligibleCodexReviewThread(thread)).sort((left, right) => codexThreadRecency(right) - codexThreadRecency(left)).slice(0, maxCandidates);
+  if (candidates.length === 0) return { threads: baseThreads, availability: "available" };
+  const signals = /* @__PURE__ */ new Map();
+  let nextCandidate = 0;
+  let availability = "available";
+  const inspectCandidate = async (thread) => {
+    try {
+      const response = await beforeDeadline(
+        requestTurns({ threadId: thread.id, limit: 1, sortDirection: "desc", itemsView: "notLoaded" }),
+        Math.max(1, deadline - now()),
+        "Codex review metadata exceeded its total deadline."
+      );
+      const outcome = classifyCodexReviewTurnPage(thread, response, now());
+      if (outcome.kind === "ready") signals.set(thread.id, outcome.signal);
+      else if (outcome.kind === "invalid") availability = "transient";
+    } catch (error51) {
+      availability = isUnsupportedExperimentalError(error51) ? "unsupported" : "transient";
+    }
+  };
+  const firstCandidate = candidates[nextCandidate++];
+  if (firstCandidate) await inspectCandidate(firstCandidate);
+  if (availability !== "available" || now() >= deadline) {
+    return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
+  }
+  const worker = async () => {
+    for (; ; ) {
+      if (availability !== "available" || now() >= deadline) {
+        if (availability === "available") availability = "transient";
+        return;
+      }
+      const thread = candidates[nextCandidate++];
+      if (!thread) return;
+      await inspectCandidate(thread);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
+  if (availability !== "available" || now() >= deadline) {
+    return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
+  }
+  return {
+    threads: baseThreads.map((thread) => {
+      const review = signals.get(thread.id);
+      return review && isEligibleCodexReviewThread(thread) ? { ...thread, gajendraReview: review } : thread;
+    }),
+    availability: "available"
+  };
+}
+function codexBaseThread(thread) {
+  const base = { id: thread.id };
+  if (typeof thread.preview === "string") base.preview = thread.preview;
+  if (typeof thread.name === "string" || thread.name === null) base.name = thread.name;
+  if (typeof thread.cwd === "string") base.cwd = thread.cwd;
+  if (typeof thread.updatedAt === "number" && Number.isFinite(thread.updatedAt)) base.updatedAt = thread.updatedAt;
+  if (typeof thread.recencyAt === "number" && Number.isFinite(thread.recencyAt)) base.recencyAt = thread.recencyAt;
+  else if (thread.recencyAt === null) base.recencyAt = null;
+  if (typeof thread.status === "string") base.status = thread.status;
+  else if (thread.status && typeof thread.status === "object" && typeof thread.status.type === "string") {
+    base.status = { type: thread.status.type };
+  }
+  if (typeof thread.path === "string" || thread.path === null) base.path = thread.path;
+  return base;
+}
+function codexThreadRecency(thread) {
+  const value = thread.recencyAt ?? thread.updatedAt ?? 0;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+function isEligibleCodexReviewThread(thread) {
+  const status = normalizeCodexStatus(codexStatusType(thread.status));
+  return status === "idle" || status === "notloaded";
+}
+function normalizeCodexStatus(status) {
+  return status.toLowerCase().replace(/[^a-z]/gu, "");
+}
+function classifyCodexReviewTurnPage(thread, response, nowMs) {
+  if (!response || typeof response !== "object") return { kind: "invalid" };
+  const data = response.data;
+  if (!Array.isArray(data)) return { kind: "invalid" };
+  if (data.length === 0) return { kind: "not-ready" };
+  if (data.length !== 1) return { kind: "invalid" };
+  const turn = data[0];
+  if (!turn || typeof turn !== "object") return { kind: "invalid" };
+  const summary = turn;
+  if (summary.itemsView !== "notLoaded" || !Array.isArray(summary.items) || summary.items.length !== 0) return { kind: "invalid" };
+  if (summary.status !== "completed" && summary.status !== "inProgress" && summary.status !== "active" && summary.status !== "interrupted" && summary.status !== "failed") {
+    return { kind: "invalid" };
+  }
+  if (summary.status !== "completed") return { kind: "not-ready" };
+  if (summary.error !== null) return { kind: "invalid" };
+  const completedAt = codexCompletedAt(summary.completedAt, nowMs);
+  if (completedAt === null) return { kind: "invalid" };
+  return { kind: "ready", signal: {
+    state: "ready",
+    kind: "result",
+    updatedAt: completedAt,
+    destination: { type: "thread", deepLink: `codex://threads/${encodeURIComponent(thread.id)}` },
+    providerStatus: "completed"
+  } };
+}
+function codexCompletedAt(value, nowMs) {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) return null;
+  const renderedMs = value * 1e3;
+  if (!Number.isFinite(new Date(renderedMs).getTime())) return null;
+  const nowSeconds = Math.floor(nowMs / 1e3);
+  return Number.isSafeInteger(nowSeconds) && value <= nowSeconds ? value : null;
 }
 async function enrichCodexRuntimeStatuses(threads, env = process.env, options = {}) {
   if (!isCodexActivityEnrichmentEnabled(env)) return threads;
@@ -33159,7 +33334,6 @@ function beforeDeadline(operation, timeoutMs, message = "Codex app-server exceed
 }
 
 // src/server/thread-sources.ts
-var MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 var MAX_CLAUDE_METADATA_BYTES = 512 * 1024;
 var MAX_GROK_METADATA_BYTES = 128 * 1024;
 var MAX_CATALOG_BYTES = 2 * 1024 * 1024;
@@ -33560,6 +33734,7 @@ async function readBoundedGrokSummary(filePath, onOpened) {
 }
 function codexThread(thread) {
   const id = canonicalThreadId("codex", thread.id);
+  const review = thread.gajendraReview;
   return {
     id,
     sourceId: "codex",
@@ -33569,7 +33744,8 @@ function codexThread(thread) {
     updatedAt: thread.recencyAt ?? thread.updatedAt ?? 0,
     status: typeof thread.status === "string" ? thread.status : thread.status?.type ?? "unknown",
     deepLink: `codex://threads/${encodeURIComponent(thread.id)}`,
-    allowedDeepLinkSchemes: ["codex"]
+    allowedDeepLinkSchemes: ["codex"],
+    ...review ? { review } : {}
   };
 }
 function parseCursorJson(output, executable) {

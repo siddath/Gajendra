@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "sources": [
+    {
+      "id": "ui-agent",
+      "name": "Synthetic UI Agent",
+      "catalog": "plugins/gajendra/tests/fixtures/ui-interactions-threads.json",
+      "enabled": true,
+      "deepLinkSchemes": ["ui-agent"]
+    }
+  ]
+}

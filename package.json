@@ -16,6 +16,7 @@
     "companion:test": "swift run --package-path companion/macos GajendraSelfTest",
     "companion:ui-test:build": "swift build --package-path companion/macos -c release --product GajendraUITest",
     "companion:ui-test": "zsh companion/macos/scripts/test-ui.zsh",
+    "companion:ui-performance-test": "GAJENDRA_UI_TEST_SCOPE=widget GAJENDRA_UI_TEST_ASSERT_NO_ATTRIBUTE_CYCLES=1 zsh companion/macos/scripts/test-ui.zsh",
     "companion:validate": "node scripts/validate-companion.mjs",
     "gauntlet": "node scripts/run-gauntlet.mjs",
     "host:preflight": "node scripts/host-preflight.mjs",

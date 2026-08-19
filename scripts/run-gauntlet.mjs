@@ -13,6 +13,7 @@ const gates = [
   { id: "companion-self-test", command: "npm", args: ["run", "companion:test"] },
   { id: "companion-build", command: "npm", args: ["run", "companion:build"] },
   { id: "companion-ui", command: "npm", args: ["run", "companion:ui-test"] },
+  { id: "companion-widget-performance", command: "npm", args: ["run", "companion:ui-performance-test"] },
   { id: "companion-live", command: "npm", args: ["run", "companion:validate"] },
   { id: "ui", command: "npm", args: ["run", "test:e2e"] },
   { id: "reliability-unit", command: "npm", args: ["test"], repeat: 5 },

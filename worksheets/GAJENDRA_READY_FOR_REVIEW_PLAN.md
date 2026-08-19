@@ -1,7 +1,9 @@
 # Gajendra Ready for Review — design and provider contract
 
-Status: implemented in the dirty local source candidate through the configured-catalog path;
-remote-provider integration and installed proof remain approval-gated.
+Status: implemented and frozen in the dirty local source candidate through the configured-catalog
+path and a guarded, content-free current-local Codex app-server path. The final local gauntlet and
+exact-installed automated journey pass; external provider, physical-accessibility, signed-release,
+and publication gates remain open.
 
 Visible product language: **Gajendra** — **One clear focus across your AI tools.** The existing
 promise remains **One NOW. One short queue. One click back to the exact thread.** This plan uses
@@ -9,12 +11,12 @@ NOW, Focus, Important, and Running as plain queue labels.
 
 Owner: Sid approves the contract and rollout. No deadline was supplied.
 
-Decision enabled: review the implemented **Ready for Review** disclosure below **Running** and
-decide whether a separately secured remote-provider adapter should be authorized later.
+Decision enabled: use **Ready for Review** below **Running** as a live “agent turn completed and
+awaiting your next input” disclosure, while keeping remote-provider adapters separately gated.
 
-Stopping condition for this phase: the configured-catalog model, native/web disclosures, previews,
-safe opening behavior, non-persistence proof, and local build/test gates pass. No remote credential
-path or installed-app claim is part of this phase.
+Stopping condition for this phase: configured-catalog and current-local Codex metadata models,
+native/web disclosures, visible-only refresh, search, safe opening behavior, non-persistence proof,
+and local build/UI gates pass. No remote credential path is part of this phase.
 
 ## Recommendation
 
@@ -23,7 +25,10 @@ The local candidate now adds **Ready for Review** as a second derived disclosure
 restrained system orange/amber, a distinct `checkmark.bubble`-style glyph, and the visible text
 **Ready for Review**. Green remains exclusive to provider-confirmed activity.
 
-The lane must be confidence-first: a task appears only when an enabled provider emits an explicit successful terminal or human-review-ready state. `idle`, `resumable`, recency, a branch name, a final assistant message, or the absence of activity is never enough.
+The lane must be confidence-first: a task appears only when an enabled provider emits an explicit
+successful terminal or human-review-ready state. `idle`, `resumable`, recency, a branch name, a
+rendered assistant message, or the absence of activity is never enough. Opening a task is not an
+acknowledgement and does not clear the signal; a newer provider turn changes it.
 
 ## Surface contract
 
@@ -104,10 +109,10 @@ Ready for Review is inclusive across priority placement, just like Running:
 
 | Source | Current verified signal | Decision |
 | --- | --- | --- |
-| Codex local app-server | Local Codex CLI 0.147.0 schema exposes thread states `notLoaded`, `idle`, `systemError`, and `active`, plus active waiting flags. It does not expose a review-ready thread state. | Do not map `idle` or `waitingOnUserInput` to review-ready. |
+| Codex local app-server | Local Codex CLI 0.147.0's generated experimental schema exposes `thread/turns/list`, `itemsView: notLoaded`, terminal turn status, and completion time without loading message items. | Implemented fail-closed for the 200 newest non-Running candidates with four workers and a five-second total budget. Require exactly one newest zero-item `completed` turn, no error, and a valid completion timestamp; unsupported/malformed/ambiguous evidence emits no built-in signals. |
 | Codex Cloud | OpenAI documents creating cloud tasks, tracking in-progress work, and reviewing completed tasks, but this research found no supported cloud-task listing contract that Gajendra can consume without scraping private app data. | UX supported; adapter blocked until OpenAI exposes an authenticated supported list/status/destination contract. |
 | Cursor Cloud Agents | The public-beta API exposes `RUNNING` and successful terminal `FINISHED` runs, plus pushed branch and optional `prUrl`. | Viable explicit adapter: map only `FINISHED`; prefer `prUrl`, otherwise the documented agent URL. Requires a separately approved remote-source and credential design. |
-| Claude Code local | Current Gajendra adapter emits `resumable`, not a successful review-ready state. | Unsupported; never infer readiness. |
+| Claude Code local | Current Gajendra adapter emits `resumable`; the installed CLI exposes no equivalent metadata-only terminal-turn contract. | Unsupported; never infer readiness or inspect transcript records. |
 | Grok Build local | Current Gajendra adapter emits `resumable`, not a successful review-ready state. | Unsupported; never infer readiness. |
 | Configured catalog | The bounded version-1 catalog now accepts and validates the optional live-only `ReviewSignal`. | Implemented first safe extensibility path; unsafe or fabricated signals fail the source closed. |
 
@@ -132,7 +137,8 @@ The configured-catalog path can validate the UI and normalized contract without 
 
 ## Implementation sequence
 
-1. **Complete locally:** `ReviewSignal` validation, deduplication, Running precedence, ordering, and configured-catalog fixtures.
+1. **Complete locally:** `ReviewSignal` validation, deduplication, Running precedence, ordering,
+   configured-catalog fixtures, and guarded current-local Codex zero-item terminal metadata.
 2. **Complete locally:** derived `reviewReadyThreads` without persistence or priority mutation.
 3. **Complete locally:** light/dark and both-theme suite coverage plus dedicated empty, one-row,
    ten-row/static, priority-overlap, and compact single-scroll preview cases. The review mark itself
@@ -141,37 +147,52 @@ The configured-catalog path can validate the UI and normalized contract without 
 5. **Complete locally:** full-row destination, Task fallback, priority highlight, disclosure state,
    search, keyboard-safe buttons, accessibility labels, and web/native behavioral coverage. Physical
    VoiceOver remains an installed gate.
-6. **Pending separate authority:** a remote provider adapter. Cursor Cloud remains technically
+6. **Complete locally:** visible compact surfaces refresh on reveal
+   and on a conservative visible-only cadence, pausing for search/edit/drag/load/mutation and
+   stopping when hidden. Search indexes fixed Ready/Running semantics plus ordinary metadata; the
+   real-key UI journey proves filter and clear restore behavior.
+7. **Pending separate authority:** a remote provider adapter. Cursor Cloud remains technically
    viable but needs a remote-source security decision; Codex Cloud remains blocked on a supported listing contract.
-7. **Partially completed under later authority:** the exact ad-hoc candidate was installed with
-   preserved state and a rollback, then passed the launcher tap/AX/edge journey. Signed-app,
-   clean-Mac, keyboard, physical VoiceOver, and the full Ready for Review click-through remain open.
+8. **Complete for the local ad-hoc boundary:** this exact Ready/drag candidate was installed with
+   preserved state and a rollback, then passed launcher tap/AX/edge, full-row drag, Search, and dock
+   journeys. Clean-Mac, physical VoiceOver/human drag, Developer ID, notarization, and distribution
+   remain open.
 
-## Local implementation receipt — 2026-08-18
+## Local implementation receipt — 2026-08-19
 
-- `npm run check`: 83/83 TypeScript unit/integration tests, typecheck, plugin build, and plugin validation passed.
+- `npm run check`: 98/98 TypeScript unit/integration tests, typecheck, plugin build, and plugin validation passed.
 - `npm run test:e2e`: 17/17 browser journeys passed, including the configured review disclosure,
   unsafe-destination rejection, exact Review/Task routing, overlap, collapse, and search.
 - `npm run companion:test`, `npm run companion:build`, `npm run companion:ui-test`,
-  `npm run companion:validate`, and `npm run companion:bundle-readiness` passed. The validator's isolated configured source projected
+  `npm run companion:ui-performance-test`, `npm run companion:validate`, and
+  `npm run companion:bundle-readiness` passed. Five consecutive fresh-process full UI journeys
+  passed with all cold/warm reveals at or below 93 ms; the exact installed build then passed at
+  56 ms prewarmed, 90 ms cold, and 89 ms warm. The validator's isolated configured source projected
   a review signal and proved no review/provider/destination field entered the private store.
 - Generated native evidence covers light/dark and both base themes plus dedicated
   [empty](../evidence/companion/gajendra-hover-card-review-empty.png),
   [one-row](../evidence/companion/gajendra-hover-card-review-one.png), and
   [ten-row static](../evidence/companion/gajendra-hover-card-review-ten-dark-static.png) review
   cases. The ten-row case retains the one card scroll owner and fixed search footer.
-- Bundle readiness reports an ad-hoc local bundle with `distributionReady:false`. A narrow installed
-  launcher receipt exists; no physical VoiceOver screen-reader, Developer ID, notarization, binary
+- Bundle readiness reports an ad-hoc local bundle with `distributionReady:false`. The final
+  20-receipt gauntlet, exact installed automated journey, rollback, and unchanged private-state
+  hash/modes are recorded; no physical VoiceOver screen-reader, Developer ID, notarization, binary
   distribution, or LinkedIn publication claim is made.
 
 ## Acceptance tests
 
 - Explicit `ready`/`FINISHED` success appears; idle, resumable, cancelled, expired, failed, and unknown do not.
+- Codex `completed` plus zero unloaded items and a renderable, non-future Unix-second completion
+  time appears. A structurally valid empty, active, in-progress, interrupted, or failed candidate
+  emits no Ready signal. Malformed, returned-content, invalid-time, deadline, and
+  unsupported-method cases suppress the guarded built-in batch.
+- Opening a Ready thread does not clear it; a newer turn's status is the only built-in state change.
 - A simultaneously active and ready record appears only in Running.
 - The same canonical ID can appear in Focus/Important and Ready for Review, with one priority highlight and one placement label.
 - Full-row open chooses the declared review destination; provider fallback is labeled and opens the exact owning task.
 - Ten or more review rows scroll smoothly inside the card's one scroll body; the global search footer remains fixed.
 - Search returns review-ready and ordinary threads without duplicate canonical IDs.
+- Searching `ready`, `running`, a provider, project, or context/tag uses loaded metadata only.
 - Orange is paired with glyph, label, timestamp, accessibility value, and tooltip; grayscale and Differentiate Without Color remain understandable.
 - The review check remains static under Reduce Motion; reorder/snap motion is removed without
   removing state feedback.

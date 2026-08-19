@@ -44,6 +44,6 @@ and therefore creates no persisted migration or new priority level.
 
 Source builds require macOS 13.5+, Xcode/Swift, and Node >=20. A production-style bundle is expected
 to carry Node v24.19.0 with a verified checksum and notices. Neither source compatibility, a local
-ad-hoc signature, nor the narrow installed launcher receipt proves a clean-Mac,
+ad-hoc signature, nor the exact-installed automated interaction receipt proves a clean-Mac,
 Gatekeeper-accepted, Developer ID-signed, notarized, or distribution-ready binary. Those are
 separate pending gates.

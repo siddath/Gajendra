@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -127,10 +128,38 @@ try {
   await browser.close();
 }
 
+await updateLaunchReceipt();
+
 async function pngDataUrl(filePath) {
   return `data:image/png;base64,${(await readFile(filePath)).toString("base64")}`;
 }
 
 async function svgDataUrl(filePath) {
   return `data:image/svg+xml;base64,${(await readFile(filePath)).toString("base64")}`;
+}
+
+async function updateLaunchReceipt() {
+  const receiptPath = path.join(launchRoot, "README.md");
+  const assetNames = [
+    "gajendra-hero.png",
+    "gajendra-launch-overview.png",
+    "gajendra-launch-ready-for-review.png",
+    "gajendra-launch-search.png",
+    "gajendra-launch-queue-editing.png",
+    "gajendra-launch-organizer.png",
+    "gajendra-hero-background.png",
+  ];
+  let receipt = await readFile(receiptPath, "utf8");
+  for (const name of assetNames) {
+    const bytes = await readFile(path.join(launchRoot, name));
+    const digest = createHash("sha256").update(bytes).digest("hex");
+    const lines = receipt.split("\n");
+    const index = lines.findIndex((line) => line.startsWith(`| \`${name}\` |`));
+    if (index < 0) throw new Error(`launch receipt is missing ${name}`);
+    const hashCell = /`[a-f0-9]{64}`(?= \|$)/u;
+    if (!hashCell.test(lines[index])) throw new Error(`launch receipt hash cell is malformed for ${name}`);
+    lines[index] = lines[index].replace(hashCell, `\`${digest}\``);
+    receipt = lines.join("\n");
+  }
+  await writeFile(receiptPath, receipt, "utf8");
 }

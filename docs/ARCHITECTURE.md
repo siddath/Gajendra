@@ -4,8 +4,9 @@ Gajendra — **One clear focus across your AI tools.** — keeps one global NOW,
 and an Important queue while each provider retains its own sessions and credentials. Its promise is
 **One NOW. One short queue. One click back to the exact thread.**
 
-This describes the current **source-review candidate**. One exact ad-hoc local build has a narrow
-installed launcher receipt; no signed, notarized, or distributed app is claimed.
+This describes the current **source-review candidate**. One exact ad-hoc local build has an
+installed automated interaction receipt; no clean-Mac, physical-accessibility, signed, notarized,
+or distributed app claim is made.
 
 ```mermaid
 flowchart LR
@@ -51,14 +52,21 @@ capture, source selection, app-server pagination, and enrichment use explicit by
 and deadline bounds. Source preference changes are generation-checked so a returned snapshot does
 not mix one preference generation with threads collected under another.
 
-An optional configured-catalog `ReviewSignal` remains on the live normalized thread only. The
-service projects explicit non-Running signals by review timestamp for the Ready for Review
-disclosure; it does not mutate priority or store the signal. Built-in adapters currently emit none,
-and remote adapters remain outside the local-source authority.
+An optional adapter `ReviewSignal` remains on the live normalized thread only. The service projects
+explicit non-Running signals by review timestamp for the Ready for Review disclosure; it does not
+mutate priority or store the signal. Configured catalogs may declare the validated structure. The
+current local Codex adapter may derive it only from a bounded `thread/turns/list` response requested
+with `itemsView: notLoaded`: exactly one newest turn, zero items, terminal `completed`, no error, and
+a renderable, non-future Unix-second completion timestamp. A valid non-completed turn emits no
+signal for that candidate; malformed, content-returning, deadline, or invalid-time evidence clears
+the optional batch. Other built-ins and remote adapters remain outside that authority.
 
 Each source declares safe destination schemes. URLs are normalized and checked when catalog data is
-accepted and again immediately before a host/native open. Unknown, whitespace-padded, encoded,
-`javascript:`, `data:`, and `file:` URLs fail closed.
+accepted and again immediately before a host/native open. The web surface also binds immutable
+thread/review intent at render time and re-resolves that exact destination from the current
+authoritative snapshot after its press animation, so mutable DOM attributes or a concurrent refresh
+cannot redirect an Open action. Unknown, whitespace-padded, encoded, `javascript:`, `data:`, and
+`file:` URLs fail closed.
 
 ## A4 Codex enrichment boundary
 
@@ -73,9 +81,9 @@ the app-server status rather than inferring activity.
 ## Native and release boundary
 
 The native source targets macOS 13.5 and expects a bundle containing checksum-verified Node
-v24.19.0 plus notices. It is a source/build contract only. Current documentation makes no claim
-that the candidate is installed, has completed physical interaction/accessibility checks, has been
-Developer ID signed/notarized, or is downloadable. See [Companion](COMPANION.md) and
+v24.19.0 plus notices. The exact local ad-hoc candidate has an installed automated interaction
+receipt; that does not establish clean-Mac or physical interaction/accessibility proof. It has not
+been Developer ID signed/notarized and is not downloadable. See [Companion](COMPANION.md) and
 [Status](../STATUS.md).
 
 Mobile is not an architecture component today. The retained mobile material is a documentation-only

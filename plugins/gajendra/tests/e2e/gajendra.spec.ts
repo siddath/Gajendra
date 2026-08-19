@@ -146,9 +146,9 @@ test("executes only allowlisted thread links at the click boundary", async ({ pa
 test("uses the real host openLink fallback and surfaces a failed native navigation", async ({ page }) => {
   await page.addInitScript(() => {
     const thread = {
-      id: "host:thread-1",
-      sourceId: "host",
-      sourceName: "Host mock",
+      id: "codex:thread-1",
+      sourceId: "codex",
+      sourceName: "Codex host mock",
       title: "Host fallback thread",
       project: "host-test",
       updatedAt: 1_786_545_400,
@@ -156,8 +156,24 @@ test("uses the real host openLink fallback and surfaces a failed native navigati
       level: "focus",
       isCurrent: true,
       context: null,
-      deepLink: "https://allowed.example.test/thread-1",
-      allowedDeepLinkSchemes: ["https"],
+      deepLink: "codex://threads/thread-1",
+      allowedDeepLinkSchemes: ["codex"],
+      review: {
+        state: "ready",
+        kind: "result",
+        updatedAt: 1_786_545_400,
+        destination: { type: "thread", deepLink: "codex://threads/review-1" },
+        providerStatus: "completed",
+      },
+    };
+    const otherThread = {
+      ...thread,
+      id: "codex:thread-2",
+      title: "Other Codex thread",
+      level: null,
+      isCurrent: false,
+      deepLink: "codex://threads/thread-2",
+      review: undefined,
     };
     const snapshot = {
       generatedAt: "2026-08-18T00:00:00.000Z",
@@ -165,14 +181,36 @@ test("uses the real host openLink fallback and surfaces a failed native navigati
       current: thread,
       focus: [thread],
       important: [],
-      available: [],
+      available: [otherThread],
       collapsed: { focus: false, important: false },
       focusGuide: 5,
       focusOverGuide: false,
       staleEntryCount: 0,
       source: "gajendra-registry",
-      sources: [{ id: "host", name: "Host mock", kind: "configured", state: "ready", enabled: true, threadCount: 1, detail: null }],
+      sources: [{ id: "codex", name: "Codex host mock", kind: "configured", state: "ready", enabled: true, threadCount: 2, detail: null }],
       error: null,
+    };
+    const snapshots = {
+      baseline: snapshot,
+      notReady: {
+        ...snapshot,
+        revision: 2,
+        current: { ...thread, review: undefined },
+        focus: [{ ...thread, review: undefined }],
+      },
+      running: {
+        ...snapshot,
+        revision: 3,
+        current: { ...thread, status: "active" },
+        focus: [{ ...thread, status: "active" }],
+      },
+      changedDestination: {
+        ...snapshot,
+        revision: 4,
+        current: { ...thread, review: { ...thread.review, destination: { type: "thread", deepLink: "codex://threads/review-2" } } },
+        focus: [{ ...thread, review: { ...thread.review, destination: { type: "thread", deepLink: "codex://threads/review-2" } } }],
+      },
+      missing: { ...snapshot, revision: 5, current: null, focus: [], available: [otherThread] },
     };
     const state = {
       openLinkMode: "is-error" as "is-error" | "throw",
@@ -181,27 +219,31 @@ test("uses the real host openLink fallback and surfaces a failed native navigati
       openLinkModes: [] as string[],
       navigations: [] as string[],
       navigationModes: [] as string[],
+      publish: null as null | ((kind: keyof typeof snapshots) => void),
     };
+    const hostApp = {
+      addEventListener: () => undefined,
+      connect: async () => undefined,
+      getHostContext: () => ({ theme: "light" }),
+      callServerTool: async (request: { name: string }) => ({
+        structuredContent: request.name === "gajendra_open" ? snapshot : snapshot,
+      }),
+      openLink: async ({ url }: { url: string }) => {
+        state.openLinks.push(url);
+        state.openLinkModes.push(state.openLinkMode);
+        if (state.openLinkMode === "throw") throw new Error("Host openLink failed.");
+        return { isError: true };
+      },
+      ontoolresult: undefined as undefined | ((result: { structuredContent: unknown }) => void),
+    };
+    state.publish = (kind) => hostApp.ontoolresult?.({ structuredContent: snapshots[kind] });
     const testWindow = window as Window & {
       __gajendraHostTest?: unknown;
       __gajendraHostTestState?: typeof state;
     };
     testWindow.__gajendraHostTestState = state;
     testWindow.__gajendraHostTest = {
-      createApp: () => ({
-        addEventListener: () => undefined,
-        connect: async () => undefined,
-        getHostContext: () => ({ theme: "light" }),
-        callServerTool: async (request: { name: string }) => ({
-          structuredContent: request.name === "gajendra_open" ? snapshot : snapshot,
-        }),
-        openLink: async ({ url }: { url: string }) => {
-          state.openLinks.push(url);
-          state.openLinkModes.push(state.openLinkMode);
-          if (state.openLinkMode === "throw") throw new Error("Host openLink failed.");
-          return { isError: true };
-        },
-      }),
+      createApp: () => hostApp,
       navigate: (url: string) => {
         state.navigations.push(url);
         state.navigationModes.push(state.openLinkMode);
@@ -212,7 +254,71 @@ test("uses the real host openLink fallback and surfaces a failed native navigati
   await page.goto("/gajendra.html?host-test=1");
   const root = page.locator("#app");
   const open = page.locator(".now-card .primary-action");
-  await expect(open).toHaveAttribute("href", "https://allowed.example.test/thread-1");
+  const reviewOpen = page.locator(".review-row .review-primary");
+  await expect(open).toHaveAttribute("href", "codex://threads/thread-1");
+  await expect(open).toHaveAttribute("data-open-route", "thread");
+  await expect(reviewOpen).toHaveAttribute("href", "codex://threads/review-1");
+  await expect(reviewOpen).toHaveAttribute("data-open-route", "review");
+
+  const publishSnapshot = async (kind: "baseline" | "notReady" | "running" | "changedDestination" | "missing") => {
+    await page.evaluate((next) => {
+      const testWindow = window as Window & {
+        __gajendraHostTestState?: { publish: null | ((kind: "baseline" | "notReady" | "running" | "changedDestination" | "missing") => void) };
+      };
+      const publish = testWindow.__gajendraHostTestState?.publish;
+      if (!publish) throw new Error("Host snapshot publisher is unavailable.");
+      publish(next);
+    }, kind);
+  };
+
+  // The pressed element may be stale by the time its acknowledgement animation ends. Every
+  // material snapshot change must cancel that in-flight review navigation at the final boundary.
+  for (const mutation of ["notReady", "running", "changedDestination", "missing"] as const) {
+    await publishSnapshot("baseline");
+    await expect(reviewOpen).toHaveAttribute("href", "codex://threads/review-1");
+    await expect(root).toHaveAttribute("data-motion-state", "idle");
+    const press = reviewOpen.click();
+    await expect(root).toHaveAttribute("data-motion-state", "animating");
+    await publishSnapshot(mutation);
+    await press;
+    await expect(root.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+    await expect.poll(() => page.evaluate(() => {
+      const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
+      return testWindow.__gajendraHostTestState;
+    })).toMatchObject({ openLinks: [], navigations: [] });
+  }
+  await publishSnapshot("baseline");
+  await expect(reviewOpen).toHaveAttribute("href", "codex://threads/review-1");
+
+  // Even a coupled substitution to another valid, allowlisted Codex row cannot replace the
+  // listener's render-time authority.
+  await open.evaluate((element) => {
+    element.setAttribute("data-open-thread-id", "codex:thread-2");
+    element.setAttribute("data-open-route", "thread");
+    element.setAttribute("data-open-thread", "codex://threads/thread-2");
+    element.setAttribute("href", "codex://threads/thread-2");
+  });
+  await open.click();
+  await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+  await expect(open).toHaveAttribute("data-open-thread-id", "codex:thread-1");
+  await expect(open).toHaveAttribute("data-open-route", "thread");
+  await expect(open).toHaveAttribute("data-open-thread", "codex://threads/thread-1");
+
+  // Individual same-scheme and route-intent mutations remain blocked too.
+  await open.evaluate((element) => element.setAttribute("data-open-thread", "codex://threads/thread-2"));
+  await open.click();
+  await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+  await expect(open).toHaveAttribute("data-open-thread", "codex://threads/thread-1");
+
+  await reviewOpen.evaluate((element) => element.setAttribute("data-open-route", "thread"));
+  await reviewOpen.click();
+  await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+  await expect(reviewOpen).toHaveAttribute("data-open-route", "review");
+
+  await open.evaluate((element) => element.setAttribute("data-open-thread-id", "codex:thread-2"));
+  await open.click();
+  await expect(page.getByRole("alert")).toContainText("blocked an unsafe thread destination");
+  await expect(open).toHaveAttribute("data-open-thread-id", "codex:thread-1");
 
   for (const unsafe of [
     " javascript:alert(1)",
@@ -228,21 +334,21 @@ test("uses the real host openLink fallback and surfaces a failed native navigati
     // Opening animates before the guarded boundary runs. Wait for its error render to rebuild
     // this dynamic locator before issuing the next hostile click, rather than racing six stale
     // handlers against the one permitted-fallback assertion below.
-    await expect(open).toHaveAttribute("data-open-thread", "https://allowed.example.test/thread-1");
+    await expect(open).toHaveAttribute("data-open-thread", "codex://threads/thread-1");
   }
   await expect.poll(() => page.evaluate(() => {
     const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
     return testWindow.__gajendraHostTestState;
   })).toMatchObject({ openLinks: [], navigations: [] });
 
-  await open.evaluate((element) => element.setAttribute("data-open-thread", "https://allowed.example.test/thread-1"));
+  await open.evaluate((element) => element.setAttribute("data-open-thread", "codex://threads/thread-1"));
   await open.click();
   await expect.poll(() => page.evaluate(() => {
     const testWindow = window as Window & { __gajendraHostTestState?: { openLinks: string[]; navigations: string[] } };
     return testWindow.__gajendraHostTestState;
   })).toMatchObject({
-    openLinks: ["https://allowed.example.test/thread-1"],
-    navigations: ["https://allowed.example.test/thread-1"],
+    openLinks: ["codex://threads/thread-1"],
+    navigations: ["codex://threads/thread-1"],
   });
 
   await page.evaluate(() => {
@@ -475,6 +581,19 @@ test("searches every thread and exposes organizer actions by keyboard", async ({
   await expect(search).toBeFocused();
   await page.keyboard.type("gajendra codex active");
   await expect(page.locator("[data-search-status]")).toHaveText("1 match");
+  for (const [query, threadId] of [
+    ["Ready", "review-agent:focus-review"],
+    ["Running", "cursor:running-3"],
+    ["provider codex", "codex:00000000-0000-7000-8000-000000000001"],
+    ["project gajendra", "codex:00000000-0000-7000-8000-000000000001"],
+    ["context design", "codex:00000000-0000-7000-8000-000000000001"],
+    ["tag design", "codex:00000000-0000-7000-8000-000000000001"],
+    ["label design", "codex:00000000-0000-7000-8000-000000000001"],
+  ] as Array<[string, string]>) {
+    await search.fill(query);
+    await expect(page.locator(`#available-list .available-row[data-thread-id="${threadId}"]`)).toBeVisible();
+  }
+  await search.fill("gajendra codex active");
   await search.blur();
   await searchFooter.click({ position: { x: 6, y: 6 } });
   await expect(search).toBeFocused();

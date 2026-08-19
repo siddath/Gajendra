@@ -8,12 +8,12 @@ text-free generated background.
 
 | Asset | Kind | Dimensions | SHA-256 |
 | --- | --- | ---: | --- |
-| `gajendra-hero.png` | Screenshot-led GitHub/LinkedIn hero | 1536×1024 | `d8bbf2b0aa936cdedd418e0cfb198fbd023c6eba4be4e962eb6227f12cb3f6dc` |
-| `gajendra-launch-overview.png` | Real SwiftUI overview render | 1520×1360 | `447328d26950f12fcf963b4fcf282f07bb73f1eef83f3263aaa79c9e4c18052e` |
-| `gajendra-launch-ready-for-review.png` | Real SwiftUI review render | 1320×1220 | `2c67e87d00d9fe6eeed069e6ff85ae3787e5b2a2c1205c8d330195866dbec7f7` |
-| `gajendra-launch-search.png` | Real SwiftUI search render | 1320×1220 | `2801a6c3e68448231549938bed80a4ae2a8a82783a6d835327ab31fcf402b9e4` |
-| `gajendra-launch-queue-editing.png` | Real SwiftUI edit-mode render | 1320×1220 | `2c71ce09b815abdf1552197405877e1e283bb14b43d5331075e4ca243f61ae6d` |
-| `gajendra-launch-organizer.png` | Real SwiftUI Organizer render | 1240×1800 | `33b70a937f26d65d74ee6f220e10fb81b045eaadfd0257df80bf93cc3e87d180` |
+| `gajendra-hero.png` | Screenshot-led GitHub/LinkedIn hero | 1536×1024 | `f16b64742a6ece5735a69c59533586af7d1ee66b890568a144ad178cc2c66531` |
+| `gajendra-launch-overview.png` | Real SwiftUI overview render | 1520×1360 | `f4932fe4a978e0968f8a45140b70e7c8e6061eac79278b5c46762ca00fd656e7` |
+| `gajendra-launch-ready-for-review.png` | Real SwiftUI review render | 1320×1220 | `1e1cf20153637d465cedd07a5047b60ba0b52720e8d0f5a1dfe28a317095b345` |
+| `gajendra-launch-search.png` | Real SwiftUI search render | 1320×1220 | `22089595c30d138b6c1ca9eddfd485ba982adb7e904a61827b86bf0e083209f7` |
+| `gajendra-launch-queue-editing.png` | Real SwiftUI edit-mode render | 1320×1220 | `79803828fb7246ee596ae5c12f6deea7e66a4174acf82d656d5e812ff3786d17` |
+| `gajendra-launch-organizer.png` | Real SwiftUI Organizer render | 1240×1800 | `be35c7f17359b4941b4b6e298ac46b43405a5200573d715a7e3010a863165330` |
 | `gajendra-hero-background.png` | Text-free generated backdrop | 1536×1024 | `7607d5be2faa69ee1213ba5d370d002ec3cd51f392a79a7a0c38355021587c07` |
 
 `gajendra-linkedin-synthetic.png` is the earlier all-synthetic concept image. It is retained as
@@ -26,9 +26,10 @@ design history, but it is no longer the primary product visual.
 - The six task titles, projects, IDs, timestamps, and statuses are a dedicated public fixture. They
   describe generic coding, writing, setup, release, and review work inspired by the shape of Codex
   and Claude workflows—not by copying any private thread.
-- Codex and Claude are used for the built-in metadata examples. Ready for Review is supplied by an
-  explicitly labeled **Demo Review Feed**, because the built-in adapters do not currently emit that
-  signal.
+- Codex and Claude are used for the built-in metadata examples. This deterministic screenshot
+  intentionally supplies Ready for Review through the explicitly labeled **Demo Review Feed**. The
+  current local Codex app-server may also emit the guarded zero-item terminal-turn signal; Claude
+  is never inferred ready.
 - The hero's product panel is `gajendra-launch-overview.png` without generative edits. Only the
   abstract background was generated.
 - Every public visual says or is documented as **Synthetic demo data**.

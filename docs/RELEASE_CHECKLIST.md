@@ -1,6 +1,7 @@
 # Release checklist
 
-Checked items have a current 2026-08-18 candidate receipt. They are not a binary-release claim.
+Checked items have a current 2026-08-19 working-candidate receipt. They are not a binary-release
+claim.
 
 ## Frozen local candidate
 
@@ -20,8 +21,12 @@ Checked items have a current 2026-08-18 candidate receipt. They are not a binary
 
 ## Separately authorized external gates
 
-- [ ] Clean-Mac and remaining physical VoiceOver/login/drag/system-toggle proof. The installed
-  launcher tap/AX/edge subset has a current receipt.
+- [ ] Clean-Mac and remaining physical VoiceOver/login/manual-drag/system-toggle proof. The
+  exact installed app's isolated tap/AX/edge, quick-task-click, hold/select/lift full-row drag,
+  Organizer reorder, real-key Search filter/clear, and dock automation have current receipts.
+- [x] Widget performance regression: prewarmed direct AppKit click path stays below the local 200 ms
+  launcher-to-card budget in the isolated real-window journey, with no widget-path AttributeGraph
+  cycle warning. This is not a cross-machine performance claim.
 - [ ] Developer ID identity/team, strict signing, Gatekeeper, notarization/staple, archive, and
   checksum receipt.
 - [ ] Binary distribution and LinkedIn publication. Public source review is tracked separately.

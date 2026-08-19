@@ -39,15 +39,17 @@ toggle a source or rescan.
 
 ## Everyday workflow
 
-1. **Single-click the floating Gajendra button** to show or hide the focus card.
+1. **Single-click the floating Gajendra button** to show or hide the focus card. Dock reopen and the
+   menu-bar item use the same compact-first surface; open Organizer only for deliberate management.
 2. Put one thread in **NOW**. It remains part of the Focus queue.
 3. Keep the next few threads in **Focus** and lower-pressure work in **Important**.
 4. Glance at **Running** for active provider work and **Ready for Review** for explicit completed
    work that needs human attention.
+   Double-click either dock header when you want to shrink or expand its rows.
 5. Select **Open**, a row, a provider badge, or a Review/Task action to return to the source-owned
    destination.
-6. Use the search field for a title, project, source, or status; open Organizer when you need the
-   full queues.
+6. Use the search field for a title, project, source, context/tag, priority, Running, or Ready
+   status; open Organizer when you need the full queues.
 
 ## Interaction reference
 
@@ -64,7 +66,12 @@ toggle a source or rescan.
 
 - **Make NOW** promotes a thread while preserving the previous lane/order information needed for
   Undo.
-- **Edit priorities** exposes remove controls and drag handles for Focus and Important.
+- A quick task click remains the direct Open route. Hold a Focus or Important task briefly to select
+  and lift it; keep holding and move the visible row to reorder it or change lanes. Releasing a
+  stationary hold leaves the selected task in edit mode.
+- Compact rows intentionally have no permanent three-line drag/menu handle. **Edit priorities**
+  exposes full-row drag plus remove controls; hover, selection, and the lifted row provide the
+  pointer feedback.
 - Organizer provides explicit up/down, lane, context, and overflow actions when drag is not the
   preferred input.
 - Successful changes participate in app-owned Undo/Redo. A conflicting external refresh clears
@@ -73,13 +80,23 @@ toggle a source or rescan.
 ### Running
 
 Running is derived from an explicit provider status such as active, working, or streaming. It can
-contain NOW, Focus, Important, or unprioritized work and never changes priority by itself.
+contain NOW, Focus, Important, or unprioritized work and never changes priority by itself. The
+highlighted badge shows the count at a glance. Double-click the dock header to shrink or expand the
+rows; a single click does not change it.
 
 ### Ready for Review
 
-Ready for Review requires an explicit live signal from a configured source. The review row opens the
-declared **Review** or **Task** destination; the provider badge separately opens the owning task.
-The built-in Codex, Claude Code, Cursor, and Grok adapters do not currently infer review readiness.
+Ready for Review is live provider evidence, not an unread badge. The current local Codex app-server
+path requests only the newest turn's status and completion time with message items explicitly not
+loaded. A valid completed turn appears until a newer turn changes the evidence; opening the thread
+does not clear it. Missing, active, interrupted, failed, malformed, or unsupported metadata appears
+nowhere. Claude Code, Cursor, and Grok are not guessed from idle time or resumability. Configured
+sources may still supply the validated signal directly.
+
+The review row opens the declared **Review** or **Task** destination; the provider badge separately
+opens the owning task. Its highlighted badge shows the number needing attention. Double-click the
+dock header to shrink or expand the rows; a single click does not change it. Gajendra refreshes on
+reveal and periodically while the compact surface is visible, pausing during direct manipulation.
 
 To experiment without private data, start from [the synthetic review catalog](../examples/review-catalog.json)
 and the boundaries in [Thread sources](THREAD_SOURCES.md).
@@ -92,8 +109,11 @@ and the boundaries in [Thread sources](THREAD_SOURCES.md).
   counts, and destination labels.
 - Organizer offers explicit controls as an alternative to drag-and-drop.
 
-Physical VoiceOver, drag, login-item, and system-toggle receipts remain part of the external release
-gate; the repository does not present source tests as proof of every physical journey.
+The isolated real-window UI journey distinguishes a quick task click from a stationary hold,
+automates the selected/lifted full-row drag in the card plus Organizer controls, and checks the
+resulting persisted order. Physical VoiceOver, manual human drag, login-item, and
+system-toggle receipts remain part of the external release gate; the repository does not present
+automation as proof of every physical journey.
 
 ## Troubleshooting
 
@@ -105,7 +125,18 @@ still fails, run the isolated launcher journey and include its output in a bug r
 
 ```sh
 npm run companion:ui-test
+npm run companion:ui-performance-test
 ```
+
+The second command also reports cold/warm launcher-to-card visibility and fails above the 200 ms
+local regression budget. It uses synthetic metadata and does not read private provider content.
+
+### A task does not move when dragged
+
+Hold the task until it lifts and **Done editing priorities** appears, then continue dragging the
+visible row. Drop on another row to insert before it, or on the open area of a Focus/Important lane
+to append. The whole operation is one atomic priority change. Organizer also provides explicit move
+controls if pointer drag is not your preferred input.
 
 ### A source shows Off, Not installed, or Needs setup
 

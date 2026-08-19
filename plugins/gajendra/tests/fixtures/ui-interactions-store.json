@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "revision": 0,
+  "currentFocusThreadId": "ui-agent:focus-a",
+  "entries": [
+    {
+      "threadId": "ui-agent:focus-a",
+      "level": "focus",
+      "addedAt": "2026-08-18T09:00:00.000Z",
+      "context": "engineering"
+    },
+    {
+      "threadId": "ui-agent:focus-b",
+      "level": "focus",
+      "addedAt": "2026-08-18T09:01:00.000Z"
+    },
+    {
+      "threadId": "ui-agent:focus-c",
+      "level": "focus",
+      "addedAt": "2026-08-18T09:02:00.000Z",
+      "context": "design"
+    },
+    {
+      "threadId": "ui-agent:important-a",
+      "level": "important",
+      "addedAt": "2026-08-18T09:03:00.000Z"
+    }
+  ],
+  "collapsed": {
+    "focus": false,
+    "important": false
+  },
+  "sourcePreferences": {
+    "codex": false,
+    "claude": false,
+    "cursor": false,
+    "grok": false,
+    "ui-agent": true
+  },
+  "idempotency": []
+}
