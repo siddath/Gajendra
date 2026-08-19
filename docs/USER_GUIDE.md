@@ -45,7 +45,7 @@ toggle a source or rescan.
 3. Keep the next few threads in **Focus** and lower-pressure work in **Important**.
 4. Glance at **Running** for active provider work and **Ready for Review** for explicit completed
    work that needs human attention.
-   Double-click either dock header when you want to shrink or expand its rows.
+   Click **All priority lanes** to shrink or expand Running, or double-click either dock header.
 5. Select **Open**, a row, a provider badge, or a Review/Task action to return to the source-owned
    destination.
 6. Use the search field for a title, project, source, context/tag, priority, Running, or Ready
@@ -81,8 +81,8 @@ toggle a source or rescan.
 
 Running is derived from an explicit provider status such as active, working, or streaming. It can
 contain NOW, Focus, Important, or unprioritized work and never changes priority by itself. The
-highlighted badge shows the count at a glance. Double-click the dock header to shrink or expand the
-rows; a single click does not change it.
+highlighted badge shows the count at a glance. Click **All priority lanes** or double-click the dock
+header to shrink or expand the rows; a single click on the header itself does not change it.
 
 ### Ready for Review
 

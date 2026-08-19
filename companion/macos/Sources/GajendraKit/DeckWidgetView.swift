@@ -2312,7 +2312,11 @@ public struct GajendraHoverCardView: View {
     private func runningSummary(_ threads: [DeckThread]) -> some View {
         LazyVStack(alignment: .leading, spacing: 0) {
             if threads.isEmpty {
-                runningDisclosureHeader(count: 0, expanded: false)
+                HStack(spacing: 0) {
+                    runningDisclosureHeader(count: 0)
+                    runningDisclosureControl(count: 0, expanded: false)
+                        .padding(.trailing, 10 * contentScale)
+                }
                 Divider()
                 Text("No provider reports active work")
                     .font(scaledFont(10.5, weight: .regular))
@@ -2321,25 +2325,34 @@ public struct GajendraHoverCardView: View {
                     .padding(.horizontal, 10 * contentScale)
                     .padding(.vertical, 8 * contentScale)
             } else {
-                runningDisclosureHeader(count: threads.count, expanded: isRunningExpanded)
-                    .contentShape(Rectangle())
-                    .background(
-                        isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    )
-                    .onHover { isRunningHeaderHovered = $0 }
-                    .onTapGesture(count: 2) {
-                        toggleRunningDock()
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction {
-                        toggleRunningDock()
-                    }
-                    .accessibilityLabel("Running, \(threads.count) active threads")
-                    .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
-                    .accessibilityHint("Double-click to \(isRunningExpanded ? "collapse" : "expand") the running thread list")
-                    .help("Double-click to \(isRunningExpanded ? "shrink" : "expand") Running")
+                HStack(spacing: 0) {
+                    runningDisclosureHeader(count: threads.count)
+                        .contentShape(Rectangle())
+                        .background(
+                            isRunningHeaderHovered
+                                ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        )
+                        .onHover { isRunningHeaderHovered = $0 }
+                        .onTapGesture(count: 2) {
+                            toggleRunningDock()
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction {
+                            toggleRunningDock()
+                        }
+                        .accessibilityLabel("Running, \(threads.count) active threads")
+                        .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
+                        .accessibilityHint(
+                            "Double-click the dock or click All priority lanes to "
+                                + "\(isRunningExpanded ? "collapse" : "expand") the running thread list"
+                        )
+                        .help("Double-click to \(isRunningExpanded ? "shrink" : "expand") Running")
+                    runningDisclosureControl(count: threads.count, expanded: isRunningExpanded)
+                        .padding(.trailing, 10 * contentScale)
+                }
 
                 Divider()
                 if isRunningExpanded {
@@ -2380,7 +2393,7 @@ public struct GajendraHoverCardView: View {
         }
     }
 
-    private func runningDisclosureHeader(count: Int, expanded: Bool) -> some View {
+    private func runningDisclosureHeader(count: Int) -> some View {
         HStack(spacing: 7 * contentScale) {
             Image(systemName: "waveform")
                 .font(scaledFont(10.5, weight: .semibold))
@@ -2389,6 +2402,16 @@ public struct GajendraHoverCardView: View {
                 .font(scaledFont(11.5, weight: .semibold))
             GajendraStatusCountBadge(count: count, tint: .green, scale: contentScale)
             Spacer(minLength: 8)
+        }
+        .padding(.horizontal, 10 * contentScale)
+        .frame(maxWidth: .infinity, minHeight: 34 * contentScale, alignment: .leading)
+    }
+
+    private func runningDisclosureControl(count: Int, expanded: Bool) -> some View {
+        Button {
+            guard count > 0 else { return }
+            toggleRunningDock()
+        } label: {
             HStack(spacing: 5 * contentScale) {
                 Text("All priority lanes")
                     .lineLimit(1)
@@ -2405,9 +2428,14 @@ public struct GajendraHoverCardView: View {
             .padding(.vertical, 5 * contentScale)
             .background(Color.green.opacity(count > 0 ? 0.09 : 0.035), in: Capsule())
             .overlay(Capsule().stroke(Color.green.opacity(count > 0 ? 0.28 : 0.12), lineWidth: 0.75))
+            .contentShape(Capsule())
         }
-        .padding(.horizontal, 10 * contentScale)
-        .frame(maxWidth: .infinity, minHeight: 34 * contentScale, alignment: .leading)
+        .buttonStyle(.plain)
+        .disabled(count == 0)
+        .accessibilityLabel("All priority lanes, Running")
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+        .accessibilityHint("Click to \(expanded ? "collapse" : "expand") the running thread list")
+        .help("Click to \(expanded ? "shrink" : "expand") Running")
     }
 
     private func runningRow(_ thread: DeckThread) -> some View {

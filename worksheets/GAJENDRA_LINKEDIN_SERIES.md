@@ -129,8 +129,9 @@ The more important change was the test.
 
 The macOS UI driver now launches the actual app window with isolated synthetic state. It checks a
 stationary click, a two-pixel click, edit-mode recovery, an Accessibility press, near-edge
-placement, card and Organizer queue drags with exact persisted order, and the Running/Ready
-single-click and double-click contract. I ran the complete interaction journey against the exact
+placement, card and Organizer queue drags with exact persisted order, the explicit Running
+**All priority lanes** control, and the Running/Ready header single-click and double-click contract.
+I ran the complete interaction journey against the exact
 installed ad-hoc candidate; the source build also passed five consecutive fresh-process journeys.
 
 Hosted CI compiles the UI target, but it does not pretend a headless runner has proved macOS

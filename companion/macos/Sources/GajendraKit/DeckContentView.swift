@@ -696,29 +696,45 @@ public struct DeckContentView: View {
     }
 
     private func runningSection(_ threads: [DeckThread]) -> some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        let dockValue = isRunningExpanded ? "Expanded" : "Collapsed"
+        let dockAction = isRunningExpanded ? "collapse" : "expand"
+        let dockSizeAction = isRunningExpanded ? "shrink" : "expand"
+        let dockLabel = "Running, \(threads.count) active threads across all priority lanes"
+        let dockHint = "Double-click the dock or click All priority lanes to \(dockAction) the running thread list"
+
+        return LazyVStack(alignment: .leading, spacing: 0) {
             if threads.isEmpty {
-                runningSectionHeader(count: 0, expanded: false)
+                HStack(spacing: 0) {
+                    runningSectionHeader(count: 0)
+                    runningSectionControl(count: 0, expanded: false)
+                        .padding(.trailing, 10)
+                }
             } else {
-                runningSectionHeader(count: threads.count, expanded: isRunningExpanded)
-                .contentShape(Rectangle())
-                .background(
-                    isRunningHeaderHovered ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 8)
-                )
-                .onHover { isRunningHeaderHovered = $0 }
-                .onTapGesture(count: 2) {
-                    toggleRunningDock()
+                HStack(spacing: 0) {
+                    runningSectionHeader(count: threads.count)
+                        .contentShape(Rectangle())
+                        .background(
+                            isRunningHeaderHovered
+                                ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07)
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 8)
+                        )
+                        .onHover { isRunningHeaderHovered = $0 }
+                        .onTapGesture(count: 2) {
+                            toggleRunningDock()
+                        }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction {
+                            toggleRunningDock()
+                        }
+                        .accessibilityLabel(dockLabel)
+                        .accessibilityValue(dockValue)
+                        .accessibilityHint(dockHint)
+                        .help("Double-click to \(dockSizeAction) Running")
+                    runningSectionControl(count: threads.count, expanded: isRunningExpanded)
+                        .padding(.trailing, 10)
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction {
-                    toggleRunningDock()
-                }
-                .accessibilityLabel("Running, \(threads.count) active threads across all priority lanes")
-                .accessibilityValue(isRunningExpanded ? "Expanded" : "Collapsed")
-                .accessibilityHint("Double-click to \(isRunningExpanded ? "collapse" : "expand") the running thread list")
-                .help("Double-click to \(isRunningExpanded ? "shrink" : "expand") Running")
             }
 
             Divider()
@@ -757,7 +773,7 @@ public struct DeckContentView: View {
         }
     }
 
-    private func runningSectionHeader(count: Int, expanded: Bool) -> some View {
+    private func runningSectionHeader(count: Int) -> some View {
         HStack(spacing: 7) {
             Image(systemName: "waveform")
                 .font(.caption.weight(.semibold))
@@ -766,6 +782,16 @@ public struct DeckContentView: View {
                 .font(.subheadline.weight(.semibold))
             GajendraStatusCountBadge(count: count, tint: .green)
             Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+    }
+
+    private func runningSectionControl(count: Int, expanded: Bool) -> some View {
+        Button {
+            guard count > 0 else { return }
+            toggleRunningDock()
+        } label: {
             HStack(spacing: 5) {
                 Text("All priority lanes")
                     .lineLimit(1)
@@ -782,9 +808,14 @@ public struct DeckContentView: View {
             .padding(.vertical, 5)
             .background(Color.green.opacity(count > 0 ? 0.09 : 0.035), in: Capsule())
             .overlay(Capsule().stroke(Color.green.opacity(count > 0 ? 0.28 : 0.12), lineWidth: 0.75))
+            .contentShape(Capsule())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
+        .buttonStyle(.plain)
+        .disabled(count == 0)
+        .accessibilityLabel("All priority lanes, Running in Organizer")
+        .accessibilityValue(expanded ? "Expanded" : "Collapsed")
+        .accessibilityHint("Click to \(expanded ? "collapse" : "expand") the running thread list")
+        .help("Click to \(expanded ? "shrink" : "expand") Running")
     }
 
     private func runningRow(_ thread: DeckThread) -> some View {

@@ -54,9 +54,10 @@ Developer ID signing, notarization, or distribution readiness.
   `checkmark.bubble` glyph, label, count, ready time, destination label, and accessibility copy.
   The main review row opens the declared Review or Task destination; its provider badge separately
   opens the owning task. Review metadata remains live-only and Running has overlap precedence.
-- Running and Ready for Review use high-visibility numeric badges. A pointer double-click on either
-  dock header shrinks or expands its rows; a single click is intentionally inert, while the
-  accessibility press action provides the equivalent toggle.
+- Running and Ready for Review use high-visibility numeric badges. Running also exposes an explicit
+  **All priority lanes** control that shrinks or expands its rows on click. A pointer double-click
+  on either dock header remains available; a single click on the header is intentionally inert,
+  while the accessibility press action provides the equivalent header toggle.
 
 ## Local source build procedure
 
@@ -76,9 +77,10 @@ The UI command launches the built app with a temporary isolated store, disabled 
 and a bounded synthetic catalog. It drives the real 60×60 window with stationary, 2 px,
 edit-recovery, AX-press, and edge taps; distinguishes quick task clicks from stationary holds;
 drags the lifted full task row and verifies compact/Organizer cross-lane pointer changes against the
-exact persisted queue order; then exercises the Running/Ready single-click and double-click
-contract. The performance command runs the widget-only portion, enforces the measured
-200 ms popup budget, and rejects any SwiftUI dependency cycle in that journey. Both require a
+exact persisted queue order; then exercises the explicit Running control plus the Running/Ready
+single-click guards and double-click contract. The performance command runs the widget-only
+portion, enforces the measured 200 ms popup budget, and rejects any SwiftUI dependency cycle in
+that journey. Both require a
 logged-in Mac whose invoking test host may post pointer and
 accessibility events; hosted CI compiles the target but does not claim a manual physical journey.
 Bundle readiness is an inspection, not a release authorization: it checks source-controlled bundle

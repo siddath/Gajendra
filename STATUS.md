@@ -27,7 +27,7 @@ reconciliations do not change that implementation baseline. Hosted proof remains
 | Area | Current source/local state | Boundary that remains open |
 | --- | --- | --- |
 | Focus surface | The floating launcher, Dock reopen, and menu-bar item now lead to the compact focus card; Organizer is explicit. Compact rows show thread metadata without a permanent menu/drag handle. A quick task click remains Open; a stationary hold selects the row, and continuing the same press lifts its visible preview for full-row drag. Each successful drop remains one atomic `move-before` mutation. | The exact installed ad-hoc build passed the isolated pointer journey; physical human-pointer and VoiceOver journeys remain separate evidence. |
-| Running | Explicit provider-reported activity appears across every priority lane without changing priority. The count uses a high-visibility badge and the dock shrinks or expands on double-click. | Do not infer activity from age or resumability. |
+| Running | Explicit provider-reported activity appears across every priority lane without changing priority. The count uses a high-visibility badge; the explicit **All priority lanes** control and a dock-header double-click both shrink or expand the list. | Do not infer activity from age or resumability. |
 | Ready for Review | A validated configured catalog or the current local Codex app-server's zero-message newest-turn metadata can provide a live-only review signal with exact Review/Task destinations and Running precedence. Opening does not clear it; visible compact surfaces recheck while idle. The count uses a high-visibility badge and the dock shrinks or expands on double-click. | Claude Code, Cursor, and Grok are not guessed ready from recency, idle, or resumability; remote credentials/network adapters do not exist. |
 | Launcher reopen | The real 60×60 macOS launcher handles clicks directly in AppKit, prewarms the card, and refreshes after reveal. Stationary click, 2-pixel click, move/edit recovery, accessibility press, and outer-edge automation pass. Five consecutive fresh-process journeys measured 81–93 ms cold/warm and 25–62 ms prewarmed against a 200 ms budget, versus the reproduced 454–552 ms pre-fix baseline. | This is isolated local automation on the current host, not every physical pointer, machine-load profile, or VoiceOver journey. |
 | Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists its own priority metadata, not titles, prompts, transcripts, credentials, review content, or provider databases. | Installed-provider and clean-account proof remain separate. |
@@ -62,6 +62,9 @@ The implementation now merged through PR #17 passed locally on 2026-08-19:
   accessibility press, outer-edge target, selected/lifted compact full-row drag, and Organizer cross-lane
   pointer drags with exact persisted order, single-click dock guards, and Running/Ready double-click
   collapse/expand passed on the exact PR #17 implementation candidate and its installed ad-hoc bundle.
+  The current local build additionally proves pointer collapse/expand through the explicit Running
+  **All priority lanes** control in both the compact card and Organizer while retaining the header
+  double-click route.
   The journey also enters and clears Search through real key events and proves filtered/default
   content. The visible-only refresh lifecycle is covered by source wiring review and the native
   lifecycle-policy self-test, not by runtime timer instrumentation in the installed journey.
