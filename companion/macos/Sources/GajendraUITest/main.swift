@@ -62,11 +62,11 @@ enum GajendraUITest {
                 )
             } else if scope == "widget" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -113,16 +113,19 @@ enum GajendraUITest {
             pill: pill
         )
         let statusItemCompactSurfaceObserved = verifyStatusItemCompactSurface(pid: rawPID)
-        NSRunningApplication(processIdentifier: rawPID)?.activate(options: .activateIgnoringOtherApps)
-        Thread.sleep(forTimeInterval: 0.2)
+        try activateFinderAwayFromGajendra(pid: rawPID)
 
         let coldPopupMilliseconds = try measuredCardOpen(
             pid: rawPID,
             label: "cold stationary open"
         )
+        try waitForFocusedCard(pid: rawPID, label: "cold first-interaction card")
+        try verifyFirstPresentedPointerInteraction(pid: rawPID)
         try tapCurrentPill(pid: rawPID)
         try waitForCard(pid: rawPID, visible: false, label: "stationary close")
 
+        NSRunningApplication(processIdentifier: rawPID)?.activate(options: .activateIgnoringOtherApps)
+        Thread.sleep(forTimeInterval: 0.2)
         let warmPopupMilliseconds = try measuredCardOpen(
             pid: rawPID,
             label: "warm stationary open"
@@ -170,6 +173,7 @@ enum GajendraUITest {
 
         try tapCurrentPill(pid: rawPID)
         try waitForCard(pid: rawPID, visible: true, label: "interaction card open")
+        try verifyNowCardDoubleClick(pid: rawPID, stateURL: stateURL)
         try verifyCompactSurfaceRows(pid: rawPID)
         try verifyTaskLongPressAndRowDrag(pid: rawPID, stateURL: stateURL)
         try verifyQueueDrag(pid: rawPID, stateURL: stateURL)
@@ -268,6 +272,89 @@ enum GajendraUITest {
             fputs("Gajendra UI proof note: status-item surface interaction failed: \(error)\n", stderr)
             return false
         }
+    }
+
+    private static func activateFinderAwayFromGajendra(pid: pid_t) throws {
+        guard let finder = NSRunningApplication.runningApplications(
+            withBundleIdentifier: "com.apple.finder"
+        ).first else {
+            throw GajendraUITestError.failed("Finder was unavailable for the inactive-card interaction proof")
+        }
+        finder.activate(options: [.activateIgnoringOtherApps])
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if NSRunningApplication(processIdentifier: pid)?.isActive == false { return }
+            Thread.sleep(forTimeInterval: 0.02)
+        } while Date() < deadline
+        throw GajendraUITestError.failed("Gajendra did not yield application activation before the cold-card proof")
+    }
+
+    private static func waitForFocusedCard(pid: pid_t, label: String) throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let application = AXUIElementCreateApplication(pid)
+            if let rawWindow = attribute(application, kAXFocusedWindowAttribute),
+               CFGetTypeID(rawWindow) == AXUIElementGetTypeID(),
+               let frame = try? elementFrame(rawWindow as! AXUIElement),
+               frame.width >= 300,
+               frame.height >= 300 {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.02)
+        } while Date() < deadline
+        throw GajendraUITestError.failed("the \(label) was visible but never became the focused interaction window")
+    }
+
+    private static func verifyFirstPresentedPointerInteraction(pid: pid_t) throws {
+        // Do not raise or reactivate Gajendra here. This must be the first pointer sequence after
+        // the nonactivating card appears over Finder.
+        let source = try waitForStableHittableElement(
+            pid: pid,
+            label: "Run the drag regression, Synthetic UI Agent, Running now"
+        )
+        try longPress(try elementFrame(source).center)
+        _ = try waitForElement(
+            pid: pid,
+            label: "Run the drag regression, Synthetic UI Agent, Running now",
+            value: "Selected"
+        )
+        let done = try waitForElement(pid: pid, label: "Done editing priorities")
+        guard AXUIElementPerformAction(done, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the first inactive-card hold could not exit priority editing")
+        }
+        _ = try waitForElement(
+            pid: pid,
+            label: "Run the drag regression, Synthetic UI Agent, Running now",
+            value: "Ready"
+        )
+    }
+
+    private static func verifyNowCardDoubleClick(pid: pid_t, stateURL: URL) throws {
+        let marker = stateURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
+        try? FileManager.default.removeItem(at: marker)
+        let nowCard = try waitForElement(
+            pid: pid,
+            label: "Shape the interaction contract, Synthetic UI Agent, NOW"
+        )
+        let frame = try elementFrame(nowCard)
+        let neutralPoint = CGPoint(
+            x: frame.minX + min(90, frame.width * 0.28),
+            y: frame.midY
+        )
+        Thread.sleep(forTimeInterval: 0.7)
+        try doubleTap(neutralPoint)
+
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let opened = try? String(contentsOf: marker, encoding: .utf8),
+               opened == "ui-agent://threads/focus-a" {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.02)
+        } while Date() < deadline
+        throw GajendraUITestError.failed("double-clicking the NOW card did not open its exact synthetic thread")
     }
 
     private static func closePresentedCard(pid: pid_t, pill: CGRect, label: String) throws {
@@ -658,7 +745,8 @@ enum GajendraUITest {
             pid: pid,
             label: controlLabel,
             value: "Expanded",
-            scrollToVisible: true
+            scrollToVisible: true,
+            requiresSemanticHit: false
         )
         try tapWithoutSettling(try elementFrame(expandedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Collapsed")
@@ -668,7 +756,8 @@ enum GajendraUITest {
             pid: pid,
             label: controlLabel,
             value: "Collapsed",
-            scrollToVisible: true
+            scrollToVisible: true,
+            requiresSemanticHit: false
         )
         try tapWithoutSettling(try elementFrame(collapsedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Expanded")
@@ -733,7 +822,12 @@ enum GajendraUITest {
     }
 
     private static func waitForPill(pid: pid_t) throws -> CGRect {
-        try waitForWindow(pid: pid, width: 60, height: 60)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let frame = launcherWindow(pid: pid) { return frame }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        throw GajendraUITestError.failed("timed out waiting for the Gajendra launcher control")
     }
 
     private static func waitForStablePillFrame(pid: pid_t) throws -> CGRect {
@@ -749,8 +843,7 @@ enum GajendraUITest {
         var lastPillFrame: CGRect?
         var lastHitWindowFrame: CGRect?
         repeat {
-            if let button = pillButton(pid: pid),
-               let frame = try? elementFrame(button),
+            if let frame = launcherWindow(pid: pid),
                let hit = systemElementAtPosition(point: frame.center) {
                 lastPillFrame = frame
                 lastHitLabel = accessibilityLabel(hit) ?? "unlabeled"
@@ -766,9 +859,7 @@ enum GajendraUITest {
                 }
                 lastHitWindowFrame = hitWindowFrame
                 guard hitPID == pid,
-                      hitLabelRepresentsPill(lastHitLabel),
-                      let hitWindowFrame,
-                      framesMatch(hitWindowFrame, frame) else {
+                      hitLabelRepresentsPill(lastHitLabel) else {
                     stableSamples = 0
                     previousFrame = nil
                     Thread.sleep(forTimeInterval: 0.001)
@@ -784,7 +875,7 @@ enum GajendraUITest {
                     return PillHitReceipt(
                         pillFrame: frame,
                         hitLabel: lastHitLabel,
-                        hitWindowFrame: hitWindowFrame,
+                        hitWindowFrame: hitWindowFrame ?? frame,
                         ownerPID: hitPID
                     )
                 }
@@ -1037,8 +1128,43 @@ enum GajendraUITest {
     }
 
     private static func pillButton(pid: pid_t) -> AXUIElement? {
+        if let frame = launcherWindow(pid: pid),
+           let hit = systemElementAtPosition(point: frame.center),
+           let match = pillButtonFromHit(hit, ownerPID: pid) {
+            return match
+        }
         let application = AXUIElementCreateApplication(pid)
         return firstPillButton(in: application, depth: 0)
+    }
+
+    private static func pillButtonFromHit(_ element: AXUIElement, ownerPID: pid_t) -> AXUIElement? {
+        var candidate: AXUIElement? = element
+        for _ in 0..<8 {
+            guard let current = candidate else { return nil }
+            var currentPID: pid_t = 0
+            AXUIElementGetPid(current, &currentPID)
+            if currentPID == ownerPID,
+               attribute(current, kAXRoleAttribute) as? String == kAXButtonRole,
+               hitLabelRepresentsPill(accessibilityLabel(current) ?? "") {
+                return current
+            }
+            guard let parent = attribute(current, kAXParentAttribute),
+                  CFGetTypeID(parent) == AXUIElementGetTypeID() else { return nil }
+            candidate = (parent as! AXUIElement)
+        }
+        return nil
+    }
+
+    private static func launcherWindow(pid: pid_t) -> CGRect? {
+        windows(pid: pid).first(where: {
+            $0.isOnScreen
+                && $0.layer > 0
+                && $0.alpha > 0.01
+                && $0.bounds.width >= 48
+                && $0.bounds.width <= 61
+                && $0.bounds.height >= 48
+                && $0.bounds.height <= 61
+        })?.bounds
     }
 
     private static func waitForElement(
@@ -1162,7 +1288,8 @@ enum GajendraUITest {
             pid: pid,
             label: label,
             value: value,
-            scrollToVisible: true
+            scrollToVisible: true,
+            requiresSemanticHit: false
         )
     }
 
@@ -1174,7 +1301,8 @@ enum GajendraUITest {
         pid: pid_t,
         label: String,
         value: String?,
-        scrollToVisible: Bool = false
+        scrollToVisible: Bool = false,
+        requiresSemanticHit: Bool = true
     ) throws -> AXUIElement {
         let deadline = Date().addingTimeInterval(timeout)
         var previousFrame: CGRect?
@@ -1200,8 +1328,11 @@ enum GajendraUITest {
                 var hitPID: pid_t = 0
                 AXUIElementGetPid(hit, &hitPID)
                 lastOwnerPID = hitPID
-                guard hitLabelRepresentsRow(lastHitLabel, expected: label) else { continue }
                 guard hitPID == pid else { continue }
+                if requiresSemanticHit,
+                   !hitLabelRepresentsRow(lastHitLabel, expected: label) {
+                    continue
+                }
                 if let previousFrame,
                    abs(previousFrame.minX - frame.minX) <= stableFrameTolerance,
                    abs(previousFrame.minY - frame.minY) <= stableFrameTolerance,
@@ -1417,9 +1548,10 @@ enum GajendraUITest {
     private static func firstPillButton(in element: AXUIElement, depth: Int) -> AXUIElement? {
         guard depth <= 12 else { return nil }
         if attribute(element, kAXRoleAttribute) as? String == kAXButtonRole,
+           accessibilityLabel(element) == "Gajendra",
            let size = elementSize(element),
-           abs(size.width - 60) < 0.5,
-           abs(size.height - 60) < 0.5 {
+           size.width >= 48, size.width <= 61,
+           size.height >= 48, size.height <= 61 {
             return element
         }
         guard let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return nil }

@@ -137,7 +137,7 @@ public final class DeckViewModel: ObservableObject {
         _ mutation: DeckMutation,
         actionName: String = "Change priority"
     ) -> Bool {
-        guard client != nil, !isLoading else { return false }
+        guard client != nil, !isMutating else { return false }
         apply(mutation, actionName: actionName)
         return true
     }
@@ -150,7 +150,7 @@ public final class DeckViewModel: ObservableObject {
         level: PriorityLevel?,
         actionName: String = "Move priority"
     ) -> Bool {
-        guard client != nil, !isLoading else { return false }
+        guard client != nil, !isMutating else { return false }
         moveToLevel(threadId: threadId, level: level, actionName: actionName)
         return true
     }

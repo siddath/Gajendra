@@ -46,8 +46,8 @@ toggle a source or rescan.
 4. Glance at **Running** for active provider work and **Ready for Review** for explicit completed
    work that needs human attention.
    Click **All priority lanes** to shrink or expand Running, or double-click either dock header.
-5. Select **Open**, a row, a provider badge, or a Review/Task action to return to the source-owned
-   destination.
+5. Double-click the NOW card, or select **Open**, a row, a provider badge, or a Review/Task action,
+   to return to the source-owned destination.
 6. Use the search field for a title, project, source, context/tag, priority, Running, or Ready
    status; open Organizer when you need the full queues.
 
@@ -57,7 +57,8 @@ toggle a source or rescan.
 
 - Single-click the floating button to toggle the card. The same action recovers from move/hide mode,
   so the launcher should not become a dead end.
-- Double-click the card background to open NOW.
+- Double-click anywhere inside the NOW card to open that exact thread. Double-clicking another dock
+  or blank part of the widget does not substitute a different action.
 - Open the app menu to show or hide the lotus, manage sources, change appearance, or quit.
 - Card size can be Compact, Comfortable, or Expanded. Appearance can follow the system or use an
   explicit light/dark choice.
@@ -130,6 +131,12 @@ npm run companion:ui-performance-test
 
 The second command also reports cold/warm launcher-to-card visibility and fails above the 200 ms
 local regression budget. It uses synthetic metadata and does not read private provider content.
+
+The current source makes the launcher key on demand for the click that targets it and makes the
+nonactivating card pointer-ready as it appears. Focus and Important remain clickable and draggable
+during a read refresh; only an actual priority mutation temporarily blocks another priority change.
+If an older installed copy still needs a priming click, rebuild and replace it with the current
+`build/Gajendra.app`.
 
 ### A task does not move when dragged
 

@@ -48,6 +48,7 @@ private final class GajendraPillHostingView<Content: View>: NSHostingView<Conten
     var accessibilityHelpProvider: (() -> String)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override var needsPanelToBecomeKey: Bool { true }
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .button }
     override func accessibilityLabel() -> String? { GajendraBrandCopy.name }
@@ -123,7 +124,7 @@ enum GajendraMenuBarMain {
 
 @MainActor
 final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
-    let model = DeckViewModel()
+    let model: DeckViewModel
     let visualSettings = GajendraVisualSettings()
     let pillEditController = GajendraPillEditController()
     let cardInteractionSession = GajendraCardInteractionSession()
@@ -166,6 +167,26 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private let pillOriginYKey = "gajendra.pill.origin.y"
     private let pillScreenNumberKey = "gajendra.pill.screen-number"
     private let sourceOnboardingState = GajendraSourceOnboardingState()
+
+    override init() {
+        let environment = ProcessInfo.processInfo.environment
+        if environment["GAJENDRA_UI_TEST_PROBE"] == "1",
+           let dataDirectory = environment["GAJENDRA_DATA_DIR"] {
+            let marker = URL(fileURLWithPath: dataDirectory)
+                .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
+            model = DeckViewModel(deepLinkOpener: { url in
+                do {
+                    try Data(url.absoluteString.utf8).write(to: marker, options: .atomic)
+                    return true
+                } catch {
+                    return false
+                }
+            })
+        } else {
+            model = DeckViewModel()
+        }
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let shouldPresentSourceOnboarding = sourceOnboardingState.shouldPresentOnLaunch(
@@ -539,9 +560,9 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         positionCard()
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || !animated {
             panel.alphaValue = 1
-            panel.orderFrontRegardless()
+            orderCardFront(panel)
         } else {
-            panel.orderFrontRegardless()
+            orderCardFront(panel)
             if !wasVisible { panel.alphaValue = 0 }
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.18
@@ -549,6 +570,15 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 panel.animator().alphaValue = 1
             }
         }
+    }
+
+    private func orderCardFront(_ panel: GajendraOverlayPanel) {
+        panel.orderFrontRegardless()
+        // A nonactivating panel can be key without taking the owning app away from the user's
+        // current tool. Making it key immediately activates SwiftUI tracking areas and ensures
+        // the first click/hold after reveal reaches the intended control instead of priming the
+        // window.
+        if panel.canBecomeKey { panel.makeKey() }
     }
 
     private func prepareCardPanel() {
@@ -571,12 +601,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func refreshPresentedCardAfterReveal() {
         let generation = cardWindow?.cardAnimationGeneration ?? 0
-        let delay = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0 : 0.18
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+        // Yield one main-loop turn so the prebuilt card can paint first. Calling refresh even when
+        // another load is active is intentional: DeckViewModel coalesces it into one follow-up,
+        // which prevents an in-flight launch read from swallowing the visible-surface refresh.
+        DispatchQueue.main.async { [weak self] in
             guard let self,
                   self.cardPresentation.isPresented,
-                  self.cardWindow?.cardAnimationGeneration == generation,
-                  !self.model.isLoading else { return }
+                  self.cardWindow?.cardAnimationGeneration == generation else { return }
             self.model.refresh()
         }
     }
@@ -1195,7 +1226,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func makePillPanel() -> NSPanel {
-        let panel = makeOverlayPanel(title: "Gajendra Focus Pill", size: pillSize, acceptsKeyboardInput: false)
+        // The launcher remains non-activating, but it must become key for the click that targets
+        // it. This is AppKit's intended path for a non-activating panel to handle the first click
+        // without making the user click once to "wake" the widget.
+        let panel = makeOverlayPanel(title: "Gajendra Focus Pill", size: pillSize, acceptsKeyboardInput: true)
+        panel.becomesKeyOnlyIfNeeded = true
         panel.onPointerEvent = { [weak self] event in
             self?.handlePillPointerEvent(event)
         }
@@ -1276,7 +1311,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         panel.contentMaxSize = size
         panel.level = .floating
         panel.isFloatingPanel = true
-        panel.becomesKeyOnlyIfNeeded = true
+        panel.becomesKeyOnlyIfNeeded = !acceptsKeyboardInput
+        panel.acceptsMouseMovedEvents = true
         panel.hidesOnDeactivate = false
         panel.canHide = false
         panel.isReleasedWhenClosed = false

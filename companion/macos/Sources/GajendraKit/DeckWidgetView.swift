@@ -638,18 +638,23 @@ public struct GajendraPillView: View {
     @ViewBuilder
     private var pillSurface: some View {
         let radius: CGFloat = visualSettings.theme == .focusDeck ? 14 : 24
-        if #available(macOS 26.0, *) {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.clear)
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: radius))
-                .background(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.62 : 0.14) : Color.clear, in: RoundedRectangle(cornerRadius: radius))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.16), radius: 12, y: 5)
-        } else {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(RoundedRectangle(cornerRadius: radius).fill(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.58 : 0.14) : (colorScheme == .dark ? Color.gajendraIndigo.opacity(0.28) : Color.white.opacity(0.2))))
-                .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.16), radius: 12, y: 5)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        Group {
+            if #available(macOS 26.0, *) {
+                shape
+                    .fill(.clear)
+                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: radius))
+                    .background(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.62 : 0.14) : Color.clear, in: shape)
+            } else {
+                shape
+                    .fill(.ultraThinMaterial)
+                    .overlay(shape.fill(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.58 : 0.14) : (colorScheme == .dark ? Color.gajendraIndigo.opacity(0.28) : Color.white.opacity(0.2))))
+            }
         }
+        // This view lives inside a fixed 60x60 transparent panel. A wide outer blur is clipped to
+        // that rectangular boundary, which is the occasional rectangular shadow users could see
+        // behind the rounded mark. Keep the material and border, but no window-edge blur.
+        .clipShape(shape)
     }
 
     private var pillBorder: some View {
@@ -1254,10 +1259,6 @@ public struct GajendraHoverCardView: View {
         .onPreferenceChange(GajendraQueueColumnFramePreferenceKey.self) { frames in
             queueDragGeometry.columnFrames = frames
         }
-        .onTapGesture(count: 2) {
-            guard !isQueueEditing else { return }
-            if let current = model.snapshot?.current { model.open(current) }
-        }
         .onExitCommand {
             if isQueueEditing {
                 setQueueEditing(false)
@@ -1335,7 +1336,17 @@ public struct GajendraHoverCardView: View {
                 persistentSearchFooter(total: snapshot.allThreads.count)
                     .allowsHitTesting(!isQueueEditing)
             } else {
-                Spacer(minLength: 6)
+                VStack(spacing: 8 * contentScale) {
+                    if model.isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text(model.isLoading ? "Reading your configured thread sources…" : "No thread data is available yet.")
+                        .font(scaledFont(12, weight: .regular))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                .accessibilityElement(children: .combine)
             }
             footer
                 .padding(.top, 8)
@@ -1578,6 +1589,16 @@ public struct GajendraHoverCardView: View {
             )
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .onHover { isNowHovered = $0 }
+            .onTapGesture(count: 2) {
+                model.open(current)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("\(current.title), \(current.sourceName), NOW")
+            .accessibilityHint("Double-click anywhere on this NOW card to open the thread")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                model.open(current)
+            }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isNowHovered)
         } else if model.isLoading {
             Text("Reading your configured thread sources…")
@@ -1634,7 +1655,7 @@ public struct GajendraHoverCardView: View {
                 .font(scaledFont(10.5, weight: .semibold))
                 .buttonStyle(.bordered)
                 .controlSize(.small)
-                .disabled(model.isLoading)
+                .disabled(queueInteractionBlocked)
                 .accessibilityLabel("Edit priorities")
             }
             .foregroundStyle(.secondary)
@@ -1844,7 +1865,7 @@ public struct GajendraHoverCardView: View {
                     )
                     .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .named("gajendra-hover-card")))
                     .onChanged { value in
-                        guard !model.isLoading,
+                        guard !queueInteractionBlocked,
                               !isQueueEditing || heldQueueThreadId == thread.id || draggingQueueThreadId == thread.id else {
                             return
                         }
@@ -1867,7 +1888,7 @@ public struct GajendraHoverCardView: View {
                         }
                     }
                     .onEnded { value in
-                        guard !model.isLoading else {
+                        guard !queueInteractionBlocked else {
                             heldQueueThreadId = nil
                             selectedQueueThreadId = nil
                             return
@@ -1890,7 +1911,7 @@ public struct GajendraHoverCardView: View {
                         heldQueueThreadId = nil
                     }
                 )
-                .disabled(model.isLoading)
+                .disabled(queueInteractionBlocked)
             }
 
             if isQueueEditing {
@@ -1921,7 +1942,7 @@ public struct GajendraHoverCardView: View {
                             reduceMotion: reduceMotion
                         )
                     )
-                    .disabled(model.isLoading)
+                    .disabled(queueInteractionBlocked)
                     .help("Remove from \(level.title). The task stays in \(thread.sourceName).")
                     .accessibilityIdentifier("gajendra-widget-remove-task")
                     .accessibilityLabel("Remove \(thread.title) from \(level.title)")
@@ -1992,8 +2013,8 @@ public struct GajendraHoverCardView: View {
         targetLevel: PriorityLevel,
         moveActionName: String
     ) -> some View {
-        let canMoveUp = !model.isLoading && index > 0
-        let canMoveDown = !model.isLoading && index < count - 1
+        let canMoveUp = !queueInteractionBlocked && index > 0
+        let canMoveDown = !queueInteractionBlocked && index < count - 1
 
         return content
         .help(isQueueEditing ? "Drag anywhere on the task to reorder, or use the X to remove from \(level.title)" : "Open \(thread.title) in \(thread.sourceName). Hold to select; keep holding to drag.")
@@ -2002,7 +2023,7 @@ public struct GajendraHoverCardView: View {
             "\(thread.title), \(thread.sourceName)\(thread.isRunning ? ", Running now" : thread.isReadyForReview ? ", Ready for Review" : "")"
         )
         .accessibilityValue(
-            model.isLoading
+            queueInteractionBlocked
                 ? "Busy; unavailable"
                 : (draggingQueueThreadId == thread.id
                     ? "Dragging"
@@ -2011,18 +2032,18 @@ public struct GajendraHoverCardView: View {
                         : (selectedQueueThreadId == thread.id ? "Selected" : "Ready")))
         )
         .accessibilityHint(
-            model.isLoading
+            queueInteractionBlocked
                 ? "Priority change in progress. This row is unavailable until it finishes."
                 : (isQueueEditing ? "Priority editing is active. Drag this task or use the remove action." : "Open this thread. Hold to select; keep holding to drag.")
         )
-        .disabled(model.isLoading)
+        .disabled(queueInteractionBlocked)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction {
-            guard !model.isLoading, !isQueueEditing else { return }
+            guard !queueInteractionBlocked, !isQueueEditing else { return }
             model.open(thread)
         }
         .accessibilityAction(named: Text(isQueueEditing ? "Done editing priorities" : "Edit priorities")) {
-            guard !model.isLoading else { return }
+            guard !queueInteractionBlocked else { return }
             setQueueEditing(!isQueueEditing)
         }
         .accessibilityAction(named: Text("Move up")) {
@@ -2040,7 +2061,7 @@ public struct GajendraHoverCardView: View {
             )
         }
         .accessibilityAction(named: Text(moveActionName)) {
-            guard !model.isLoading else { return }
+            guard !queueInteractionBlocked else { return }
             _ = model.performAccessibilityMove(
                 threadId: thread.id,
                 level: targetLevel,
@@ -2048,7 +2069,7 @@ public struct GajendraHoverCardView: View {
             )
         }
         .accessibilityAction(named: Text("Remove from \(level.title)")) {
-            guard !model.isLoading else { return }
+            guard !queueInteractionBlocked else { return }
             removeQueueThread(thread, from: level)
         }
     }
@@ -2069,20 +2090,20 @@ public struct GajendraHoverCardView: View {
         Button("Move Up") {
             model.apply(.move(threadId: thread.id, direction: .up))
         }
-        .disabled(index == 0 || model.isLoading)
+        .disabled(index == 0 || queueInteractionBlocked)
         Button("Move Down") {
             model.apply(.move(threadId: thread.id, direction: .down))
         }
-        .disabled(index == count - 1 || model.isLoading)
+        .disabled(index == count - 1 || queueInteractionBlocked)
         Button(moveActionName) {
             model.moveToLevel(threadId: thread.id, level: targetLevel)
         }
-        .disabled(model.isLoading)
+        .disabled(queueInteractionBlocked)
         Divider()
         Button("Remove from \(level.title)", role: .destructive) {
             removeQueueThread(thread, from: level)
         }
-        .disabled(model.isLoading)
+        .disabled(queueInteractionBlocked)
     }
 
     @ViewBuilder
@@ -2129,7 +2150,7 @@ public struct GajendraHoverCardView: View {
 
     private func moveQueueThread(_ threadId: String, to level: PriorityLevel, before targetId: String?) -> Bool {
         if threadId == targetId { return true }
-        guard !model.isLoading,
+        guard !queueInteractionBlocked,
               let snapshot = model.snapshot,
               !(targetId == nil
                 && snapshot.allThreads.first(where: { $0.id == threadId })?.level == level
@@ -2149,7 +2170,7 @@ public struct GajendraHoverCardView: View {
     }
 
     private func updateQueueDrag(threadId: String, at point: CGPoint) {
-        guard !model.isLoading else { return }
+        guard !queueInteractionBlocked else { return }
         selectedQueueThreadId = threadId
         if draggingQueueThreadId != threadId {
             draggingQueueThreadId = threadId
@@ -2166,7 +2187,7 @@ public struct GajendraHoverCardView: View {
             .highPriorityGesture(
                 DragGesture(minimumDistance: GajendraQueueInteractionTuning.dragMinimumDistance, coordinateSpace: .named("gajendra-hover-card"))
                     .onChanged { value in
-                        guard !model.isLoading else { return }
+                        guard !queueInteractionBlocked else { return }
                         updateQueueDrag(threadId: thread.id, at: value.location)
                     }
                     .onEnded { value in
@@ -2220,6 +2241,13 @@ public struct GajendraHoverCardView: View {
 
     private var queueDragIsActive: Bool {
         isQueueEditing || draggingQueueThreadId != nil
+    }
+
+    private var queueInteractionBlocked: Bool {
+        // A snapshot refresh retains the last valid visible snapshot, and DeckViewModel queues a
+        // resulting priority intent behind that read. Only an actual mutation blocks another
+        // pointer or accessibility priority action.
+        model.isMutating
     }
 
     private var queueMovementAnimation: Animation? {

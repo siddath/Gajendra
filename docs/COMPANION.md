@@ -43,9 +43,16 @@ Developer ID signing, notarization, or distribution readiness.
   2 px tap is not consumed as a drag. The AppKit host exposes one real accessibility button with
   the same recovery action.
 - The pill panel handles the single click directly instead of waiting for a double-click gesture to
-  fail. The card is constructed and laid out during launch; metadata refresh starts after reveal and
-  is skipped when another load is already active. The isolated pre-fix launcher-to-visible-card
-  baseline was 454–552 ms; the current focused runs are 80–94 ms against a 200 ms regression budget.
+  fail. It remains nonactivating and becomes key on demand for the click that targets it, so an
+  inactive app does not consume a priming click. The card is constructed and laid out during launch,
+  becomes the key nonactivating panel on reveal, and accepts mouse movement plus the first pointer
+  sequence immediately. Its reveal refresh coalesces behind an active launch read instead of being dropped. The isolated pre-fix
+  launcher-to-visible-card baseline was 454–552 ms; the current focused runs remain below the 200 ms
+  regression budget.
+- Snapshot reads keep the last valid Focus/Important rows interactive. A priority intent made during
+  that read is queued against the resulting authoritative snapshot; only an in-flight mutation
+  blocks another priority action. Double-click Open is scoped to the NOW card rather than the entire
+  widget background.
 - Running and Ready metadata refresh immediately on reveal and at a conservative cadence only while
   a compact surface is visible. Refresh pauses during search focus, queue editing, drag, loading, or
   mutation and stops when the card/popover closes; Gajendra does not install a hidden always-on
@@ -55,7 +62,7 @@ Developer ID signing, notarization, or distribution readiness.
   The main review row opens the declared Review or Task destination; its provider badge separately
   opens the owning task. Review metadata remains live-only and Running has overlap precedence.
 - Running and Ready for Review use high-visibility numeric badges. Running also exposes an explicit
-  **All priority lanes** control that shrinks or expands its rows on click. A pointer double-click
+  **All priority lanes** control that shrinks or expands its rows on one click. A pointer double-click
   on either dock header remains available; a single click on the header is intentionally inert,
   while the accessibility press action provides the equivalent header toggle.
 
@@ -78,7 +85,9 @@ and a bounded synthetic catalog. It drives the real 60×60 window with stationar
 edit-recovery, AX-press, and edge taps; distinguishes quick task clicks from stationary holds;
 drags the lifted full task row and verifies compact/Organizer cross-lane pointer changes against the
 exact persisted queue order; then exercises the explicit Running control plus the Running/Ready
-single-click guards and double-click contract. The performance command runs the widget-only
+single-click guards and double-click contract. It also opens the card while another app is active,
+proves that the first hold is accepted without a priming click, and verifies that a NOW-card
+double-click opens the exact synthetic destination. The performance command runs the widget-only
 portion, enforces the measured 200 ms popup budget, and rejects any SwiftUI dependency cycle in
 that journey. Both require a
 logged-in Mac whose invoking test host may post pointer and
