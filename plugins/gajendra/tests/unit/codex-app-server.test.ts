@@ -569,7 +569,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it("uses a small bounded rollout worker pool and abandons a whole timed-out enrichment", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-codex-enrichment-"));

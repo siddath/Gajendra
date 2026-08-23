@@ -74,7 +74,7 @@ env \
   -gajendra.onboarding.sources.seen.v1 YES \
   -gajendra.pill.hidden NO \
   -gajendra.visual.hover-card-size compact \
-  -gajendra.visual.pill-anchor top-left \
+  -gajendra.visual.pill-anchor "${GAJENDRA_UI_TEST_PILL_ANCHOR:-top-left}" \
   >"$test_root/app.log" 2>&1 &
 app_pid=$!
 

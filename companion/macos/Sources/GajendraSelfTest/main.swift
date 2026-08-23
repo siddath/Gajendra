@@ -1428,7 +1428,14 @@ enum GajendraSelfTest {
         let model = await DeckViewModel(client: probe)
         let mutation = DeckMutation.setCollapsed(level: .focus, collapsed: true)
         await model.refresh()
-        await model.apply(mutation)
+        let acceptedDuringRefresh = await model.performAccessibilityMutation(
+            mutation,
+            actionName: "Queued during refresh"
+        )
+        try require(
+            acceptedDuringRefresh,
+            "a snapshot refresh incorrectly blocked a priority interaction instead of queueing it"
+        )
 
         for _ in 0..<50 {
             try await Task.sleep(for: .milliseconds(10))

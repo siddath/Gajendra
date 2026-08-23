@@ -26,7 +26,12 @@ const source: ThreadSourceStatus = {
   threadCount: 1,
   detail: null,
 };
-const service = new GajendraService(new GajendraStoreRepository(), {
+// This fixture intentionally starts forty TypeScript/Node processes at once. Give the proof
+// transaction a test-only acquisition window inside its 30 s parent-process deadline so host
+// startup contention cannot be mistaken for a lost-write failure. Product defaults are unchanged.
+const service = new GajendraService(new GajendraStoreRepository(undefined, undefined, {
+  lockTimeoutMs: 20_000,
+}), {
   collect: async () => ({ threads: [thread], sources: [source], error: null }),
   close: async () => undefined,
 });

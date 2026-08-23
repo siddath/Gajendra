@@ -16,6 +16,10 @@
   process-group cleanup, and fail-closed recovery.
 - Added a source-build guide, user/support/security/contribution documentation, synthetic product
   screenshots, deterministic browser/native interaction tests, and local release-readiness checks.
+- Made the compact card pointer-ready on reveal, retained queue interaction during snapshot reads,
+  made the nonactivating launcher become key on demand for its first click, coalesced a reveal
+  refresh behind in-flight launch loading, scoped double-click Open to the NOW card, and removed
+  the clipped launcher blur that could resemble a rectangular shadow.
 - Published source remains separate from binary distribution: Developer ID signing, notarization,
   stapling, Gatekeeper, clean-Mac proof, and mobile implementation are still open gates.
 
