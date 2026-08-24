@@ -13,6 +13,7 @@ import { applyMutation, buildSnapshot } from "./domain.js";
 import { hashIdempotencyKey } from "./idempotency.js";
 import { GajendraStoreRepository } from "./store.js";
 import { ThreadSourceRegistry, type SourceCollection } from "./thread-sources.js";
+import { CODEX_PROVIDER_COLLECTION_ENVELOPE_MS } from "./codex-app-server.js";
 
 type SourceRegistry = Pick<ThreadSourceRegistry, "collect" | "close">;
 type MutationInput = DeckMutation | DeckMutationRequest;
@@ -24,34 +25,45 @@ type MutationAttempt =
 
 const GENERATION_BUSY_MESSAGE = "Gajendra changed repeatedly while sources were loading. Refresh and retry.";
 const MAX_GENERATION_RETRIES = 4;
+/**
+ * The maximum accepted Codex provider envelope is 60.75s: two 15s initialize attempts,
+ * 0.75s bounded fallback teardown, a 20s thread page pass, and the hard-capped 10s runtime
+ * enrichment. Add the initial 5s private store read and round up to a 70s service budget. The
+ * native caller owns a separate margin for confirmation/transaction settling and process output.
+ */
+export const DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS =
+  CODEX_PROVIDER_COLLECTION_ENVELOPE_MS + 9_250;
 
 export type GajendraServiceOptions = {
   /**
-   * Provider work is deliberately outside the store lock. The default uses the store's stale-lock
-   * recovery window, which is longer than ordinary lock acquisition and gives bounded providers
-   * time to return without turning source loading into an unbounded wait.
+   * Provider work is deliberately outside the store lock. The default is derived from the
+   * accepted Codex provider bounds plus the initial store read; callers may still inject a tighter
+   * explicit deadline for a host with a stricter latency contract.
    */
   generationDeadlineMs?: number;
-  /** Overrides the derived retry budget for hosts that intentionally use a longer lock window. */
+  /** Optional bounded retry tuning; it cannot enlarge the fixed source-generation deadline. */
   maxGenerationRetries?: number;
+  /** Deterministic clock seam for deadline regression tests; production uses Date.now. */
+  now?: () => number;
 };
 
 export class GajendraService {
   private readonly generationDeadlineMs: number;
   private readonly maxGenerationRetries: number;
+  private readonly now: () => number;
 
   constructor(
     private readonly store = new GajendraStoreRepository(),
     private readonly sources: SourceRegistry = new ThreadSourceRegistry(),
     options: GajendraServiceOptions = {},
   ) {
-    // A provider collection can consume a full lock window by itself. Use the existing stale-lock
-    // recovery window for the default generation budget rather than truncating it at the shorter
-    // lock-acquisition timeout; callers may still opt into a tighter explicit deadline.
+    // Do not derive this from staleLockMs: the Codex provider can legally outlive that recovery
+    // marker while still staying bounded. An explicit caller deadline remains a tighter opt-in.
+    this.now = options.now ?? Date.now;
     this.generationDeadlineMs = boundedPositive(
       options.generationDeadlineMs,
-      this.store.staleLockMs,
-      Math.max(this.store.lockTimeoutMs, this.store.staleLockMs),
+      DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS,
+      DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS,
     );
     this.maxGenerationRetries = boundedPositive(
       options.maxGenerationRetries,
@@ -64,11 +76,11 @@ export class GajendraService {
     // Provider work stays outside the store lock, then the entire store generation is checked.
     // Source preferences alone are not enough: a concurrent writer can otherwise make returned
     // priority metadata and the source collection describe different store generations.
-    const deadline = Date.now() + this.generationDeadlineMs;
+    const deadline = this.now() + this.generationDeadlineMs;
     const collections: SourceCollectionCache = new Map();
     let retries = 0;
     for (;;) {
-      if (Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      if (this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       const state = await this.store.read();
       let collection: SourceCollection;
       try {
@@ -87,7 +99,7 @@ export class GajendraService {
       if (sameSourcePreferences(confirmed.sourcePreferences, state.sourcePreferences)) {
         return buildSnapshot(confirmed, collection.threads, collection.sources, collection.error);
       }
-      if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       // A changed preference generation invalidates any older collection, even if a later toggle
       // happens to restore the same values. Only an unchanged generation may be coalesced.
       collections.clear();
@@ -105,11 +117,11 @@ export class GajendraService {
     // compared inside it. A changed source preference causes a fresh collection/retry; a priority
     // only write is safely derived from the transaction's current generation using the same
     // source collection, so it does not repeatedly invoke a slow provider.
-    const deadline = Date.now() + this.generationDeadlineMs;
+    const deadline = this.now() + this.generationDeadlineMs;
     const collections: SourceCollectionCache = new Map();
     let retries = 0;
     for (;;) {
-      if (Date.now() >= deadline) return this.storeBusyResult();
+      if (this.now() >= deadline) return this.storeBusyResult();
       const stateForSources = await this.store.read();
       let collection: SourceCollection;
       try {
@@ -171,7 +183,7 @@ export class GajendraService {
         }, next);
       });
       if (attempt.retry) {
-        if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.storeBusyResult();
+        if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.storeBusyResult();
         collections.clear();
         retries += 1;
         continue;
@@ -218,9 +230,12 @@ export class GajendraService {
     const key = sourcePreferencesKey(preferences);
     const cached = collections.get(key);
     if (cached) return cached;
-    const remaining = deadline - Date.now();
+    const remaining = deadline - this.now();
     if (remaining <= 0) throw new GenerationDeadlineError();
     const collection = await completeBeforeDeadline(this.collect(preferences), remaining);
+    // The timer protects real elapsed time; the injected clock makes a provider that resolves
+    // after the absolute budget observable in deterministic tests as the same safe fallback.
+    if (this.now() >= deadline) throw new GenerationDeadlineError();
     collections.set(key, collection);
     return collection;
   }

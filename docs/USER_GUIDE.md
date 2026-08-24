@@ -101,10 +101,11 @@ Ready for Review is live provider evidence, not an unread badge. The current loc
 path requests only the newest turn's status and completion time with message items explicitly not
 loaded. A valid completed turn appears until a newer turn changes the evidence; opening the thread
 does not clear it. An otherwise exact safe `completedAt: null` response is candidate-local omitted
-evidence, so it does not make that one thread Ready. Malformed, private-content, error, unsupported,
-or ambiguous responses suppress the built-in Ready batch fail-closed. Claude Code, Cursor, and Grok
-are not guessed from idle time or resumability. Configured sources may still supply the validated
-signal directly.
+evidence, so it does not make that one thread Ready. Malformed, private-content, unsupported,
+ambiguous, or purported-completed responses with an error suppress the built-in Ready batch
+fail-closed. A structurally valid active, failed, or interrupted newest turn is candidate-local
+non-Ready evidence. Claude Code, Cursor, and Grok are not guessed from idle time or resumability.
+Configured sources may still supply the validated signal directly.
 
 The review row opens the declared **Review** or **Task** destination; the provider badge separately
 opens the owning task. Its highlighted badge shows the number needing attention. Double-click the

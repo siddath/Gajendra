@@ -27,18 +27,24 @@
 - Added isolated persistence and real-window interaction coverage for those actions, including
   primary Open-target separation, NOW immobility, drag/drop coexistence, and a same-host performance
   comparison against the pre-change revision.
-- Enforced the NOW guard below every native surface and the public mutation service: a direct lane
-  change cannot demote or remove NOW, while an atomic Make-NOW/Undo operation may name a valid
-  replacement. Updated host preflight to validate the current private store schema version.
+- Enforced the NOW guard below every native surface, the standalone MCP web surface, and the public
+  mutation service: a direct lane change cannot demote or remove NOW, while an atomic Make-NOW/Undo
+  operation may name a valid replacement. Updated host preflight to validate the current private
+  store schema version.
 - Clarified the Ready evidence boundary: an otherwise exact `completedAt: null` response is
-  candidate-local omitted evidence, while malformed, private-content, error, unsupported, or
-  ambiguous responses fail the built-in review batch closed. Ready is provider completion rather
-  than unread state, and a valid provider completion moves from Running to Ready on refresh.
+  candidate-local omitted evidence, while malformed, private-content, unsupported, ambiguous, or
+  purported-completed responses with an error fail the built-in review batch closed. Valid active,
+  failed, and interrupted turns remain candidate-local non-Ready evidence. Ready is provider
+  completion rather than unread state, and a valid provider completion moves from Running to Ready
+  on refresh.
 - Fixed an outer refresh-budget race that could return an empty safe fallback while a bounded Codex
-  collection was still completing. Provider collection now uses the store's existing bounded
-  stale-lock recovery window by default instead of the shorter lock-acquisition timeout, and the
-  native subprocess watchdog covers that budget, two bounded store settlements, and a final
-  startup/output margin.
+  collection was still completing. The accepted provider envelope is 60.75 seconds, with tighter-only
+  RPC overrides and a four-worker source-collection floor; the source-generation budget rounds to
+  70 seconds instead of inheriting the store's stale-lock marker. At 85 seconds the native
+  subprocess watchdog starts TERM/KILL; bounded process-group and pipe cleanup follows, so this is
+  not a response-by-85s SLO.
+- Mitigated browser automation collisions with stale local previews by selecting a bounded OS-assigned
+  loopback port when no explicit `GAJENDRA_E2E_PORT` is supplied; valid explicit ports remain exact.
 - Published source remains separate from binary distribution: Developer ID signing, notarization,
   stapling, Gatekeeper, clean-Mac proof, and mobile implementation are still open gates.
 

@@ -6,7 +6,7 @@ records on 2026-08-24. The run covers repository scripts, static/behavior/build/
 MCP, companion self-test/build/real-window launcher/live checks, measured widget performance,
 direct Running/Ready priority actions, NOW immobility, pointer queue edits and dock interaction,
 browser UI, repeated reliability checks, final artifacts, and dependency audit. Its current receipt
-includes 101/101 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
+includes 106/106 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
 85/85 repeated browser journeys.
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,

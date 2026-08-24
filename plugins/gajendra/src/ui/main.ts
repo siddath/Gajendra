@@ -47,6 +47,7 @@ let app: App | null = null;
 let busy = false;
 let runningExpanded = true;
 let reviewExpanded = true;
+let draggedThreadId: string | null = null;
 const fixtureNow = new Date("2026-08-11T15:00:00.000Z").valueOf();
 
 applyVisualPreferences();
@@ -222,8 +223,8 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
       ${contextSelector(thread)}
       ${thread.level === "focus" && !thread.isCurrent ? actionButton("Make Now", "current", thread.id) : ""}
       ${moveButtons(thread.id, index, count)}
-      ${thread.level === "focus" ? actionButton("Important", "level-important", thread.id) : actionButton("Focus", "level-focus", thread.id)}
-      ${actionButton("Remove", "level-none", thread.id)}
+      ${thread.isCurrent ? "" : thread.level === "focus" ? actionButton("Important", "level-important", thread.id) : actionButton("Focus", "level-focus", thread.id)}
+      ${thread.isCurrent ? "" : actionButton("Remove", "level-none", thread.id)}
     </div>
   </li>`;
 }
@@ -331,8 +332,9 @@ function reviewMark(thread: DeckThread): string {
 }
 
 function threadActions(thread: DeckThread): string {
+  if (thread.isCurrent) return "";
   return [
-    thread.isCurrent ? "" : actionButton("Make Now", "current", thread.id),
+    actionButton("Make Now", "current", thread.id),
     thread.level === "important" ? "" : actionButton("Important", "level-important", thread.id),
     thread.level === "focus" ? "" : actionButton("Focus", "level-focus", thread.id, true),
     thread.level ? actionButton("Remove", "level-none", thread.id) : "",
@@ -519,6 +521,7 @@ function bindDragAndDrop(): void {
     row.addEventListener("dragstart", (event) => {
       const threadId = row.dataset.threadId;
       if (!threadId || !event.dataTransfer) return;
+      draggedThreadId = threadId;
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", threadId);
       row.classList.add("is-dragging");
@@ -529,6 +532,12 @@ function bindDragAndDrop(): void {
   root.querySelectorAll<HTMLElement>(".deck-section[data-drop-level]").forEach((sectionElement) => {
     sectionElement.addEventListener("dragover", (event) => {
       if (busy || !event.dataTransfer?.types.includes("text/plain")) return;
+      const level = sectionElement.dataset.dropLevel as PriorityLevel | undefined;
+      if (!level || (snapshot?.current?.id === draggedThreadId && level !== "focus")) {
+        event.dataTransfer.dropEffect = "none";
+        clearDropTargets();
+        return;
+      }
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
       clearDropTargets();
@@ -555,6 +564,7 @@ function clearDropTargets(): void {
 }
 
 function clearDragState(): void {
+  draggedThreadId = null;
   root.querySelectorAll(".is-dragging, .is-drop-target, .is-drop-zone").forEach((element) => {
     element.classList.remove("is-dragging", "is-drop-target", "is-drop-zone");
   });
@@ -562,6 +572,7 @@ function clearDragState(): void {
 
 async function moveDroppedThread(threadId: string, level: PriorityLevel, beforeId?: string): Promise<void> {
   if (!snapshot || busy || !allDeckThreads(snapshot).some((candidate) => candidate.id === threadId)) return;
+  if (snapshot.current?.id === threadId && level !== "focus") return;
   if (beforeId === threadId) return;
   await mutate("gajendra_move_before", {
     threadId,
@@ -688,6 +699,7 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
   if (tool === "gajendra_move_before") {
     const level = args.level === "focus" || args.level === "important" ? args.level : null;
     const beforeId = typeof args.beforeThreadId === "string" ? args.beforeThreadId : null;
+    if (snapshot.current?.id === id && level !== "focus") return;
     snapshot.focus = snapshot.focus.filter((thread) => thread.id !== id);
     snapshot.important = snapshot.important.filter((thread) => thread.id !== id);
     snapshot.available = snapshot.available.filter((thread) => thread.id !== id);
@@ -733,8 +745,10 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
     snapshot.focus.unshift(target);
     snapshot.current = target;
   } else if (tool === "gajendra_set_level") {
+    const level = args.level === "focus" || args.level === "important" ? args.level : null;
+    if (snapshot.current?.id === id && level !== "focus") return;
     target.isCurrent = false;
-    target.level = (args.level as PriorityLevel | null) ?? null;
+    target.level = level;
     if (!target.level) target.context = null;
     (target.level === "focus" ? snapshot.focus : target.level === "important" ? snapshot.important : snapshot.available).push(target);
     if (snapshot.current?.id === id) {

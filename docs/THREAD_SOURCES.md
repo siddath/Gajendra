@@ -16,19 +16,28 @@ have hard bounds. Process collection stops retaining stdout after its cap/timeou
 TERM-to-KILL/close settlement for an uncooperative child. A provider failure leaves the safe base
 status instead of exposing partial/private data.
 
+Source adapters run with a four-worker floor and an eight-worker hard cap, so a lower
+`GAJENDRA_SOURCE_COLLECTION_CONCURRENCY` value cannot serialize the default-enabled Cursor pass
+after Codex and invalidate the derived generation envelope.
+
 Source preference generation is part of a collection result. The service verifies that generation
 before returning or mutating a snapshot; under sustained change it uses a bounded retry/deadline
 and returns a typed safe busy/error response instead of a stale success.
 
-The outer collection budget defaults to the store's existing 30-second stale-lock recovery window,
-not its 5-second lock-acquisition timeout. This avoids discarding a valid bounded provider result
-that is still loading after five seconds. It remains an overall safe-fallback budget, not a promise
-that every provider will finish, and the provider-specific row, byte, worker, and deadline bounds
-continue to apply inside it.
+The outer source-generation budget defaults to a derived 70-second provider/store envelope, not the
+store's 30-second stale-lock recovery window or its 5-second lock-acquisition timeout. Accepted
+Codex bounds cover experimental initialize, bounded fallback teardown, baseline initialize, listing,
+and the hard-capped runtime enrichment; the initial store read is included before provider work.
+This remains an overall safe-fallback budget, not a hard end-to-end snapshot ceiling: lock
+acquisition for a later store operation is capped at five seconds, while the filesystem operation
+itself remains under the native process watchdog. Provider-specific row, byte, worker, and deadline
+bounds continue to apply inside the generation budget. Explicit `generationDeadlineMs` callers may
+choose a tighter bound.
 
-The macOS client gives the local service a 45-second subprocess watchdog. That covers the
-30-second generation budget, up to two bounded five-second store settlements after collection, and
-a final bounded five-second margin for process startup, response encoding, and shutdown.
+The macOS client gives the local service an 85-second subprocess watchdog over the 70-second
+source-generation budget and later store/process work. At the threshold it initiates TERM/KILL;
+process-group and pipe-drain cleanup follows. Treat 85 seconds as a termination threshold, not a
+strict response-by SLO.
 
 ## Running
 
@@ -60,10 +69,10 @@ is not Running. An otherwise exact safe response with `completedAt: null` is can
 evidence: it contributes no Ready signal for that one candidate but does not expose content or
 discard another independently valid candidate. Up to the existing 200 newest background candidates
 are checked by a four-worker, five-second bounded pass. An unsupported method, deadline, malformed
-or private-content response, returned item, declared error, or invalid/future timestamp suppresses
-the whole built-in review batch fail-closed. A structurally valid empty, active, or interrupted
-newest turn contributes no Ready signal without being treated as a private/protocol-error batch
-failure.
+or private-content response, returned item, error on a purported completed turn, or invalid/future
+timestamp suppresses the whole built-in review batch fail-closed. A structurally valid empty,
+active, failed, or interrupted newest turn contributes no Ready signal without exposing its error
+detail or being treated as a private/protocol-error batch failure.
 
 Claude Code, Cursor, and Grok do not currently emit built-in review readiness. Gajendra does not
 translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review signal. Remote

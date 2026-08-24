@@ -13,7 +13,12 @@ import {
   type ThreadSourceStatus,
 } from "../../src/shared/contracts.js";
 import { applyMutation, buildSnapshot, canonicalThreadId, normalizeStore } from "../../src/server/domain.js";
-import { resolveRpcTimeout } from "../../src/server/codex-app-server.js";
+import {
+  clampCodexRpcTimeout,
+  CODEX_PROVIDER_COLLECTION_ENVELOPE_MS,
+  resolveRpcTimeout,
+} from "../../src/server/codex-app-server.js";
+import { DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS } from "../../src/server/service.js";
 
 const now = new Date("2026-08-12T12:00:00.000Z");
 const sources: ThreadSourceStatus[] = [
@@ -272,8 +277,18 @@ describe("Gajendra domain", () => {
 
   it("uses a bounded, configurable app-server request timeout with legacy compatibility", () => {
     expect(resolveRpcTimeout({})).toBe(15_000);
-    expect(resolveRpcTimeout({ GAJENDRA_RPC_TIMEOUT_MS: "25000" })).toBe(25_000);
-    expect(resolveRpcTimeout({ AADI_RPC_TIMEOUT_MS: "18000" })).toBe(18_000);
+    expect(resolveRpcTimeout({ GAJENDRA_RPC_TIMEOUT_MS: "12000" })).toBe(12_000);
+    expect(resolveRpcTimeout({ GAJENDRA_RPC_TIMEOUT_MS: "25000" })).toBe(15_000);
+    expect(resolveRpcTimeout({ AADI_RPC_TIMEOUT_MS: "18000" })).toBe(15_000);
+    expect(resolveRpcTimeout({ PRIORITY_DECK_RPC_TIMEOUT_MS: "17000" })).toBe(15_000);
+    expect(clampCodexRpcTimeout(5_000)).toBe(5_000);
+    expect(clampCodexRpcTimeout(25_000)).toBe(15_000);
+  });
+
+  it("derives the source-generation envelope from accepted provider bounds", () => {
+    expect(CODEX_PROVIDER_COLLECTION_ENVELOPE_MS).toBe(60_750);
+    expect(DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS).toBe(70_000);
+    expect(DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS).toBeGreaterThan(CODEX_PROVIDER_COLLECTION_ENVELOPE_MS + 5_000);
   });
 });
 

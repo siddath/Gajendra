@@ -59,10 +59,13 @@ readiness.
 - Running and Ready metadata refresh immediately on reveal and at a conservative cadence only while
   a compact surface is visible. Refresh pauses during search focus, queue editing, drag, loading, or
   mutation and stops when the card/popover closes; Gajendra does not install a hidden always-on
-  watcher. The overall source collection uses the existing bounded stale-lock recovery window by
-  default instead of racing the shorter lock-acquisition timeout. The native process watchdog is
-  45 seconds: the service's 30-second overall generation budget, up to two bounded five-second store
-  settlements, and a final five-second startup/output margin. A provider completion changes from
+  watcher. The overall source collection uses a derived 70-second provider/store envelope by
+  default rather than the shorter stale-lock recovery marker: accepted Codex bounds include
+  experimental and baseline initialization, bounded fallback teardown, listing, and the hard-capped
+  runtime enrichment. At 85 seconds the native process watchdog initiates TERM/KILL; bounded
+  process-group and pipe-drain cleanup follows. This is a termination threshold over the
+  source-generation and later store/process work, not a strict response-by-85s SLO.
+  A provider completion changes from
   Running to Ready for Review on refresh only when it has valid Ready evidence; Ready is not an
   unread marker.
 - Ready for Review sits below Running in the same single scroll body. Orange is paired with the

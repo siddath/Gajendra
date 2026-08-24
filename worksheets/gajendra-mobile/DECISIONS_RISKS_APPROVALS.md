@@ -8,20 +8,20 @@
 security invariants; it does not approve a listener, mobile app, OAuth server, dependency, target,
 credential, build, install, signing, distribution, merge, or publication.
 
-This is the human gate for future work. Recommendations are not approvals. Sid owns product,
+This is the human gate for future work. Recommendations are not approvals. The repository owner owns product,
 trust, and distribution choices unless a later record explicitly delegates them.
 
 ## Decision register
 
 | ID | Decision | Recommendation | State | Needed before |
 | --- | --- | --- | --- | --- |
-| D01 | Same-LAN Mac-hosted opt-in relay and privacy/security amendment | Approve bounded v1 spike | Pending Sid | Listener code/enablement |
-| D02 | Open on Mac as only v1 resume behavior | Approve | Pending Sid | Resume integration |
-| D03 | Capacitor v8 plus native transport-plugin spike | Approve with kill gate | Pending Sid | Mobile shell/dependencies |
+| D01 | Same-LAN Mac-hosted opt-in relay and privacy/security amendment | Approve bounded v1 spike | Pending the repository owner | Listener code/enablement |
+| D02 | Open on Mac as only v1 resume behavior | Approve | Pending the repository owner | Resume integration |
+| D03 | Capacitor v8 plus native transport-plugin spike | Approve with kill gate | Pending the repository owner | Mobile shell/dependencies |
 | D04 | SwiftUI plus Compose fallback | Defer unless D03 fails; re-estimate/reapprove | Conditional | Native fallback |
-| D05 | Minimum/current iOS and Android targets | Select from current evidence | Pending Sid | Project generation/CI |
-| D06 | v1 distribution scope | Local/internal physical proof first | Pending Sid | Signing/distribution |
-| D07 | Physical devices and approved LAN | Confirm iPhone, Android, safe LAN | Pending Sid | Physical gate |
+| D05 | Minimum/current iOS and Android targets | Select from current evidence | Pending the repository owner | Project generation/CI |
+| D06 | v1 distribution scope | Local/internal physical proof first | Pending the repository owner | Signing/distribution |
+| D07 | Physical devices and approved LAN | Confirm iPhone, Android, safe LAN | Pending the repository owner | Physical gate |
 | D08 | Cloud/out-of-home access | Reject for v1; separate plan | Rejected for proposed v1 | Public/cloud path |
 | D09 | Mobile source enablement/provider credentials | Reject for v1 | Rejected for proposed v1 | Provider config |
 | D10 | Offline snapshot/notifications/background/widgets | Defer; separate decision | Deferred | Related work |
@@ -92,18 +92,18 @@ implementation-spike questions.
 | --- | --- | --- | --- | --- |
 | R01 | Projection leaks command/path/provider data | Critical | Allow-list DTO, schema, redaction, fuzz/evidence scan | Security |
 | R02 | Mac/MCP/mobile writes silently overwrite | Critical | Lock, revision/CAS, idempotency before mobile write | Server |
-| R03 | LAN listener expands trust boundary | Critical | Off by default, app-owned, approval, pinning/auth review | Sid/security |
+| R03 | LAN listener expands trust boundary | Critical | Off by default, app-owned, approval, pinning/auth review | Owner/security |
 | R04 | Client Open route enables execution | Critical | Canonical ID only, trusted resolver, injection tests | Security/integration |
 | R05 | WebView bypasses native controls | High | Native-only architecture test; Capacitor kill gate | Mobile |
 | R06 | Credentials/snapshots persist on phone | High | Secure credentials only, no cache, inspections | Mobile/security |
 | R07 | TypeScript/Swift/Kotlin contract drift | High | One schema/fixture corpus | All/Sol |
 | R08 | Provider capability overstated | High | Fixture/live/Open/resume labels per provider | Integration |
 | R09 | Simulator substitutes for physical proof | High | Mandatory iPhone/Android UAT | Sol |
-| R10 | Capacitor fails accessibility/lifecycle | High | Bounded spike and native fallback | Mobile/Sid |
+| R10 | Capacitor fails accessibility/lifecycle | High | Bounded spike and native fallback | Mobile/owner |
 | R11 | SDK migration breaks stdio/MCP App | High | Isolated relay and regression gates | Server/integration |
 | R12 | Missing/incompatible toolchains | High | Fail-closed readiness; pin JDK/SDK/Xcode | Integration |
 | R13 | Private evidence enters reports | High | Synthetic fixtures and sanitization review | All |
-| R14 | Scope grows to cloud/widgets/stores | Medium | Explicit non-goals and separate approvals | Sid/Sol |
+| R14 | Scope grows to cloud/widgets/stores | Medium | Explicit non-goals and separate approvals | Owner/orchestrator |
 | R15 | Existing doc drift counts as mobile progress | Medium | Truth-heal only in final docs phase | Docs owner |
 
 ## Historical truth-drift record (resolved)
@@ -125,6 +125,6 @@ implementation-spike questions.
 
 ## Current approval status
 
-No implementation approval is recorded. At resumption, refresh repo/toolchain truth and ask Sid to
+No implementation approval is recorded. At resumption, refresh repo/toolchain truth and ask the repository owner to
 decide D01-D07. Until then, no relay exists, no product dependencies or branches are created, and
 this remains a retained planning artifact.

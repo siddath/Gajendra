@@ -27,8 +27,8 @@ enum GajendraSelfTest {
             "priority edit hold must feel deliberate without delaying drag pickup"
         )
         try require(
-            GajendraProcessLimits.defaultTimeout == 45 && GajendraProcessLimits().timeout == 45,
-            "native watchdog must cover the 30-second service budget, two store settlements, and output margin"
+            GajendraProcessLimits.defaultTimeout == 85 && GajendraProcessLimits().timeout == 85,
+            "native watchdog must cover the 70-second service budget, two store lock acquisitions, teardown, and output margin"
         )
         try require(
             GajendraQueueInteractionTuning.movementTolerance == 4,

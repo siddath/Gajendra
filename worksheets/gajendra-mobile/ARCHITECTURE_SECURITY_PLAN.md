@@ -12,7 +12,7 @@ Enable a phone to view and mutate Gajendra priorities without moving provider cr
 provider discovery, provider session ownership, command execution, or the authoritative store off
 the Mac.
 
-Sid owns approval of the new trust boundary. Stop if it requires a public relay, a second priority
+The repository owner approves the new trust boundary. Stop if it requires a public relay, a second priority
 store, mobile provider credentials, raw provider files, shell input from a phone, or weakened
 transport security.
 
@@ -212,5 +212,5 @@ gajendra.resume.mac. There is no mobile source-write scope.
 6. Security review finds no client-controlled execution or mobile snapshot persistence.
 7. One physical iPhone and Android pass same-LAN privacy and reconnect tests.
 
-Implementation remains blocked until Sid records approval in
+Implementation remains blocked until the repository owner records approval in
 [the decision register](DECISIONS_RISKS_APPROVALS.md).

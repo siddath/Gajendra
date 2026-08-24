@@ -64,7 +64,8 @@ Built-in Codex, Claude Code, Cursor, and Grok adapters provide bounded thread me
 local Codex app-server can additionally supply a zero-message newest-turn summary: Gajendra maps
 only a valid terminal `completed` turn to Ready for Review. An otherwise exact `completedAt: null`
 shape is candidate-local omitted evidence, so that one candidate is not Ready; malformed,
-private-content, error, unsupported, or ambiguous responses fail the built-in Ready batch closed.
+private-content, completed-turn error, unsupported, or ambiguous responses fail the built-in Ready
+batch closed.
 Claude Code, Cursor, and Grok are never guessed ready from idle time, recency, or resumability. An
 explicitly configured bounded catalog can also supply a validated live review signal. Focused unit,
 native self-test, and real-window journeys cover the mixed-candidate review boundary and compact
@@ -105,8 +106,10 @@ For the full daily workflow, interaction reference, configured review example, a
 read the [user guide](docs/USER_GUIDE.md).
 
 To verify the real floating window with privacy-safe synthetic tasks, run `npm run
-companion:ui-test`. `npm run companion:ui-performance-test` separately enforces the measured
-launcher budget and checks the widget journey for SwiftUI dependency cycles.
+companion:ui-test`; the journey includes the same task visibly moving from Running to Ready after
+refresh while its priority and exact destination stay unchanged. `npm run
+companion:ui-performance-test` separately enforces the measured launcher budget and checks the
+widget journey for SwiftUI dependency cycles.
 
 ### Optional: add the Codex plugin
 

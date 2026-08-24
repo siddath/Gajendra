@@ -12,6 +12,7 @@ import {
   parseCursorSessionList,
   readClaudeThreadMetadata,
   readGrokThreadMetadata,
+  resolveSourceCollectionConcurrency,
   selectSourceThreads,
   ThreadSourceRegistry,
   type DiscoveryMeasurement,
@@ -43,10 +44,18 @@ describe("thread source adapters", () => {
         return [threadForSource(`provider-${index}`, `thread-${index}`, index)];
       },
     }));
-    const outcomes = await collectSourceAdapters(adapters, {}, 3);
-    expect(peak).toBeLessThanOrEqual(3);
+    const outcomes = await collectSourceAdapters(adapters, {}, 4);
+    expect(peak).toBeLessThanOrEqual(4);
     expect(outcomes.map((outcome) => outcome.status.id)).toEqual(adapters.map((adapter) => adapter.id));
     expect(outcomes.map((outcome) => outcome.threads[0]?.id)).toEqual(adapters.map((adapter) => `${adapter.id}:thread-${adapter.id.slice("provider-".length)}`));
+  });
+
+  it("keeps source collection concurrency at or above the derived provider-parallelism floor", () => {
+    expect(resolveSourceCollectionConcurrency(1)).toBe(4);
+    expect(resolveSourceCollectionConcurrency(4)).toBe(4);
+    expect(resolveSourceCollectionConcurrency(8)).toBe(8);
+    expect(resolveSourceCollectionConcurrency(12)).toBe(8);
+    expect(resolveSourceCollectionConcurrency("not-a-number")).toBe(4);
   });
 
   it("retains every active thread beyond the ordinary 200-thread history window", () => {

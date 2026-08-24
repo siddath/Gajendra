@@ -2669,7 +2669,9 @@ public struct GajendraHoverCardView: View {
     }
 
     private func reviewReadySummary(_ threads: [DeckThread]) -> some View {
-        LazyVStack(alignment: .leading, spacing: 0) {
+        // Ready is deliberately capped at five compact rows. Keep this bounded disclosure eager
+        // so its stable header remains in the SwiftUI/AX tree while the enclosing card scrolls.
+        VStack(alignment: .leading, spacing: 0) {
             if threads.isEmpty {
                 reviewDisclosureHeader(count: 0, expanded: false)
                 Divider()

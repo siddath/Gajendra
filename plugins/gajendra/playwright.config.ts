@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
+import { parseRequestedE2EPort, resolveE2EPort } from "./src/e2e-port.js";
 
-const requestedPort = Number.parseInt(process.env.GAJENDRA_E2E_PORT ?? "", 10);
-const e2ePort = Number.isSafeInteger(requestedPort) && requestedPort >= 1_024 && requestedPort <= 65_535
-  ? requestedPort
-  : 4_173;
+const requestedPort = parseRequestedE2EPort(process.env.GAJENDRA_E2E_PORT);
+const e2ePort = await resolveE2EPort();
+if (requestedPort === undefined) process.env.GAJENDRA_E2E_PORT = String(e2ePort);
 const e2eOrigin = `http://127.0.0.1:${e2ePort}`;
 
 export default defineConfig({

@@ -25,7 +25,8 @@ as merged until its hosted checks and merged-main checks pass.
 | NOW, Focus, Important | One NOW remains inside Focus. Quick click opens; a stationary hold selects and lifts the visible row, and continuing the same press drags it. Unprioritized status rows use **+** to choose Focus or Important; non-NOW prioritized rows swap lanes in one click. NOW may reorder within Focus but cannot move or be removed through compact, Organizer, Search, accessibility, drag/drop, model, or public mutation routes; make another task NOW first. | Physical human-pointer and VoiceOver journeys remain separate evidence. |
 | Running | Explicit provider-reported activity appears across every priority lane without changing priority. The highlighted count remains visible; **All priority lanes** single-click and dock-header double-click expand or contract the list. | Activity is never inferred from age or resumability. |
 | Ready for Review | Provider-completed work appears independently of priority and opens the exact Task/Review destination. It is completion evidence, not an unread badge; opening does not clear it. A valid completion replaces Running on the next visible refresh. Expanded compact view shows five rows and the exact Organizer overflow. | Codex currently supplies built-in completion evidence; Claude Code, Cursor, and Grok are not guessed ready. |
-| Ready sync fix | One exact safe legacy `completedAt: null` summary is treated as missing evidence for that candidate only. It no longer suppresses valid completed siblings. The 30-second outer collection budget no longer races the shorter lock timeout, and the native caller covers the budget plus bounded store settlement and output margins. Private items, declared errors, malformed shapes, invalid/future timestamps, timeouts, and unsupported metadata still fail the built-in batch closed. | The provider does not expose a trustworthy human opened/unread field, so Gajendra does not claim one. |
+| Ready sync fix | One exact safe legacy `completedAt: null` summary is treated as missing evidence for that candidate only. It no longer suppresses valid completed siblings. The derived 70-second source-generation envelope no longer races the 30-second stale-lock marker; at 85 seconds the native watchdog initiates TERM/KILL, followed by process-group and pipe cleanup. It is not a strict response-by-85s SLO. Private items, errors on purported completed turns, malformed shapes, invalid/future timestamps, timeouts, and unsupported metadata still fail the built-in batch closed. | The provider does not expose a trustworthy human opened/unread field, so Gajendra does not claim one. |
+| Test isolation | Native transition proof mutates only a temporary synthetic catalog. Browser automation selects a bounded OS-assigned loopback port unless an explicit test port is supplied, so an interrupted preview on fixed port `4173` no longer creates that deterministic failure. | Automated real-window proof does not replace physical VoiceOver or clean-Mac testing; a narrow port-release-to-bind race remains possible. |
 | Launcher and performance | The circular launcher has no clipped rectangular blur, recovers the inactive first click, and prewarms the card. Three final widget samples measured median 47 ms prewarmed, 85 ms cold, and 86 ms warm against 58/86/85 ms at the exact pre-change revision; all paths stayed under the local 200 ms budget. | Same-host automation is not a cross-machine performance claim; the system AX tree did not expose the status item. |
 | Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists namespaced IDs and its own priority metadata, not titles, prompts, transcripts, credentials, review bodies, or provider databases. | Installed-provider and clean-account proof remain separate. |
 | Native app | macOS 13.5 source build, bundled Node v24.19.0/notices, service parity, strict ad-hoc codesign verification, and local bundle readiness pass. | Developer ID, notarization, stapling, Gatekeeper, clean-Mac, and binary distribution are not complete. |
@@ -49,7 +50,7 @@ as merged until its hosted checks and merged-main checks pass.
 
 The working candidate passed locally on 2026-08-24:
 
-- `npm run check` — script/release regressions, launch privacy validation, TypeScript, **101/101**
+- `npm run check` — script/release regressions, launch privacy validation, TypeScript, **106/106**
   Vitest tests, deterministic plugin build, and plugin validation passed.
 - A local metadata-only provider probe confirmed that valid completed candidates remain visible
   when an unrelated legacy candidate has no completion timestamp. No live workload counts, task
@@ -57,11 +58,13 @@ The working candidate passed locally on 2026-08-24:
 - `npm run companion:test` and `npm run companion:build` — native model/source invariants, isolated
   persistence/undo paths, bundled runtime, service parity, and strict ad-hoc signature checks passed.
 - `npm run companion:ui-test` — full synthetic real-window journey passed with
-  `priorityActions:true`, `readyPriorityActions:true`, and `organizerNowGuard:true`, including
+  `priorityActions:true`, `readyPriorityActions:true`, `organizerNowGuard:true`, and
+  `runningToReadyTransition:true`, including
   inactive-first-click recovery, reopen, quick Open versus long-press/drag, direct Ready/Running
-  priority changes, unchanged NOW, dock controls, Search, and Organizer drag/drop. The exact final
-  full run measured 35 ms prewarmed, 80 ms cold, and 86 ms warm; the focused widget run measured
-  32/86/81 ms.
+  priority changes, the same visible row moving from Running to Ready on refresh, unchanged NOW,
+  exact destination opening, dock controls, Search, and Organizer drag/drop. The exact final
+  full run measured 33 ms prewarmed, 84 ms cold, and 89 ms warm; the focused widget run measured
+  64/83/92 ms.
 - `npm run companion:ui-performance-test` — three final widget journeys passed the 200 ms budget
   and dependency-cycle gate. See the
   [same-host comparison](evidence/verification/2026-08-24-priority-actions-performance.md).
@@ -71,7 +74,7 @@ The working candidate passed locally on 2026-08-24:
   correctly reports `distributionReady:false` and ad-hoc signing.
 - `npm run gauntlet` — **20** fail-fast gate receipts passed against the final source candidate,
   including live MCP, native UI, widget performance, **85/85** repeated browser journeys, five
-  repeated 101-test unit runs, final-artifact validation, and dependency audit.
+  repeated 106-test unit runs, final-artifact validation, and dependency audit.
 
 These receipts are local and source-candidate scoped. Hosted green belongs only to the exact PR and
 merged-main revisions. The receipts do not close clean-Mac, physical accessibility, signed
@@ -85,6 +88,9 @@ distribution, mobile, or publication gates.
 - Clean-Mac installation and independent offline-path proof.
 - Physical VoiceOver, status-item accessibility, manual drag, keyboard/system-toggle, and login-item
   receipts.
+- The strict compact-widget journey is cycle-clean, but the longer synthetic journey can still emit
+  an Organizer-path SwiftUI `AttributeGraph` diagnostic after all functional assertions pass; keep
+  this P2 layout diagnostic open for a dedicated Organizer follow-up.
 - Developer ID signing, notarization, stapling, Gatekeeper, archive parity, and distribution proof.
 - Manual owner approval and publication of the LinkedIn post and synthetic hero.
 - Mobile D01–D07 and D11 approvals before any relay or application implementation.

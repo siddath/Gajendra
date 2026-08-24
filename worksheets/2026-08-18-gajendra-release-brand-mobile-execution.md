@@ -115,10 +115,11 @@ writer begins.
   successfully (**17 tests**). The
   focused suite proves the measured 383,665-byte Codex `thread/list limit=100` response fits the
   new 512 KiB default, while default-plus-one and over-1 MiB frames fail generically without a
-  content leak. `npm run probe:live` then observed 8 tools, a reachable Codex app-server, 139
-  available threads at that run, and 4 sources without emitting thread content. One earlier aggregate attempt
-  timed out a frame-overflow assertion under load; the subsequent focused and full success is
-  current local evidence, not a reason to weaken the bound.
+  content leak. `npm run probe:live` then confirmed the metadata-only MCP and reachable Codex
+  app-server paths without emitting thread content; no live workload count or identifier is retained
+  in this public record. One earlier aggregate attempt timed out a frame-overflow assertion under
+  load; the subsequent focused and full success is current local evidence, not a reason to weaken
+  the bound.
 - `npm run gauntlet` then produced a passing current-candidate
   [report](../evidence/gauntlet/report.json) on 2026-08-19: all 20 result records passed across
   repository/static/behavior/build/plugin/live-MCP, companion, real-window launcher UI, measured

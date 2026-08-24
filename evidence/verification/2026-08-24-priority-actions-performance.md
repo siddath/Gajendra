@@ -24,3 +24,8 @@ Ready-for-Review priority mutation paths.
 local budget. This is a same-host regression receipt, not a cross-machine performance claim. The
 system accessibility tree did not expose the status item, so status-item presentation remains a
 separate physical/manual gate.
+
+The final 20-gate release gauntlet repeated both native paths after the source deadline and
+Running-to-Ready transition work. Its full journey measured 33/84/89 ms
+(prewarmed/cold/warm); the strict compact-widget journey measured 64/83/92 ms. Both retained the
+same 200 ms budget, and the strict compact journey emitted no dependency-cycle diagnostic.

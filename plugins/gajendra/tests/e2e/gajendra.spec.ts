@@ -416,7 +416,10 @@ test("includes prioritized and unprioritized active work while retaining priorit
   await expect(running.locator(".running-scope")).toHaveCSS("border-top-style", "solid");
   await expect(running.locator(".running-row")).toHaveCount(4);
   await expect(running).toContainText("Ship the Gajendra source release");
-  await expect(running.locator('.running-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"] .placement-badge')).toHaveText("NOW");
+  const runningNow = running.locator('.running-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"]');
+  await expect(runningNow.locator(".placement-badge")).toHaveText("NOW");
+  await expect(runningNow.getByRole("button", { name: "Important" })).toHaveCount(0);
+  await expect(runningNow.getByRole("button", { name: "Remove" })).toHaveCount(0);
   await expect(running).toContainText("Investigate the CI performance regression");
   await expect(page.locator('#available-list .available-row[data-thread-id="windsurf:available-2"]')).toBeHidden();
 
@@ -604,7 +607,25 @@ test("searches every thread and exposes organizer actions by keyboard", async ({
   const prioritizedMatch = page.locator('#available-list .available-row[data-thread-id="codex:00000000-0000-7000-8000-000000000001"]');
   await expect(prioritizedMatch).toBeVisible();
   await expect(prioritizedMatch.locator(".placement-badge")).toHaveText("NOW");
-  await expect(prioritizedMatch.getByRole("button", { name: "Important" })).toBeVisible();
+  await expect(prioritizedMatch.getByRole("button", { name: "Important" })).toHaveCount(0);
+  await expect(prioritizedMatch.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  const importantIdsBefore = await page.locator("#important-list .thread-row").evaluateAll((rows) =>
+    rows.map((row) => (row as HTMLElement).dataset.threadId),
+  );
+  await prioritizedMatch.evaluate((source) => {
+    const target = document.querySelector<HTMLElement>("#important-list .thread-row");
+    if (!target) throw new Error("Synthetic Important drag target is unavailable.");
+    const transfer = new DataTransfer();
+    source.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    target.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+    source.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer: transfer }));
+  });
+  await expect(page.locator("#focus-list .thread-row.is-current")).toContainText("Ship the Gajendra source release");
+  await expect(page.locator("#important-list .thread-row")).toHaveCount(importantIdsBefore.length);
+  expect(await page.locator("#important-list .thread-row").evaluateAll((rows) =>
+    rows.map((row) => (row as HTMLElement).dataset.threadId),
+  )).toEqual(importantIdsBefore);
   await expect(page.locator('#available-list .available-row[data-thread-id="codex:available-1"]')).toBeHidden();
   await page.keyboard.press("Shift+Tab");
   await expect(page.locator(":focus")).toBeVisible();
