@@ -174,6 +174,98 @@ describe("Codex desktop runtime status", () => {
     }
   });
 
+  it("keeps four valid siblings when one completed turn omits its timestamp", async () => {
+    const validIds = Array.from({ length: 4 }, (_, index) => syntheticThreadId(214 + index));
+    const legacyId = syntheticThreadId(218);
+    const interruptedId = syntheticThreadId(219);
+    const runningId = syntheticThreadId(220);
+    const privateContent = "private legacy payload must not leak";
+    const requestedIds: string[] = [];
+    const nowMs = 1_786_545_500_000;
+    const result = await enrichCodexReviewSignals([
+      ...validIds.map((id, index) => ({ id, recencyAt: 100 - index, status: "idle" })),
+      { id: legacyId, recencyAt: 95, status: "idle" },
+      { id: interruptedId, recencyAt: 94, status: "idle" },
+      { id: runningId, recencyAt: 93, status: "running" },
+    ], async ({ threadId }) => {
+      requestedIds.push(threadId);
+      if (validIds.includes(threadId)) {
+        return { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null }] };
+      }
+      if (threadId === legacyId) {
+        return {
+          data: [{
+            status: "completed",
+            completedAt: null,
+            itemsView: "notLoaded",
+            items: [],
+            error: null,
+            unexpectedProviderPayload: privateContent,
+          }],
+        };
+      }
+      if (threadId === interruptedId) {
+        return { data: [{ status: "interrupted", completedAt: null, itemsView: "notLoaded", items: [], error: null }] };
+      }
+      throw new Error("running candidates must not be queried");
+    }, { now: () => nowMs });
+
+    const reviewThreads = result.threads.filter((thread) => Object.hasOwn(thread, "gajendraReview"));
+    expect(result.availability).toBe("available");
+    expect(reviewThreads).toHaveLength(4);
+    expect(reviewThreads.map((thread) => thread.id)).toEqual(expect.arrayContaining(validIds));
+    expect(requestedIds).toEqual(expect.arrayContaining([...validIds, legacyId, interruptedId]));
+    expect(requestedIds).toHaveLength(6);
+    expect(requestedIds).not.toContain(runningId);
+    for (const id of [legacyId, interruptedId, runningId]) {
+      expect(result.threads.find((thread) => thread.id === id)).not.toHaveProperty("gajendraReview");
+    }
+    expect(JSON.stringify(result)).not.toContain(privateContent);
+  });
+
+  it("fails the whole batch when a null timestamp is paired with private items or an error", async () => {
+    const validId = syntheticThreadId(221);
+    const poisonedId = syntheticThreadId(222);
+    const poisonedPages = [
+      {
+        secret: "private-null-timestamp-item",
+        page: {
+          data: [{
+            status: "completed",
+            completedAt: null,
+            itemsView: "notLoaded",
+            items: [{ content: "private-null-timestamp-item" }],
+            error: null,
+          }],
+        },
+      },
+      {
+        secret: "private-null-timestamp-error",
+        page: {
+          data: [{
+            status: "completed",
+            completedAt: null,
+            itemsView: "notLoaded",
+            items: [],
+            error: { message: "private-null-timestamp-error" },
+          }],
+        },
+      },
+    ];
+
+    for (const { secret, page } of poisonedPages) {
+      const result = await enrichCodexReviewSignals([
+        { id: validId, recencyAt: 2, status: "idle" },
+        { id: poisonedId, recencyAt: 1, status: "idle" },
+      ], async ({ threadId }) => threadId === validId
+        ? { data: [{ status: "completed", completedAt: 1_786_545_400, itemsView: "notLoaded", items: [], error: null }] }
+        : page);
+      expect(result.availability).toBe("transient");
+      expect(result.threads.every((thread) => !Object.hasOwn(thread, "gajendraReview"))).toBe(true);
+      expect(JSON.stringify(result)).not.toContain(secret);
+    }
+  });
+
   it("fails an entire review batch closed when any turn summary is structurally invalid", async () => {
     const validId = syntheticThreadId(210);
     const invalidId = syntheticThreadId(211);
@@ -198,7 +290,6 @@ describe("Codex desktop runtime status", () => {
       data: [{ status: "completed", completedAt, itemsView: "notLoaded", items: [], error: null }],
     });
     const invalidTimestamps: unknown[] = [
-      null,
       "not-a-timestamp",
       1_786_545_400_000,
       1_786_545_501,

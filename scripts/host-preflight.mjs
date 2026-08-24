@@ -364,7 +364,7 @@ function inspectState(filePath) {
         ).length
       : 0;
     const valid =
-      document.version === 2 &&
+      document.version === 3 &&
       uniqueIds.size === entries.length &&
       (document.currentFocusThreadId == null || currentMatches === 1);
     return {

@@ -33,13 +33,14 @@ describe("Gajendra domain", () => {
     ]);
   });
 
-  it("selects the next focus thread when NOW is demoted", () => {
+  it("keeps NOW in Focus when a direct level change attempts to demote it", () => {
     const initial: PriorityStore = state([
       { threadId: "codex:a", level: "focus", addedAt: now.toISOString() },
       { threadId: "cursor:b", level: "focus", addedAt: now.toISOString() },
     ], "codex:a");
     const result = applyMutation(initial, { type: "set-level", threadId: "codex:a", level: "important" }, now);
-    expect(result.currentFocusThreadId).toBe("cursor:b");
+    expect(result.currentFocusThreadId).toBe("codex:a");
+    expect(result.entries).toEqual(initial.entries);
   });
 
   it("reorders within a tier without moving across sources or tiers", () => {
@@ -94,7 +95,7 @@ describe("Gajendra domain", () => {
     store = applyMutation(store, { type: "set-context", threadId: "codex:a", context: "engineering" }, now);
     store = applyMutation(store, { type: "set-current", threadId: "codex:a" }, now);
     store = applyMutation(store, { type: "set-level", threadId: "codex:a", level: "important" }, now);
-    expect(store.entries[0]).toMatchObject({ threadId: "codex:a", level: "important", context: "engineering" });
+    expect(store.entries[0]).toMatchObject({ threadId: "codex:a", level: "focus", context: "engineering" });
 
     const unchanged = applyMutation(store, { type: "set-context", threadId: "codex:recent", context: "life" }, now);
     expect(unchanged.entries).toHaveLength(1);
@@ -105,7 +106,7 @@ describe("Gajendra domain", () => {
     });
     expect(normalized.entries[0]).toEqual({
       threadId: "codex:a",
-      level: "important",
+      level: "focus",
       addedAt: now.toISOString(),
     });
   });
@@ -144,10 +145,18 @@ describe("Gajendra domain", () => {
     ]);
     expect(append.currentFocusThreadId).toBe("cursor:important");
 
+    const blockedRemoval = applyMutation(append, {
+      type: "move-before",
+      threadId: "cursor:important",
+      level: null,
+    }, now);
+    expect(blockedRemoval).toEqual(append);
+
     const removed = applyMutation(append, {
       type: "move-before",
       threadId: "cursor:important",
       level: null,
+      currentThreadId: "codex:focus",
     }, now);
     expect(removed.currentFocusThreadId).toBe("codex:focus");
     expect(removed.entries.map((entry) => entry.threadId)).not.toContain("cursor:important");

@@ -31815,6 +31815,7 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     return repairCurrentFocus(next);
   }
   if (mutation.type === "set-level") {
+    if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") return next;
     const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
     if (mutation.level) {
@@ -31846,6 +31847,11 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
 }
 function moveBefore(store, mutation, now) {
   const next = store;
+  if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    const hasValidReplacement = typeof replacement === "string" && replacement !== mutation.threadId && next.entries.some((entry2) => entry2.threadId === replacement && entry2.level === "focus");
+    if (!hasValidReplacement) return next;
+  }
   const existingIndex = next.entries.findIndex((entry2) => entry2.threadId === mutation.threadId);
   const existing = existingIndex >= 0 ? next.entries[existingIndex] : void 0;
   if (existingIndex >= 0) next.entries.splice(existingIndex, 1);
@@ -32996,6 +33002,7 @@ function classifyCodexReviewTurnPage(thread, response, nowMs) {
   }
   if (summary.status !== "completed") return { kind: "not-ready" };
   if (summary.error !== null) return { kind: "invalid" };
+  if (summary.completedAt === null) return { kind: "not-ready" };
   const completedAt = codexCompletedAt(summary.completedAt, nowMs);
   if (completedAt === null) return { kind: "invalid" };
   return { kind: "ready", signal: {
@@ -34155,7 +34162,7 @@ var GajendraService = class {
     this.sources = sources;
     this.generationDeadlineMs = boundedPositive2(
       options.generationDeadlineMs,
-      this.store.lockTimeoutMs,
+      this.store.staleLockMs,
       Math.max(this.store.lockTimeoutMs, this.store.staleLockMs)
     );
     this.maxGenerationRetries = boundedPositive2(
@@ -34365,7 +34372,14 @@ function validateMutation(store, mutation, collection) {
   if (mutation.type === "move" || mutation.type === "set-context") {
     return stored ? null : "invalid-target";
   }
+  if (mutation.type === "set-level") {
+    return store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus" ? "invalid-target" : null;
+  }
   if (mutation.type !== "move-before") return null;
+  if (store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    if (typeof replacement !== "string" || replacement === mutation.threadId) return "invalid-target";
+  }
   if (!Object.hasOwn(mutation, "currentThreadId") && mutation.isCurrent === true && mutation.level !== "focus") return "invalid-target";
   if (mutation.level === null) {
     if (mutation.beforeThreadId) return "invalid-target";

@@ -702,6 +702,10 @@ function classifyCodexReviewTurnPage(thread: CodexThread, response: unknown, now
   // valid optional metadata batch, and no error/details are traversed or retained.
   if (summary.status !== "completed") return { kind: "not-ready" };
   if (summary.error !== null) return { kind: "invalid" };
+  // After the metadata-only shape and null error checks above, an explicit null completion time is
+  // an older Codex candidate-local omission rather than malformed metadata. It is not review-ready
+  // and must not poison valid siblings. Missing/other timestamp values still fail closed below.
+  if (summary.completedAt === null) return { kind: "not-ready" };
   const completedAt = codexCompletedAt(summary.completedAt, nowMs);
   if (completedAt === null) return { kind: "invalid" };
   return { kind: "ready", signal: {

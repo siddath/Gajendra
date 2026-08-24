@@ -402,7 +402,7 @@ enum GajendraPreview {
             model: launchReviewModel,
             theme: .nativePopover,
             appearance: .light,
-            size: .comfortable,
+            size: .expanded,
             destination: launchReviewDestination
         )
         try renderCard(

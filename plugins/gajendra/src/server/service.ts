@@ -27,8 +27,9 @@ const MAX_GENERATION_RETRIES = 4;
 
 export type GajendraServiceOptions = {
   /**
-   * Provider work is deliberately outside the store lock. This caps an optimistic revalidation
-   * cycle to the store's existing lock window by default, so contention cannot spin forever.
+   * Provider work is deliberately outside the store lock. The default uses the store's stale-lock
+   * recovery window, which is longer than ordinary lock acquisition and gives bounded providers
+   * time to return without turning source loading into an unbounded wait.
    */
   generationDeadlineMs?: number;
   /** Overrides the derived retry budget for hosts that intentionally use a longer lock window. */
@@ -44,11 +45,12 @@ export class GajendraService {
     private readonly sources: SourceRegistry = new ThreadSourceRegistry(),
     options: GajendraServiceOptions = {},
   ) {
-    // A provider collection can consume a full lock window by itself. Permit one retry per
-    // configured lock window (capped), rather than inventing a disconnected retry duration.
+    // A provider collection can consume a full lock window by itself. Use the existing stale-lock
+    // recovery window for the default generation budget rather than truncating it at the shorter
+    // lock-acquisition timeout; callers may still opt into a tighter explicit deadline.
     this.generationDeadlineMs = boundedPositive(
       options.generationDeadlineMs,
-      this.store.lockTimeoutMs,
+      this.store.staleLockMs,
       Math.max(this.store.lockTimeoutMs, this.store.staleLockMs),
     );
     this.maxGenerationRetries = boundedPositive(
@@ -286,7 +288,7 @@ function mutationFingerprint(mutation: DeckMutation): string {
 }
 
 function validateMutation(
-  store: { entries: Array<{ threadId: string; level: "focus" | "important" }> },
+  store: Pick<PriorityStore, "entries" | "currentFocusThreadId">,
   mutation: DeckMutation,
   collection: SourceCollection,
 ): ValidationErrorCode | null {
@@ -303,7 +305,16 @@ function validateMutation(
   if (mutation.type === "move" || mutation.type === "set-context") {
     return stored ? null : "invalid-target";
   }
+  if (mutation.type === "set-level") {
+    return store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus"
+      ? "invalid-target"
+      : null;
+  }
   if (mutation.type !== "move-before") return null;
+  if (store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    if (typeof replacement !== "string" || replacement === mutation.threadId) return "invalid-target";
+  }
   if (!Object.hasOwn(mutation, "currentThreadId") && mutation.isCurrent === true && mutation.level !== "focus") return "invalid-target";
   if (mutation.level === null) {
     if (mutation.beforeThreadId) return "invalid-target";
@@ -318,7 +329,7 @@ function validateMutation(
 }
 
 function validatePostMoveCurrent(
-  store: { entries: Array<{ threadId: string; level: "focus" | "important" }> },
+  store: Pick<PriorityStore, "entries" | "currentFocusThreadId">,
   mutation: Extract<DeckMutation, { type: "move-before" }>,
   knownThreadIds: Set<string>,
 ): ValidationErrorCode | null {

@@ -80,6 +80,9 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
   }
 
   if (mutation.type === "set-level") {
+    // A direct level change cannot silently replace NOW. The user must select another NOW first;
+    // atomic move-before operations may still name an explicit valid replacement.
+    if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") return next;
     const existing = index >= 0 ? next.entries[index] : undefined;
     if (index >= 0) next.entries.splice(index, 1);
     if (mutation.level) {
@@ -121,6 +124,13 @@ function moveBefore(
   now: Date,
 ): PriorityStore {
   const next = store;
+  if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    const hasValidReplacement = typeof replacement === "string"
+      && replacement !== mutation.threadId
+      && next.entries.some((entry) => entry.threadId === replacement && entry.level === "focus");
+    if (!hasValidReplacement) return next;
+  }
   const existingIndex = next.entries.findIndex((entry) => entry.threadId === mutation.threadId);
   const existing = existingIndex >= 0 ? next.entries[existingIndex] : undefined;
   if (existingIndex >= 0) next.entries.splice(existingIndex, 1);

@@ -746,6 +746,9 @@ public enum GajendraQueueMovePlanner {
         guard let thread = snapshot.allThreads.first(where: { $0.id == threadId }) else { return nil }
         guard targetId != threadId else { return nil }
         if level == nil, targetId != nil { return nil }
+        // NOW may be reordered within Focus, but changing or removing its lane requires the user
+        // to make another task NOW first. Enforce this below every native surface, not only in UI.
+        if snapshot.current?.id == threadId, level != .focus { return nil }
         let destination = lane(for: level, snapshot: snapshot)
         if let targetId, !destination.contains(where: { $0.id == targetId }) { return nil }
 
@@ -753,10 +756,6 @@ public enum GajendraQueueMovePlanner {
         let priorIndex = priorLane.firstIndex(where: { $0.id == threadId })
         let priorBefore = beforeAfter(threadId: threadId, in: priorLane)
         let currentThreadId = snapshot.current?.id
-        let nextFocus = snapshot.focus.first(where: { $0.id != threadId })?.id
-        let forwardCurrentThreadId = currentThreadId == threadId && level != .focus
-            ? nextFocus
-            : currentThreadId
 
         // Dropping an item at the end of its existing lane is the only same-lane append no-op.
         // A middle item dropped at the end must still produce an atomic reorder.
@@ -778,7 +777,7 @@ public enum GajendraQueueMovePlanner {
                 level: level,
                 beforeThreadId: targetId,
                 context: thread.context,
-                currentThreadId: forwardCurrentThreadId
+                currentThreadId: currentThreadId
             ),
             inverse: .moveBefore(
                 threadId: threadId,

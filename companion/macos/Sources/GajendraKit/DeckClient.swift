@@ -24,13 +24,19 @@ public struct GajendraNodeResolution: Equatable, Sendable {
 }
 
 public struct GajendraProcessLimits: Equatable, Sendable {
+    /// The local service may use its full 30-second generation budget, then settle at most two
+    /// bounded 5-second store operations before encoding a safe response. Keep a final bounded
+    /// margin for process startup, JSON output, and shutdown so the native watchdog cannot race a
+    /// valid service result at the same deadline.
+    public static let defaultTimeout: TimeInterval = 45
+
     public let timeout: TimeInterval
     public let stdoutBytes: Int
     public let stderrBytes: Int
     public let terminationGrace: TimeInterval
 
     public init(
-        timeout: TimeInterval = 30,
+        timeout: TimeInterval = GajendraProcessLimits.defaultTimeout,
         stdoutBytes: Int = 4 * 1024 * 1024,
         stderrBytes: Int = 1 * 1024 * 1024,
         terminationGrace: TimeInterval = 0.5
