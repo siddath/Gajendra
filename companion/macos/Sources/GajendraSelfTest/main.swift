@@ -27,6 +27,10 @@ enum GajendraSelfTest {
             "priority edit hold must feel deliberate without delaying drag pickup"
         )
         try require(
+            GajendraProcessLimits.defaultTimeout == 85 && GajendraProcessLimits().timeout == 85,
+            "native watchdog must cover the 70-second service budget, two store lock acquisitions, teardown, and output margin"
+        )
+        try require(
             GajendraQueueInteractionTuning.movementTolerance == 4,
             "priority edit hold must cancel before an intentional task drag or scroll"
         )
@@ -532,27 +536,42 @@ enum GajendraSelfTest {
             ) == nil,
             "queue drag must reject unknown task identifiers"
         )
-        guard let currentToImportant = GajendraQueueMovePlanner.plan(
-            threadId: queueNow.id,
-            to: .important,
-            before: nil,
-            snapshot: queueSnapshot
-        ) else { throw SelfTestError.failed("moving NOW out of Focus did not produce a plan") }
         try require(
-            currentToImportant.forward == .moveBefore(
+            GajendraQueueMovePlanner.plan(
                 threadId: queueNow.id,
-                level: .important,
-                beforeThreadId: nil,
+                to: .important,
+                before: nil,
+                snapshot: queueSnapshot
+            ) == nil
+                && GajendraQueueMovePlanner.plan(
+                    threadId: queueNow.id,
+                    to: nil,
+                    before: nil,
+                    snapshot: queueSnapshot
+                ) == nil,
+            "NOW must reject cross-lane and remove plans until another task becomes NOW"
+        )
+        guard let currentWithinFocus = GajendraQueueMovePlanner.plan(
+            threadId: queueNow.id,
+            to: .focus,
+            before: queueFocusB.id,
+            snapshot: queueSnapshot
+        ) else { throw SelfTestError.failed("same-Focus NOW reorder did not produce a plan") }
+        try require(
+            currentWithinFocus.forward == .moveBefore(
+                threadId: queueNow.id,
+                level: .focus,
+                beforeThreadId: queueFocusB.id,
                 context: nil,
-                currentThreadId: queueFocusA.id
-            ) && currentToImportant.inverse == .moveBefore(
+                currentThreadId: queueNow.id
+            ) && currentWithinFocus.inverse == .moveBefore(
                 threadId: queueNow.id,
                 level: .focus,
                 beforeThreadId: queueFocusA.id,
                 context: nil,
                 currentThreadId: queueNow.id
             ),
-            "moving NOW Focus to Important must select the next remaining Focus and restore it on undo"
+            "same-Focus NOW reorder must preserve NOW and its exact inverse"
         )
         guard let availableToImportant = GajendraQueueMovePlanner.plan(
             threadId: queueAvailable.id,
@@ -863,9 +882,11 @@ enum GajendraSelfTest {
         try await verifyVisualSettings()
         try await verifySourceOnboarding()
         try await verifyNativeBoundaries()
+        try verifyCompactPriorityWidgetContract()
         try verifyReviewOpenRoutes(reviewSnapshot)
         try await verifyNativeViewProof(with: snapshot)
         try await verifyQueueHandlers(with: snapshot)
+        try await verifyCompactPriorityMoves(with: snapshot)
         try await verifyAdvancingQueueIntents(with: snapshot)
         try await verifyQueuedRefresh(with: snapshot)
         try await verifyQueuedMutation(with: snapshot)
@@ -1165,6 +1186,303 @@ enum GajendraSelfTest {
                 "blocked deep link was accepted: \(blocked)"
             )
         }
+    }
+
+    private static func verifyCompactPriorityWidgetContract() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("GajendraKit/DeckWidgetView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+        func section(from start: String, before end: String) throws -> String {
+            guard let startRange = source.range(of: start),
+                  let endRange = source.range(of: end, range: startRange.upperBound..<source.endIndex) else {
+                throw SelfTestError.failed("widget source no longer exposes the \(start) section")
+            }
+            return String(source[startRange.lowerBound..<endRange.lowerBound])
+        }
+
+        let priorityMenu = try section(
+            from: "private func priorityActionMenu(",
+            before: "private func priorityActionReservedSpace()"
+        )
+        try require(
+            priorityMenu.contains("plus.circle") && priorityMenu.contains("arrow.left.arrow.right"),
+            "compact priority menu must preserve explicit add and move symbols"
+        )
+        try require(
+            priorityMenu.contains("Add to Focus")
+                && priorityMenu.contains("Add to Important")
+                && priorityMenu.contains("Move to Focus")
+                && priorityMenu.contains("Move to Important"),
+            "compact priority controls must retain every local lane transition"
+        )
+        try require(
+            priorityMenu.contains("if thread.isCurrent") && priorityMenu.contains("priorityActionReservedSpace()"),
+            "NOW must not expose a compact lane-changing priority menu"
+        )
+        try require(
+            source.range(
+                of: #"accessibilityIdentifier\([\s\S]{0,200}thread\.id"#,
+                options: .regularExpression
+            ) == nil
+                && source.range(
+                    of: #"thread\.id[\s\S]{0,200}accessibilityIdentifier\("#,
+                    options: .regularExpression
+                ) == nil,
+            "canonical thread identifiers must not be exported through accessibility identifiers"
+        )
+
+        let reviewDock = try section(
+            from: "private func reviewReadySummary(_ threads: [DeckThread])",
+            before: "private func toggleReviewDock()"
+        )
+        try require(
+            reviewDock.contains("let visibleThreads = Array(threads.prefix(5))")
+                && reviewDock.contains("moreButton(remaining: threads.count - 5, title: \"Ready for Review\")"),
+            "Ready for Review must cap its compact list at five while disclosing the exact overflow"
+        )
+
+        let queueRow = try section(
+            from: "private func queueRow(",
+            before: "private func queueRowAccessibility"
+        )
+        let queueAccessibility = try section(
+            from: "private func queueRowAccessibility",
+            before: "private func queueRowContextMenu"
+        )
+        let queueContextMenu = try section(
+            from: "private func queueRowContextMenu",
+            before: "private func queueJiggle"
+        )
+        let removeQueue = try section(
+            from: "private func removeQueueThread",
+            before: "private func setQueueEditing"
+        )
+        let queueMove = try section(
+            from: "private func moveQueueThread",
+            before: "private func updateQueueDrag"
+        )
+        let queueDrop = try section(
+            from: "private func updateQueueDropTarget",
+            before: "private func setQueueDropTarget"
+        )
+        let searchActions = try section(
+            from: "private func searchActions",
+            before: "private func relativeUpdateText"
+        )
+        try require(
+            queueRow.contains("if isQueueEditing && !thread.isCurrent")
+                && queueAccessibility.contains("if thread.isCurrent")
+                && queueContextMenu.contains("if !thread.isCurrent")
+                && removeQueue.contains("!thread.isCurrent"),
+            "NOW must not expose queue remove or cross-lane accessibility routes"
+        )
+        try require(
+            queueMove.contains("(!thread.isCurrent || level == .focus)")
+                && queueDrop.contains("!sourceIsCurrent || level == .focus"),
+            "NOW drag must remain within Focus and reject cross-lane drops"
+        )
+        try require(
+            searchActions.contains("if !thread.isCurrent")
+                && searchActions.contains("Move to Important")
+                && searchActions.contains("Remove from priorities"),
+            "compact search actions must keep priority moves inside the non-NOW guard"
+        )
+
+        let kitDirectory = sourceURL.deletingLastPathComponent()
+        let organizerSource = try String(
+            contentsOf: kitDirectory.appendingPathComponent("DeckContentView.swift"),
+            encoding: .utf8
+        )
+        let modelSource = try String(
+            contentsOf: kitDirectory.appendingPathComponent("Models.swift"),
+            encoding: .utf8
+        )
+        try require(
+            organizerSource.contains("snapshot.current?.id != threadId || level == .focus")
+                && organizerSource.contains("guard !sourceIsCurrent || level == .focus")
+                && organizerSource.contains("if !thread.isCurrent {\n                    Menu"),
+            "Organizer must keep NOW within Focus across actions and drag/drop"
+        )
+        try require(
+            modelSource.contains("if snapshot.current?.id == threadId, level != .focus { return nil }"),
+            "the shared queue planner must reject every NOW cross-lane or remove intent"
+        )
+    }
+
+    private static func verifyCompactPriorityMoves(with snapshot: DeckSnapshot) async throws {
+        func thread(_ id: String, level: PriorityLevel?, isCurrent: Bool = false) -> DeckThread {
+            DeckThread(
+                id: id,
+                sourceId: "codex",
+                sourceName: "Codex",
+                title: id,
+                project: "Compact priority fixture",
+                updatedAt: 1,
+                status: "idle",
+                level: level,
+                isCurrent: isCurrent,
+                deepLink: "codex://threads/\(id)"
+            )
+        }
+
+        let now = thread("compact-priority-now", level: .focus, isCurrent: true)
+        let focus = thread("compact-priority-focus", level: .focus)
+        let important = thread("compact-priority-important", level: .important)
+        let available = thread("compact-priority-available", level: nil)
+        let initial = DeckSnapshot(
+            revision: 0,
+            generatedAt: snapshot.generatedAt,
+            current: now,
+            focus: [now, focus],
+            important: [important],
+            available: [available],
+            collapsed: snapshot.collapsed,
+            focusGuide: snapshot.focusGuide,
+            focusOverGuide: false,
+            staleEntryCount: 0,
+            source: snapshot.source,
+            sources: snapshot.sources,
+            error: nil
+        )
+
+        func verifyMoveAndUndo(
+            _ label: String,
+            threadId: String,
+            targetLevel: PriorityLevel,
+            forward: DeckMutation,
+            inverse: DeckMutation,
+            expectedFocus: [String],
+            expectedImportant: [String],
+            expectedAvailable: [String]
+        ) async throws {
+            let service = AdvancingQueueService(initial: initial)
+            let model = await DeckViewModel(client: service, initialSnapshot: initial)
+            await model.moveToLevel(threadId: threadId, level: targetLevel, actionName: label)
+            try await waitUntilIdle(model)
+
+            let forwardRequests = await service.requests()
+            try require(
+                forwardRequests.map(\.mutation) == [forward],
+                "\(label) did not dispatch one atomic priority mutation"
+            )
+            let persisted = try await service.snapshot()
+            try require(
+                persisted.focus.map(\.id) == expectedFocus
+                    && persisted.important.map(\.id) == expectedImportant
+                    && persisted.available.map(\.id) == expectedAvailable,
+                "\(label) did not persist the expected lane state"
+            )
+            let canUndo = await model.canUndo
+            try require(canUndo, "\(label) did not register an undo entry")
+
+            await model.undo()
+            try await waitUntilIdle(model)
+            let requests = await service.requests()
+            try require(
+                requests.map(\.mutation) == [forward, inverse],
+                "\(label) undo did not dispatch the exact atomic inverse"
+            )
+            let restored = try await service.snapshot()
+            try require(
+                restored.focus.map(\.id) == initial.focus.map(\.id)
+                    && restored.important.map(\.id) == initial.important.map(\.id)
+                    && restored.available.map(\.id) == initial.available.map(\.id)
+                    && restored.current?.id == now.id,
+                "\(label) undo did not restore persisted priority state"
+            )
+        }
+
+        try await verifyMoveAndUndo(
+            "Add available to Focus",
+            threadId: available.id,
+            targetLevel: .focus,
+            forward: .moveBefore(
+                threadId: available.id,
+                level: .focus,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            inverse: .moveBefore(
+                threadId: available.id,
+                level: nil,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            expectedFocus: [now.id, focus.id, available.id],
+            expectedImportant: [important.id],
+            expectedAvailable: []
+        )
+        try await verifyMoveAndUndo(
+            "Add available to Important",
+            threadId: available.id,
+            targetLevel: .important,
+            forward: .moveBefore(
+                threadId: available.id,
+                level: .important,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            inverse: .moveBefore(
+                threadId: available.id,
+                level: nil,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            expectedFocus: [now.id, focus.id],
+            expectedImportant: [important.id, available.id],
+            expectedAvailable: []
+        )
+        try await verifyMoveAndUndo(
+            "Move Focus to Important",
+            threadId: focus.id,
+            targetLevel: .important,
+            forward: .moveBefore(
+                threadId: focus.id,
+                level: .important,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            inverse: .moveBefore(
+                threadId: focus.id,
+                level: .focus,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            expectedFocus: [now.id],
+            expectedImportant: [important.id, focus.id],
+            expectedAvailable: [available.id]
+        )
+        try await verifyMoveAndUndo(
+            "Move Important to Focus",
+            threadId: important.id,
+            targetLevel: .focus,
+            forward: .moveBefore(
+                threadId: important.id,
+                level: .focus,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            inverse: .moveBefore(
+                threadId: important.id,
+                level: .important,
+                beforeThreadId: nil,
+                context: nil,
+                currentThreadId: now.id
+            ),
+            expectedFocus: [now.id, focus.id, important.id],
+            expectedImportant: [],
+            expectedAvailable: [available.id]
+        )
     }
 
     @MainActor
@@ -2125,21 +2443,15 @@ enum GajendraSelfTest {
         try await waitUntilIdle(model)
         var requests = await probe.requests()
         try require(
-            requests.first?.mutation == .moveBefore(
-                threadId: now.id,
-                level: .important,
-                beforeThreadId: nil,
-                context: nil,
-                currentThreadId: middle.id
-            ),
-            "handler current-to-important did not select the next remaining Focus row as NOW"
+            requests.isEmpty,
+            "handler must reject moving NOW to another lane before it reaches the service"
         )
 
         await model.moveToLevel(threadId: available.id, level: .important)
         try await waitUntilIdle(model)
         requests = await probe.requests()
         try require(
-            requests.dropFirst().first?.mutation == .moveBefore(
+            requests.first?.mutation == .moveBefore(
                 threadId: available.id,
                 level: .important,
                 beforeThreadId: nil,
@@ -2153,7 +2465,7 @@ enum GajendraSelfTest {
         try await waitUntilIdle(model)
         requests = await probe.requests()
         try require(
-            requests.dropFirst(2).first?.mutation == .moveBefore(
+            requests.dropFirst().first?.mutation == .moveBefore(
                 threadId: available.id,
                 level: nil,
                 beforeThreadId: nil,
@@ -2167,7 +2479,7 @@ enum GajendraSelfTest {
         try await waitUntilIdle(model)
         requests = await probe.requests()
         try require(
-            requests.dropFirst(3).first?.mutation == .moveBefore(
+            requests.dropFirst(2).first?.mutation == .moveBefore(
                 threadId: middle.id,
                 level: .focus,
                 beforeThreadId: nil,

@@ -1,6 +1,6 @@
 # Release checklist
 
-Checked items have a current 2026-08-19 working-candidate receipt. They are not a binary-release
+Checked items have a current 2026-08-24 working-candidate receipt. They are not a binary-release
 claim.
 
 ## Frozen local candidate
@@ -26,7 +26,9 @@ claim.
   Organizer reorder, real-key Search filter/clear, and dock automation have current receipts.
 - [x] Widget performance regression: prewarmed direct AppKit click path stays below the local 200 ms
   launcher-to-card budget in the isolated real-window journey, with no widget-path AttributeGraph
-  cycle warning. This is not a cross-machine performance claim.
+  cycle warning. Three same-host candidate samples measured median 47 ms prewarmed, 85 ms cold, and
+  86 ms warm against 58/86/85 ms at the exact pre-change revision. This is not a cross-machine
+  performance claim.
 - [ ] Developer ID identity/team, strict signing, Gatekeeper, notarization/staple, archive, and
   checksum receipt.
 - [ ] Binary distribution and LinkedIn publication. Public source review is tracked separately.

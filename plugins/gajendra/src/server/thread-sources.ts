@@ -94,7 +94,7 @@ export class ThreadSourceRegistry {
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {
     this.codex = codex;
-    this.sourceCollectionConcurrency = boundedSourceConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
+    this.sourceCollectionConcurrency = resolveSourceCollectionConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
 
   async collect(preferences: Record<string, boolean>): Promise<SourceCollection> {
@@ -142,7 +142,7 @@ export async function collectSourceAdapters(
   preferences: Record<string, boolean>,
   maxConcurrency = DEFAULT_SOURCE_COLLECTION_CONCURRENCY,
 ): Promise<SourceAdapterOutcome[]> {
-  const concurrency = Math.min(boundedSourceConcurrency(maxConcurrency), adapters.length);
+  const concurrency = Math.min(resolveSourceCollectionConcurrency(maxConcurrency), adapters.length);
   const outcomes: SourceAdapterOutcome[] = new Array(adapters.length);
   let nextAdapter = 0;
   const worker = async (): Promise<void> => {
@@ -636,10 +636,15 @@ function sourcesConfigByteLimit(env: NodeJS.ProcessEnv): number {
   return Math.min(requested, MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES);
 }
 
-function boundedSourceConcurrency(value: number | string | undefined): number {
+/**
+ * Keep the source worker pool at its documented default or higher. A lower override can serialize
+ * the default-enabled Cursor pass after the 60.75s Codex envelope and make the derived service
+ * deadline false; values above the hard cap remain bounded.
+ */
+export function resolveSourceCollectionConcurrency(value: number | string | undefined): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) return DEFAULT_SOURCE_COLLECTION_CONCURRENCY;
-  return Math.min(parsed, MAX_SOURCE_COLLECTION_CONCURRENCY);
+  return Math.min(Math.max(parsed, DEFAULT_SOURCE_COLLECTION_CONCURRENCY), MAX_SOURCE_COLLECTION_CONCURRENCY);
 }
 
 export function resolveSourcesConfigPath(env: NodeJS.ProcessEnv = process.env): string {

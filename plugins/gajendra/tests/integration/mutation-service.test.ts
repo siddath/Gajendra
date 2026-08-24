@@ -131,6 +131,12 @@ describe("Gajendra mutation service", () => {
     await expectRejected(service, { type: "set-level", threadId: "codex:missing", level: "focus" }, "unknown-thread");
     await expectRejected(service, { type: "set-source-enabled", sourceId: "unknown", enabled: true }, "unknown-source");
     await expectRejected(service, {
+      type: "set-level", threadId: "claude:thread-a", level: "important",
+    }, "invalid-target");
+    await expectRejected(service, {
+      type: "move-before", threadId: "claude:thread-a", level: "important",
+    }, "invalid-target");
+    await expectRejected(service, {
       type: "move-before", threadId: "codex:thread-0", level: "important", beforeThreadId: "claude:thread-a",
     }, "invalid-target");
     await expectRejected(service, {
@@ -385,6 +391,57 @@ describe("Gajendra mutation service", () => {
       revision: 1,
       sources: [expect.objectContaining({ id: "codex", enabled: false, state: "disabled" })],
     });
+  });
+
+  it("lets a bounded source refresh use the stale-lock window instead of the lock timeout", async () => {
+    const directory = await temporaryDirectory();
+    const repository = new GajendraStoreRepository(directory, [], { lockTimeoutMs: 50, staleLockMs: 1_000 });
+    const collection = collectionForIds(["codex:slow-ready"]);
+    collection.threads[0] = {
+      ...collection.threads[0]!,
+      review: {
+        state: "ready",
+        kind: "result",
+        updatedAt: 1_786_545_400,
+        destination: { type: "thread", deepLink: "codex://threads/slow-ready" },
+        providerStatus: "completed",
+      },
+    };
+    let collections = 0;
+    const service = new GajendraService(repository, {
+      collect: async () => {
+        collections += 1;
+        await delay(150);
+        return collection;
+      },
+      close: async () => undefined,
+    });
+
+    const snapshot = await service.snapshot();
+    expect(collections).toBe(1);
+    expect(snapshot.error).toBeNull();
+    expect(snapshot.available.map((thread) => thread.id)).toEqual(["codex:slow-ready"]);
+    expect(snapshot.available[0]?.review?.state).toBe("ready");
+  });
+
+  it("keeps valid data beyond the legacy 30-second fallback without waiting tens of seconds", async () => {
+    const directory = await temporaryDirectory();
+    const repository = new GajendraStoreRepository(directory, [], { lockTimeoutMs: 5_000, staleLockMs: 30_000 });
+    const collection = collectionForIds(["codex:derived-envelope"]);
+    let clock = 0;
+    const service = new GajendraService(repository, {
+      collect: async () => {
+        // Simulate a provider returning after the old 30s stale-lock-derived deadline. The
+        // injected clock advances the full interval without making the test wait tens of seconds.
+        clock = 31_000;
+        return collection;
+      },
+      close: async () => undefined,
+    }, { now: () => clock });
+
+    const snapshot = await service.snapshot();
+    expect(snapshot.error).toBeNull();
+    expect(snapshot.available.map((thread) => thread.id)).toEqual(["codex:derived-envelope"]);
   });
 
   it("keeps a live Codex review projection out of persistence and discards it on a changed source generation", async () => {

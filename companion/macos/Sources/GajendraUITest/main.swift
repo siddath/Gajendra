@@ -27,12 +27,13 @@ private struct PillHitReceipt {
     let ownerPID: pid_t
 }
 
-private struct StoredPriorityState: Decodable {
-    struct Entry: Decodable {
+private struct StoredPriorityState: Decodable, Equatable {
+    struct Entry: Decodable, Equatable {
         let threadId: String
         let level: String
     }
 
+    let currentFocusThreadId: String?
     let entries: [Entry]
 }
 
@@ -41,6 +42,7 @@ private struct GajendraUIJourneyMetrics {
     let coldPopupMilliseconds: Int
     let warmPopupMilliseconds: Int
     let statusItemCompactSurfaceObserved: Bool
+    let runningToReadyTransition: Bool
 }
 
 @main
@@ -58,15 +60,19 @@ enum GajendraUITest {
             let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
             if scope == "running-dock" {
                 print(
-                    #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true}"#
+                    #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"runningToReadyTransition":false}"#
+                )
+            } else if scope == "running-to-ready" {
+                print(
+                    #"{"status":"passed","scope":"running-to-ready","runningToReadyTransition":\#(metrics.runningToReadyTransition)}"#
                 )
             } else if scope == "widget" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -77,13 +83,16 @@ enum GajendraUITest {
 
     private static func run() throws -> GajendraUIJourneyMetrics {
         let arguments = Array(CommandLine.arguments.dropFirst())
-        guard arguments.count == 3,
+        guard arguments.count == 4,
               let rawPID = Int32(arguments[0]),
               rawPID > 0 else {
-            throw GajendraUITestError.failed("expected a positive Gajendra PID, isolated state path, and app path")
+            throw GajendraUITestError.failed(
+                "expected a positive Gajendra PID, isolated state path, isolated catalog path, and app path"
+            )
         }
         let stateURL = URL(fileURLWithPath: arguments[1])
-        let appURL = URL(fileURLWithPath: arguments[2])
+        let catalogURL = URL(fileURLWithPath: arguments[2])
+        let appURL = URL(fileURLWithPath: arguments[3])
         guard CGPreflightPostEventAccess() else {
             throw GajendraUITestError.failed("the UI test host lacks permission to post pointer events")
         }
@@ -102,7 +111,25 @@ enum GajendraUITest {
                 prewarmedRevealMilliseconds: 0,
                 coldPopupMilliseconds: 0,
                 warmPopupMilliseconds: 0,
-                statusItemCompactSurfaceObserved: false
+                statusItemCompactSurfaceObserved: false,
+                runningToReadyTransition: false
+            )
+        }
+
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "running-to-ready" {
+            try tapCurrentPill(pid: rawPID)
+            try waitForCard(pid: rawPID, visible: true, label: "Running-to-Ready focused card")
+            let runningToReadyTransition = try verifyRunningToReadyTransition(
+                pid: rawPID,
+                stateURL: stateURL,
+                catalogURL: catalogURL
+            )
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: 0,
+                coldPopupMilliseconds: 0,
+                warmPopupMilliseconds: 0,
+                statusItemCompactSurfaceObserved: false,
+                runningToReadyTransition: runningToReadyTransition
             )
         }
 
@@ -195,19 +222,35 @@ enum GajendraUITest {
             collapsedValue: "Collapsed"
         )
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget" {
+            try verifyCompactPriorityActions(pid: rawPID, stateURL: stateURL)
+            let runningToReadyTransition = try verifyRunningToReadyTransition(
+                pid: rawPID,
+                stateURL: stateURL,
+                catalogURL: catalogURL
+            )
             return GajendraUIJourneyMetrics(
                 prewarmedRevealMilliseconds: prewarmedRevealMilliseconds,
                 coldPopupMilliseconds: coldPopupMilliseconds,
                 warmPopupMilliseconds: warmPopupMilliseconds,
-                statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved
+                statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved,
+                runningToReadyTransition: runningToReadyTransition
             )
         }
         try verifyOrganizerDrag(pid: rawPID, stateURL: stateURL)
+        try tapCurrentPill(pid: rawPID)
+        try waitForCard(pid: rawPID, visible: true, label: "priority-action card reopen")
+        try verifyCompactPriorityActions(pid: rawPID, stateURL: stateURL)
+        let runningToReadyTransition = try verifyRunningToReadyTransition(
+            pid: rawPID,
+            stateURL: stateURL,
+            catalogURL: catalogURL
+        )
         return GajendraUIJourneyMetrics(
             prewarmedRevealMilliseconds: prewarmedRevealMilliseconds,
             coldPopupMilliseconds: coldPopupMilliseconds,
             warmPopupMilliseconds: warmPopupMilliseconds,
-            statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved
+            statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved,
+            runningToReadyTransition: runningToReadyTransition
         )
     }
 
@@ -334,16 +377,20 @@ enum GajendraUITest {
             .deletingLastPathComponent()
             .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
         try? FileManager.default.removeItem(at: marker)
-        let nowCard = try waitForElement(
+        // Resolve a stable, hittable frame immediately before the pointer sequence. A plain AX
+        // lookup followed by a settling sleep can retain the old NOW-card frame while the first
+        // reveal refresh is still committing its snapshot/layout pass.
+        let nowCard = try waitForStableHittableElement(
             pid: pid,
-            label: "Shape the interaction contract, Synthetic UI Agent, NOW"
+            label: "Shape the interaction contract, Synthetic UI Agent, NOW",
+            value: nil,
+            scrollToVisible: true
         )
         let frame = try elementFrame(nowCard)
         let neutralPoint = CGPoint(
             x: frame.minX + min(90, frame.width * 0.28),
             y: frame.midY
         )
-        Thread.sleep(forTimeInterval: 0.7)
         try doubleTap(neutralPoint)
 
         let deadline = Date().addingTimeInterval(timeout)
@@ -381,6 +428,449 @@ enum GajendraUITest {
         }
         _ = try waitForElement(pid: pid, label: "Verify queue ordering, Synthetic UI Agent")
         _ = try waitForElement(pid: pid, label: "Run the drag regression, Synthetic UI Agent, Running now")
+    }
+
+    private static func verifyCompactPriorityActions(pid: pid_t, stateURL: URL) throws {
+        let marker = stateURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
+        try? FileManager.default.removeItem(at: marker)
+
+        let nowCard = try waitForElement(
+            pid: pid,
+            label: "Shape the interaction contract, Synthetic UI Agent, NOW"
+        )
+        try requireNoPriorityMoveOrRemoveAction(on: nowCard)
+        try requireElementAbsent(
+            pid: pid,
+            label: "Move Shape the interaction contract to Important",
+            duration: 0.2
+        )
+
+        let readyHeader = try waitForStableDockHeader(
+            pid: pid,
+            label: "Ready for Review, 1 thread",
+            value: "Expanded"
+        )
+        try scrollVertically(at: try elementFrame(readyHeader).center, lines: -8)
+        let readyPrimary = try waitForStableHittableElement(
+            pid: pid,
+            label: "Inspect the finished UI proof, Ready for Review, Task destination",
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
+        let readyAddAction = try waitForStableHittableElement(
+            pid: pid,
+            label: "Add Inspect the finished UI proof to Focus or Important",
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
+        try requireSeparatePriorityAndOpenTargets(
+            pid: pid,
+            priorityAction: readyAddAction,
+            primaryRow: readyPrimary,
+            phase: "unprioritized Ready for Review row"
+        )
+        let beforeReadyAdd = try readState(stateURL)
+        try openPriorityMenu(readyAddAction)
+        try selectPriorityMenuItem(
+            pid: pid,
+            label: "Add to Important",
+            fallbackDownArrowPresses: 2
+        )
+        try waitForPriorityLaneCounts(
+            stateURL,
+            entryCount: beforeReadyAdd.entries.count + 1,
+            focusCount: priorityEntryCount(beforeReadyAdd, level: "focus"),
+            importantCount: priorityEntryCount(beforeReadyAdd, level: "important") + 1,
+            currentThreadId: beforeReadyAdd.currentFocusThreadId,
+            phase: "adding the Ready for Review row to Important"
+        )
+        try requireOpenMarkerAbsent(marker, phase: "adding the Ready for Review row to Important")
+
+        let primaryRowLabel = "Build the isolated app, Synthetic UI Agent, Running now"
+        let addActionLabel = "Add Build the isolated app to Focus or Important"
+        let primaryRow = try waitForStableHittableElement(
+            pid: pid,
+            label: primaryRowLabel,
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
+        let addAction = try waitForStableHittableElement(
+            pid: pid,
+            label: addActionLabel,
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
+        try requireSeparatePriorityAndOpenTargets(
+            pid: pid,
+            priorityAction: addAction,
+            primaryRow: primaryRow,
+            phase: "unprioritized Running row"
+        )
+
+        let beforeAdd = try readState(stateURL)
+        let runningPrimaryCenter = try elementFrame(primaryRow).center
+        let runningPriorityCenter = try elementFrame(addAction).center
+        try openPriorityMenu(addAction)
+        try selectPriorityMenuItem(
+            pid: pid,
+            label: "Add to Focus",
+            fallbackDownArrowPresses: 1
+        )
+        try waitForPriorityLaneCounts(
+            stateURL,
+            entryCount: beforeAdd.entries.count + 1,
+            focusCount: priorityEntryCount(beforeAdd, level: "focus") + 1,
+            importantCount: priorityEntryCount(beforeAdd, level: "important"),
+            currentThreadId: beforeAdd.currentFocusThreadId,
+            phase: "adding the Running row to Focus"
+        )
+        try requireOpenMarkerAbsent(marker, phase: "adding the Running row to Focus")
+
+        let moveActionLabel = "Move Build the isolated app to Important"
+        let moveAction = try waitForStableHittableElement(
+            pid: pid,
+            label: moveActionLabel,
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false,
+            preferredPoint: runningPriorityCenter
+        )
+        let updatedPrimaryRow = try waitForStableHittableElement(
+            pid: pid,
+            label: primaryRowLabel,
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false,
+            preferredPoint: runningPrimaryCenter
+        )
+        try requireSeparatePriorityAndOpenTargets(
+            pid: pid,
+            priorityAction: moveAction,
+            primaryRow: updatedPrimaryRow,
+            phase: "prioritized Running row"
+        )
+
+        let beforeMove = try readState(stateURL)
+        try tapWithoutSettling(try elementFrame(moveAction).center)
+        Thread.sleep(forTimeInterval: 0.35)
+        try waitForPriorityLaneCounts(
+            stateURL,
+            entryCount: beforeMove.entries.count,
+            focusCount: priorityEntryCount(beforeMove, level: "focus") - 1,
+            importantCount: priorityEntryCount(beforeMove, level: "important") + 1,
+            currentThreadId: beforeMove.currentFocusThreadId,
+            phase: "moving the Running row to Important"
+        )
+        try requireOpenMarkerAbsent(marker, phase: "moving the Running row to Important")
+    }
+
+    private static func verifyRunningToReadyTransition(
+        pid: pid_t,
+        stateURL: URL,
+        catalogURL: URL
+    ) throws -> Bool {
+        // focus-b is the same synthetic provider row used by the preceding compact journey. The
+        // catalog is changed only after its real Running row is visible, then restored after the
+        // refresh/reveal proof so this test never leaves provider metadata behind.
+        let taskTitle = "Run the drag regression"
+        let sourceName = "Synthetic UI Agent"
+        let runningRowLabel = "\(taskTitle), \(sourceName), Running now"
+        let readyRowLabel = "\(taskTitle), Ready for Review, Task destination"
+        let beforePriority = try readState(stateURL)
+
+        _ = try waitForStableHittableElement(
+            pid: pid,
+            label: runningRowLabel,
+            value: "Ready",
+            scrollToVisible: true
+        )
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Running, 2 active threads",
+            value: "Expanded"
+        )
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Ready for Review, 1 thread",
+            value: "Expanded"
+        )
+
+        let originalCatalog = try Data(contentsOf: catalogURL)
+        let mutatedCatalog = try readyCatalogData(
+            from: originalCatalog,
+            taskID: "focus-b",
+            deepLink: "ui-agent://threads/focus-b"
+        )
+        try mutatedCatalog.write(to: catalogURL, options: .atomic)
+        defer {
+            // Do not overwrite an unrelated concurrent fixture writer. Under the normal isolated
+            // UI command the bytes still match and the exact original fixture is restored.
+            if let current = try? Data(contentsOf: catalogURL), current == mutatedCatalog {
+                try? originalCatalog.write(to: catalogURL, options: .atomic)
+            } else {
+                fputs(
+                    "Gajendra UI proof note: synthetic catalog changed concurrently; left its newer bytes intact.\n",
+                    stderr
+                )
+            }
+        }
+
+        let refresh = try waitForElement(pid: pid, label: "Refresh Gajendra", enabled: true)
+        guard AXUIElementPerformAction(refresh, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the compact refresh action was unavailable for the Running-to-Ready proof")
+        }
+
+        // This is the first visible projection after the provider evidence mutation. The
+        // Running count drops, the same row disappears from Running, and the Ready count grows.
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Running, 1 active threads",
+            value: "Expanded"
+        )
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Ready for Review, 2 threads",
+            value: "Expanded"
+        )
+        try requireElementAbsent(pid: pid, label: runningRowLabel, duration: 0.45)
+        _ = try waitForStableHittableElement(
+            pid: pid,
+            label: readyRowLabel,
+            value: nil,
+            scrollToVisible: true
+        )
+        guard try readState(stateURL) == beforePriority else {
+            throw GajendraUITestError.failed(
+                "the visible Running-to-Ready refresh changed persisted priority state or NOW"
+            )
+        }
+
+        // Close and reopen the actual compact card. Its reveal callback owns another refresh, so
+        // the transition is proven through the same lifecycle a user sees after hiding the card.
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "Running-to-Ready card close")
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: true, label: "Running-to-Ready card reveal")
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Running, 1 active threads",
+            value: "Expanded"
+        )
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Ready for Review, 2 threads",
+            value: "Expanded"
+        )
+        try requireElementAbsent(pid: pid, label: runningRowLabel, duration: 0.45)
+        let readyRow = try waitForStableHittableElement(
+            pid: pid,
+            label: readyRowLabel,
+            value: nil,
+            scrollToVisible: true
+        )
+
+        let marker = stateURL
+            .deletingLastPathComponent()
+            .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
+        try? FileManager.default.removeItem(at: marker)
+        try tap(try elementFrame(readyRow).center)
+        let expectedDestination = "ui-agent://threads/focus-b"
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let opened = try? String(contentsOf: marker, encoding: .utf8),
+               opened == expectedDestination {
+                break
+            }
+            Thread.sleep(forTimeInterval: 0.02)
+        } while Date() < deadline
+        guard let opened = try? String(contentsOf: marker, encoding: .utf8),
+              opened == expectedDestination else {
+            throw GajendraUITestError.failed(
+                "the transitioned Ready row did not open its exact synthetic Task destination"
+            )
+        }
+        guard try readState(stateURL) == beforePriority else {
+            throw GajendraUITestError.failed(
+                "opening the transitioned Ready row changed persisted priority state or NOW"
+            )
+        }
+        return true
+    }
+
+    private static func readyCatalogData(
+        from data: Data,
+        taskID: String,
+        deepLink: String
+    ) throws -> Data {
+        guard var root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              var threads = root["threads"] as? [[String: Any]],
+              let index = threads.firstIndex(where: { $0["id"] as? String == taskID }) else {
+            throw GajendraUITestError.failed("the synthetic UI thread catalog did not contain \(taskID)")
+        }
+        guard let status = threads[index]["status"] as? String,
+              ["active", "running"].contains(status.lowercased()),
+              threads[index]["review"] == nil,
+              threads[index]["deepLink"] as? String == deepLink else {
+            throw GajendraUITestError.failed(
+                "synthetic task \(taskID) was not in the expected Running-only state"
+            )
+        }
+
+        threads[index]["status"] = "idle"
+        threads[index]["review"] = [
+            "state": "ready",
+            "kind": "result",
+            "updatedAt": "2026-08-18T10:12:00Z",
+            "destination": [
+                "type": "thread",
+                "deepLink": deepLink,
+            ],
+            "providerStatus": "READY",
+        ]
+        root["threads"] = threads
+        return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    private static func requireNoPriorityMoveOrRemoveAction(on nowCard: AXUIElement) throws {
+        var rawActionNames: CFArray?
+        guard AXUIElementCopyActionNames(nowCard, &rawActionNames) == .success else {
+            throw GajendraUITestError.failed("the NOW row did not expose accessibility actions for the priority-action guard")
+        }
+        let actionNames = (rawActionNames as? [String]) ?? []
+        let forbidden = actionNames.filter { action in
+            let normalized = action.lowercased()
+            return normalized.contains("move to") || normalized.contains("remove from")
+        }
+        guard forbidden.isEmpty else {
+            throw GajendraUITestError.failed("the NOW row exposed a priority move or remove accessibility action")
+        }
+    }
+
+    private static func requireSeparatePriorityAndOpenTargets(
+        pid: pid_t,
+        priorityAction: AXUIElement,
+        primaryRow: AXUIElement,
+        phase: String
+    ) throws {
+        let priorityFrame = try elementFrame(priorityAction)
+        let primaryFrame = try elementFrame(primaryRow)
+        guard !priorityFrame.intersects(primaryFrame) else {
+            throw GajendraUITestError.failed("the priority action overlaps its primary Open target for the \(phase)")
+        }
+        guard let priorityHit = systemElementAtPosition(point: priorityFrame.center),
+              let primaryHit = systemElementAtPosition(point: primaryFrame.center) else {
+            throw GajendraUITestError.failed("the real window did not expose separate pointer hit targets for the \(phase)")
+        }
+        var priorityPID: pid_t = 0
+        var primaryPID: pid_t = 0
+        AXUIElementGetPid(priorityHit, &priorityPID)
+        AXUIElementGetPid(primaryHit, &primaryPID)
+        guard priorityPID == pid, primaryPID == pid,
+              accessibilityLabel(priorityHit) != accessibilityLabel(primaryHit) else {
+            throw GajendraUITestError.failed("the priority action and primary Open control were not separate real-window targets for the \(phase)")
+        }
+    }
+
+    private static func openPriorityMenu(_ action: AXUIElement) throws {
+        try tapWithoutSettling(try elementFrame(action).center)
+        Thread.sleep(forTimeInterval: 0.18)
+    }
+
+    private static func selectPriorityMenuItem(
+        pid: pid_t,
+        label: String,
+        fallbackDownArrowPresses: Int
+    ) throws {
+        if let item = waitForPriorityMenuItem(pid: pid, label: label) {
+            if AXUIElementPerformAction(item, kAXPressAction as CFString) == .success {
+                Thread.sleep(forTimeInterval: 0.3)
+                return
+            }
+            if let frame = try? elementFrame(item) {
+                try tapWithoutSettling(frame.center)
+                Thread.sleep(forTimeInterval: 0.3)
+                return
+            }
+        }
+
+        // SwiftUI/AppKit may present this transient Menu outside the app's durable AX subtree.
+        // The trigger and its adjacent primary button were independently hit-tested above; retain
+        // a real menu selection with the standard keyboard route when the child is not exposed.
+        fputs(
+            "Gajendra UI proof note: transient priority menu children were unavailable to AX; used the keyboard menu fallback after the separately hit-tested trigger.\n",
+            stderr
+        )
+        for _ in 0..<fallbackDownArrowPresses {
+            try postKey(125) // Down Arrow.
+        }
+        try postKey(36) // Return.
+        Thread.sleep(forTimeInterval: 0.35)
+    }
+
+    private static func waitForPriorityMenuItem(pid: pid_t, label: String) -> AXUIElement? {
+        let deadline = Date().addingTimeInterval(0.75)
+        repeat {
+            let application = AXUIElementCreateApplication(pid)
+            if let item = firstElement(in: application, depth: 0, label: label) {
+                return item
+            }
+            let system = AXUIElementCreateSystemWide()
+            if let rawFocused = attribute(system, kAXFocusedUIElementAttribute),
+               CFGetTypeID(rawFocused) == AXUIElementGetTypeID() {
+                let focused = rawFocused as! AXUIElement
+                if accessibilityLabel(focused) == label { return focused }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        return nil
+    }
+
+    private static func waitForPriorityLaneCounts(
+        _ url: URL,
+        entryCount: Int,
+        focusCount: Int,
+        importantCount: Int,
+        currentThreadId: String?,
+        phase: String
+    ) throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        var lastCounts = (entries: -1, focus: -1, important: -1)
+        repeat {
+            if let state = try? readState(url) {
+                lastCounts = (
+                    entries: state.entries.count,
+                    focus: priorityEntryCount(state, level: "focus"),
+                    important: priorityEntryCount(state, level: "important")
+                )
+                if lastCounts.entries == entryCount,
+                   lastCounts.focus == focusCount,
+                   lastCounts.important == importantCount,
+                   state.currentFocusThreadId == currentThreadId {
+                    return
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        throw GajendraUITestError.failed(
+            "the priority action did not persist the expected isolated lane counts during \(phase); "
+                + "entries=\(lastCounts.entries), focus=\(lastCounts.focus), important=\(lastCounts.important)"
+        )
+    }
+
+    private static func priorityEntryCount(_ state: StoredPriorityState, level: String) -> Int {
+        state.entries.filter { $0.level == level }.count
+    }
+
+    private static func requireOpenMarkerAbsent(_ marker: URL, phase: String) throws {
+        guard !FileManager.default.fileExists(atPath: marker.path) else {
+            throw GajendraUITestError.failed("the priority action opened a synthetic task during \(phase)")
+        }
     }
 
     private static func verifyTaskTapPreservesOpenMode(pid: pid_t) throws {
@@ -592,6 +1082,28 @@ enum GajendraUITest {
         let initialSource = try waitForElement(pid: pid, label: "Drag Run the drag regression")
         try moveContainingWindow(of: initialSource, to: CGPoint(x: 40, y: 40))
         Thread.sleep(forTimeInterval: 0.25)
+        try requireElementAbsent(
+            pid: pid,
+            label: "Actions for Shape the interaction contract",
+            duration: 0.2
+        )
+        let currentSource = try waitForStableHittableElement(
+            pid: pid,
+            label: "Drag Shape the interaction contract"
+        )
+        let currentCrossLaneTarget = try waitForStableHittableElement(
+            pid: pid,
+            label: "Drag Review the dock behavior"
+        )
+        let beforeCurrentDrag = try readState(stateURL)
+        try drag(
+            from: try elementFrame(currentSource).center,
+            to: try elementFrame(currentCrossLaneTarget).center
+        )
+        Thread.sleep(forTimeInterval: 0.35)
+        guard try readState(stateURL) == beforeCurrentDrag else {
+            throw GajendraUITestError.failed("Organizer allowed NOW to move or lose current status across priority lanes")
+        }
         let source = try waitForStableHittableElement(pid: pid, label: "Drag Run the drag regression")
         let target = try waitForStableHittableElement(pid: pid, label: "Drag Review the dock behavior")
         let sourceFrame = try elementFrame(source)
@@ -740,7 +1252,6 @@ enum GajendraUITest {
             value: "Expanded"
         )
         try raiseContainingWindow(of: visibleExpandedControl, context: "Running dock control")
-        _ = AXUIElementPerformAction(visibleExpandedControl, "AXScrollToVisible" as CFString)
         let expandedControl = try waitForStableHittableElement(
             pid: pid,
             label: controlLabel,
@@ -772,11 +1283,12 @@ enum GajendraUITest {
         to finalValue: String
     ) throws {
         // Let AppKit clear any prior click sequence before resolving the current, possibly
-        // scroll-adjusted header frame. The low-level gesture must click that fresh frame
-        // immediately; otherwise a visible refresh/layout pass can move it during the delay.
+        // scroll-adjusted header frame. The low-level gesture must click a neutral left-side
+        // point in that fresh header immediately; the right-side disclosure copy can otherwise
+        // produce a child AX hit instead of the dock's double-click target.
         Thread.sleep(forTimeInterval: 0.7)
         let header = try waitForStableDockHeader(pid: pid, label: label, value: initialValue)
-        try doubleTap(try elementFrame(header).center)
+        try doubleTap(dockHeaderInteractionPoint(try elementFrame(header)))
         _ = try waitForDockHeaderValue(header, pid: pid, label: label, expected: finalValue)
     }
 
@@ -789,7 +1301,6 @@ enum GajendraUITest {
         let deadline = Date().addingTimeInterval(timeout)
         var observedValues: [String] = []
         repeat {
-            _ = AXUIElementPerformAction(retainedHeader, "AXScrollToVisible" as CFString)
             if let retainedValue = attribute(retainedHeader, kAXValueAttribute) as? String {
                 observedValues.append(retainedValue)
                 if retainedValue == expected { return retainedHeader }
@@ -1067,6 +1578,38 @@ enum GajendraUITest {
         }
     }
 
+    private static func compactCardScrollPoint(pid: pid_t) -> CGPoint? {
+        windows(pid: pid)
+            .filter {
+                $0.isOnScreen
+                    && $0.layer > 0
+                    && $0.alpha > 0.01
+                    && $0.bounds.width >= 300
+                    && $0.bounds.height >= 300
+            }
+            .min { lhs, rhs in
+                lhs.bounds.width * lhs.bounds.height < rhs.bounds.width * rhs.bounds.height
+            }?
+            .bounds.center
+    }
+
+    private static func scrollCompactCardTowardElement(pid: pid_t, frame: CGRect) throws {
+        guard let cardPoint = compactCardScrollPoint(pid: pid) else {
+            throw GajendraUITestError.failed("the compact card was unavailable for a real scroll-wheel reveal")
+        }
+        // Window-list coordinates use a top-left origin. A row below the card needs the same
+        // negative wheel direction used by a trackpad user to reveal later content.
+        let lines: Int32 = frame.midY >= cardPoint.y ? -8 : 8
+        try scrollVertically(at: cardPoint, lines: lines)
+    }
+
+    private static func dockHeaderInteractionPoint(_ frame: CGRect) -> CGPoint {
+        CGPoint(
+            x: frame.minX + min(90, max(28, frame.width * 0.28)),
+            y: frame.midY
+        )
+    }
+
     private static func number(_ value: Any?) -> CGFloat? {
         (value as? NSNumber).map { CGFloat(truncating: $0) }
     }
@@ -1280,16 +1823,31 @@ enum GajendraUITest {
     ) throws -> AXUIElement {
         let header = try waitForElement(pid: pid, label: label, value: value)
         try raiseContainingWindow(of: header, context: "dock header")
-        // Compact cards can place the review disclosure below the current ScrollView viewport.
-        // Request visibility before resolving a pointer frame; unsupported AX actions are safe
-        // to ignore on older accessibility implementations.
-        _ = AXUIElementPerformAction(header, "AXScrollToVisible" as CFString)
-        return try waitForStableHittableElement(
+
+        // AXScrollToVisible invalidates SwiftUI's LazyVStack accessibility subtree. First prove
+        // that the current header is already pointer-stable without asking the scroll view to lay
+        // itself out again. If it really is outside the viewport, request visibility once, then
+        // reacquire it from the rebuilt AX tree.
+        if let stableVisibleHeader = try? waitForStableHittableElement(
             pid: pid,
             label: label,
             value: value,
-            scrollToVisible: true,
-            requiresSemanticHit: false
+            maximumWait: 0.3
+        ) {
+            return stableVisibleHeader
+        }
+
+        // This is the same scroll-wheel path a user takes. AXScrollToVisible invalidates the
+        // compact LazyVStack's disclosure element on this macOS target, so it is deliberately
+        // not an accessibility-test fallback.
+        guard let cardPoint = compactCardScrollPoint(pid: pid) else {
+            throw GajendraUITestError.failed("the compact card was unavailable to reveal dock header \(label)")
+        }
+        try scrollVertically(at: cardPoint, lines: -8)
+        return try waitForStableHittableElement(
+            pid: pid,
+            label: label,
+            value: value
         )
     }
 
@@ -1302,24 +1860,45 @@ enum GajendraUITest {
         label: String,
         value: String?,
         scrollToVisible: Bool = false,
-        requiresSemanticHit: Bool = true
+        requiresSemanticHit: Bool = true,
+        preferredPoint: CGPoint? = nil,
+        maximumWait: TimeInterval? = nil
     ) throws -> AXUIElement {
-        let deadline = Date().addingTimeInterval(timeout)
+        let deadline = Date().addingTimeInterval(maximumWait ?? timeout)
         var previousFrame: CGRect?
         var stableSamples = 0
         var lastOwnerPID: pid_t = 0
         var lastHitLabel = "none"
         var recentFrames: [String] = []
+        var requestedPhysicalScroll = false
         repeat {
             let application = AXUIElementCreateApplication(pid)
-            for element in matchingElements(in: application, depth: 0, label: label) {
+            let matches = matchingElements(in: application, depth: 0, label: label)
+            let orderedMatches: [AXUIElement]
+            if let preferredPoint {
+                let nearest = matches.min { lhs, rhs in
+                    let lhsCenter = (try? elementFrame(lhs))?.center ?? .zero
+                    let rhsCenter = (try? elementFrame(rhs))?.center ?? .zero
+                    return hypot(lhsCenter.x - preferredPoint.x, lhsCenter.y - preferredPoint.y)
+                        < hypot(rhsCenter.x - preferredPoint.x, rhsCenter.y - preferredPoint.y)
+                }
+                orderedMatches = nearest.map { [$0] } ?? []
+            } else {
+                orderedMatches = matches
+            }
+            for element in orderedMatches {
                 guard (attribute(element, kAXEnabledAttribute) as? NSNumber)?.boolValue != false,
                       value == nil || (attribute(element, kAXValueAttribute) as? String) == value else { continue }
-                if scrollToVisible {
-                    _ = AXUIElementPerformAction(element, "AXScrollToVisible" as CFString)
+                guard let frame = try? elementFrame(element) else { continue }
+                guard let hit = systemElementAtPosition(point: frame.center) else {
+                    if scrollToVisible && !requestedPhysicalScroll {
+                        try scrollCompactCardTowardElement(pid: pid, frame: frame)
+                        requestedPhysicalScroll = true
+                        previousFrame = nil
+                        stableSamples = 0
+                    }
+                    continue
                 }
-                guard let frame = try? elementFrame(element),
-                      let hit = systemElementAtPosition(point: frame.center) else { continue }
                 recentFrames.append(describeFrame(frame))
                 if recentFrames.count > 12 {
                     recentFrames.removeFirst(recentFrames.count - 12)
@@ -1328,9 +1907,23 @@ enum GajendraUITest {
                 var hitPID: pid_t = 0
                 AXUIElementGetPid(hit, &hitPID)
                 lastOwnerPID = hitPID
-                guard hitPID == pid else { continue }
+                guard hitPID == pid else {
+                    if scrollToVisible && !requestedPhysicalScroll {
+                        try scrollCompactCardTowardElement(pid: pid, frame: frame)
+                        requestedPhysicalScroll = true
+                        previousFrame = nil
+                        stableSamples = 0
+                    }
+                    continue
+                }
                 if requiresSemanticHit,
-                   !hitLabelRepresentsRow(lastHitLabel, expected: label) {
+                   !hitElementRepresentsTarget(hit, ownerPID: pid, expected: label) {
+                    if scrollToVisible && !requestedPhysicalScroll {
+                        try scrollCompactCardTowardElement(pid: pid, frame: frame)
+                        requestedPhysicalScroll = true
+                        previousFrame = nil
+                        stableSamples = 0
+                    }
                     continue
                 }
                 if let previousFrame,
@@ -1365,6 +1958,33 @@ enum GajendraUITest {
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         )
         return !expectedTokens.isEmpty && expectedTokens.allSatisfy(hitTokens.contains)
+    }
+
+    /// AX hit testing commonly lands on a child Text/Image inside a SwiftUI accessibility element.
+    /// Treat it as the requested target only when an owning in-process ancestor carries the exact
+    /// semantic label. This distinguishes an offscreen disclosure's stale frame from a visible
+    /// header without forcing the enclosing LazyVStack to scroll.
+    private static func hitElementRepresentsTarget(
+        _ element: AXUIElement,
+        ownerPID: pid_t,
+        expected: String
+    ) -> Bool {
+        var candidate: AXUIElement? = element
+        for _ in 0..<8 {
+            guard let current = candidate else { return false }
+            var currentPID: pid_t = 0
+            AXUIElementGetPid(current, &currentPID)
+            if currentPID == ownerPID,
+               hitLabelRepresentsRow(accessibilityLabel(current) ?? "", expected: expected) {
+                return true
+            }
+            guard let parent = attribute(current, kAXParentAttribute),
+                  CFGetTypeID(parent) == AXUIElementGetTypeID() else {
+                return false
+            }
+            candidate = (parent as! AXUIElement)
+        }
+        return false
     }
 
     private static func hitLabelRepresentsPill(_ hitLabel: String) -> Bool {
@@ -1751,6 +2371,23 @@ enum GajendraUITest {
         }
         event.setIntegerValueField(.mouseEventClickState, value: clickState)
         event.post(tap: .cghidEventTap)
+    }
+
+    private static func scrollVertically(at point: CGPoint, lines: Int32) throws {
+        postMove(to: point)
+        guard let event = CGEvent(
+            scrollWheelEvent2Source: nil,
+            units: .line,
+            wheelCount: 1,
+            wheel1: lines,
+            wheel2: 0,
+            wheel3: 0
+        ) else {
+            throw GajendraUITestError.failed("could not create a vertical scroll event")
+        }
+        event.location = point
+        event.post(tap: .cghidEventTap)
+        Thread.sleep(forTimeInterval: 0.35)
     }
 }
 

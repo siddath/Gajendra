@@ -23,7 +23,9 @@
    are source requirements. Physical accessibility evidence remains a separate pending gate.
 6. **Metadata-first rows.** Compact tasks show the thread title, project, context/tag when present,
    provider, and an applicable Running/Review mark. Hover and hold create selection feedback; a
-   selected row lifts for app-local drag instead of carrying permanent menu/drag chrome.
+   selected row lifts for app-local drag instead of carrying generic menu/drag chrome. A stable
+   trailing slot may hold a purpose-specific add/swap control, but NOW never exposes a lane-changing
+   action and the control must remain separate from the row's Open target.
 
 Green is reserved for provider-confirmed activity. System orange supports Ready for Review and is
 always paired with a static `checkmark.bubble` glyph, the visible status label, ready time, and

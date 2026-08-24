@@ -92,7 +92,7 @@ The bounded spike may reuse the responsive web UI only if:
 
 If any gate fails, stop and update the decision register with evidence. The predeclared fallback is
 SwiftUI plus Jetpack Compose over the unchanged mobile-safe contract and needs a new estimate and
-Sid approval.
+repository-owner approval.
 
 ## UX evidence
 

@@ -60,13 +60,23 @@ fi
 
 /bin/mkdir -p "$test_root/home" "$test_root/state"
 /bin/cp "$store_fixture" "$test_root/state/gajendra.v2.json"
+# Keep provider evidence fully isolated: the UI journey is allowed to mutate only these temp
+# copies, never the source-controlled catalog/configuration used to seed the test.
+test_sources_fixture="$test_root/ui-interactions-sources.json"
+test_threads_fixture="$test_root/ui-interactions-threads.json"
+/bin/cp "$sources_fixture" "$test_sources_fixture"
+/bin/cp "$threads_fixture" "$test_threads_fixture"
+/usr/bin/sed -e "s|plugins/gajendra/tests/fixtures/ui-interactions-threads.json|$test_threads_fixture|g" \
+  "$test_sources_fixture" >"$test_sources_fixture.rewritten"
+/bin/mv "$test_sources_fixture.rewritten" "$test_sources_fixture"
 /bin/chmod 0700 "$test_root/state"
 /bin/chmod 0600 "$test_root/state/gajendra.v2.json"
+/bin/chmod 0600 "$test_sources_fixture" "$test_threads_fixture"
 
 env \
   CFFIXED_USER_HOME="$test_root/home" \
   GAJENDRA_DATA_DIR="$test_root/state" \
-  GAJENDRA_SOURCES_CONFIG="$sources_fixture" \
+  GAJENDRA_SOURCES_CONFIG="$test_sources_fixture" \
   GAJENDRA_UI_TEST_PROBE=1 \
   "$app_binary" \
   -ApplePersistenceIgnoreState YES \
@@ -81,7 +91,7 @@ app_pid=$!
 /usr/bin/swift build --package-path "$package_root" -c release --product GajendraUITest
 test_binary_dir=$(/usr/bin/swift build --package-path "$package_root" -c release --show-bin-path)
 
-if ! "$test_binary_dir/GajendraUITest" "$app_pid" "$test_root/state/gajendra.v2.json" "$app_path"; then
+if ! "$test_binary_dir/GajendraUITest" "$app_pid" "$test_root/state/gajendra.v2.json" "$test_threads_fixture" "$app_path"; then
   /usr/bin/tail -n 80 "$test_root/app.log" >&2 || true
   exit 1
 fi

@@ -13,10 +13,10 @@ approval remains absent.
 
 **Repository baseline:** 53e9855e8d19f90bb1d35e7432d5bc514e418f67 on main
 
-**Approval owner:** Sid
+**Approval owner:** repository owner
 
 This directory is the durable handoff for a future Gajendra mobile implementation. It records the
-architecture, evidence requirements, and gates that remain closed until Sid authorizes product
+architecture, evidence requirements, and gates that remain closed until the repository owner authorizes product
 work.
 
 The E0 amendment freezes ownership, pairing/authentication, modern Streamable HTTP request
@@ -33,7 +33,7 @@ The [master plan](../GAJENDRA_MOBILE_APP_PLAN.md) is the primary decision record
 decompose it without changing its scope.
 
 - plan_generated: written and reviewable, but not approved for implementation.
-- approved_for_spike: Sid has approved only the bounded phase-zero spike.
+- approved_for_spike: the repository owner has approved only the bounded phase-zero spike.
 - implementation_in_progress: an approved phase has product changes and current evidence.
 - verified: the named gate passed on the named host, device, and build.
 - mobile_ready: every required desktop, simulator/emulator, physical-device, security, and
@@ -79,10 +79,10 @@ When work resumes:
 1. Check the current branch, HEAD, worktree, package locks, status documents, and installed
    toolchains. Do not assume this baseline is still current.
 2. Read the master plan, the decisions register, and the plan for the next intended phase.
-3. Re-run the Sid Harness preparation route. If Gajendra is still absent from its registry, record
+3. Re-run the AI Harness preparation route. If Gajendra is still absent from its registry, record
    that boundary and use live Gajendra repo canon plus governing standards.
 4. Reconfirm requested model/agent availability only if delegation is still requested.
-5. Record Sid's exact approval and scope in the decisions register.
+5. Record the repository owner's exact approval and scope in the decisions register.
 6. Create a fresh codex-prefixed implementation branch only after approval.
 7. Execute one phase at a time, attach its evidence receipt, and reopen proof invalidated by later
    work.

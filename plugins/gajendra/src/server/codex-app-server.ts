@@ -39,6 +39,15 @@ const MAX_LSOF_OUTPUT_BYTES = 512 * 1024;
 // These are intentionally bounded teardown timings, separate from the request-response timeout.
 const CODEX_APP_SERVER_KILL_GRACE_MS = LSOF_KILL_GRACE_MS;
 const CODEX_APP_SERVER_CLOSE_GRACE_MS = LSOF_CLOSE_GRACE_MS;
+/** The default per-RPC budget also bounds each app-server initialize request. */
+export const DEFAULT_CODEX_RPC_TIMEOUT_MS = 15_000;
+/**
+ * An experimental initialize rejection can take one TERM/KILL/pipe-close settlement cycle before
+ * the baseline initialize is allowed to start. Keep this explicit so the provider envelope and
+ * the native watchdog can be derived from the same bounded teardown contract.
+ */
+export const CODEX_APP_SERVER_RETRY_SETTLEMENT_MS =
+  CODEX_APP_SERVER_KILL_GRACE_MS + CODEX_APP_SERVER_CLOSE_GRACE_MS + CODEX_APP_SERVER_KILL_GRACE_MS;
 /**
  * A measured production thread/list response for 100 Codex threads was 383,665 bytes. Keep enough
  * headroom for that ordinary frame while still bounding an unterminated or hostile stdout stream.
@@ -61,6 +70,18 @@ export const DEFAULT_CODEX_REVIEW_CONCURRENCY = 4;
 export const MAX_CODEX_REVIEW_CONCURRENCY = DEFAULT_CODEX_REVIEW_CONCURRENCY;
 export const DEFAULT_CODEX_REVIEW_DEADLINE_MS = 5_000;
 export const MAX_CODEX_REVIEW_DEADLINE_MS = DEFAULT_CODEX_REVIEW_DEADLINE_MS;
+/**
+ * Maximum accepted Codex source time: experimental initialize (15s), bounded teardown (0.75s),
+ * baseline initialize (15s), thread listing (20s), and the hard-capped runtime enrichment (10s).
+ * The supported experimental path can spend another 5s on review enrichment, but it has only one
+ * initialize, so it remains below this fallback path. This is a provider budget, before
+ * service-store settling.
+ */
+export const CODEX_PROVIDER_COLLECTION_ENVELOPE_MS =
+  (DEFAULT_CODEX_RPC_TIMEOUT_MS * 2)
+  + CODEX_APP_SERVER_RETRY_SETTLEMENT_MS
+  + MAX_CODEX_THREAD_LIST_DURATION_MS
+  + MAX_CODEX_ENRICHMENT_DEADLINE_MS;
 
 type CodexThreadListPage = { data?: CodexThread[]; nextCursor?: string | null };
 type CodexTurnListPage = { data?: unknown };
@@ -143,6 +164,7 @@ export class CodexAppServerClient {
   private nextId = 1;
   private stdoutCleanup: (() => void) | null = null;
   private readonly stdoutLineLimit: number;
+  private readonly requestTimeoutMs: number;
   private readonly pending = new Map<
     number,
     { resolve(value: unknown): void; reject(error: Error): void; timeout: NodeJS.Timeout }
@@ -152,9 +174,10 @@ export class CodexAppServerClient {
   private experimentalTurnsUnsupported = false;
 
   constructor(
-    private readonly requestTimeoutMs = resolveRpcTimeout(),
+    requestTimeoutMs = resolveRpcTimeout(),
     private readonly env: NodeJS.ProcessEnv = process.env,
   ) {
+    this.requestTimeoutMs = clampCodexRpcTimeout(requestTimeoutMs);
     this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
 
@@ -702,6 +725,10 @@ function classifyCodexReviewTurnPage(thread: CodexThread, response: unknown, now
   // valid optional metadata batch, and no error/details are traversed or retained.
   if (summary.status !== "completed") return { kind: "not-ready" };
   if (summary.error !== null) return { kind: "invalid" };
+  // After the metadata-only shape and null error checks above, an explicit null completion time is
+  // an older Codex candidate-local omission rather than malformed metadata. It is not review-ready
+  // and must not poison valid siblings. Missing/other timestamp values still fail closed below.
+  if (summary.completedAt === null) return { kind: "not-ready" };
   const completedAt = codexCompletedAt(summary.completedAt, nowMs);
   if (completedAt === null) return { kind: "invalid" };
   return { kind: "ready", signal: {
@@ -1021,7 +1048,15 @@ export function listOpenFiles(
 
 export function resolveRpcTimeout(env: NodeJS.ProcessEnv = process.env): number {
   const configured = Number(env.GAJENDRA_RPC_TIMEOUT_MS ?? env.AADI_RPC_TIMEOUT_MS ?? env.PRIORITY_DECK_RPC_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured > 0 ? configured : 15_000;
+  // Compatibility overrides may tighten the default request budget, but cannot enlarge the
+  // service envelope. A larger provider wait would otherwise invalidate the derived 70-second
+  // generation deadline without changing any caller-visible configuration.
+  return clampCodexRpcTimeout(configured);
+}
+
+/** Applies the same hard request ceiling to environment and direct-constructor callers. */
+export function clampCodexRpcTimeout(value: number | undefined): number {
+  return boundedPositive(value, DEFAULT_CODEX_RPC_TIMEOUT_MS, DEFAULT_CODEX_RPC_TIMEOUT_MS);
 }
 
 export function resolveCodexAppServerStdoutLineLimit(env: NodeJS.ProcessEnv = process.env): number {

@@ -10,7 +10,7 @@ const assets = new Map([
   ["gajendra-hero-background.png", [1536, 1024]],
   ["gajendra-hero.png", [1536, 1024]],
   ["gajendra-launch-overview.png", [1520, 1360]],
-  ["gajendra-launch-ready-for-review.png", [1320, 1220]],
+  ["gajendra-launch-ready-for-review.png", [1520, 1360]],
   ["gajendra-launch-search.png", [1320, 1220]],
   ["gajendra-launch-queue-editing.png", [1320, 1220]],
   ["gajendra-launch-organizer.png", [1240, 1800]],

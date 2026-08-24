@@ -31815,6 +31815,7 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
     return repairCurrentFocus(next);
   }
   if (mutation.type === "set-level") {
+    if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") return next;
     const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
     if (mutation.level) {
@@ -31846,6 +31847,11 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
 }
 function moveBefore(store, mutation, now) {
   const next = store;
+  if (next.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    const hasValidReplacement = typeof replacement === "string" && replacement !== mutation.threadId && next.entries.some((entry2) => entry2.threadId === replacement && entry2.level === "focus");
+    if (!hasValidReplacement) return next;
+  }
   const existingIndex = next.entries.findIndex((entry2) => entry2.threadId === mutation.threadId);
   const existing = existingIndex >= 0 ? next.entries[existingIndex] : void 0;
   if (existingIndex >= 0) next.entries.splice(existingIndex, 1);
@@ -32520,6 +32526,8 @@ var LSOF_CLOSE_GRACE_MS = LSOF_KILL_GRACE_MS;
 var MAX_LSOF_OUTPUT_BYTES = 512 * 1024;
 var CODEX_APP_SERVER_KILL_GRACE_MS = LSOF_KILL_GRACE_MS;
 var CODEX_APP_SERVER_CLOSE_GRACE_MS = LSOF_CLOSE_GRACE_MS;
+var DEFAULT_CODEX_RPC_TIMEOUT_MS = 15e3;
+var CODEX_APP_SERVER_RETRY_SETTLEMENT_MS = CODEX_APP_SERVER_KILL_GRACE_MS + CODEX_APP_SERVER_CLOSE_GRACE_MS + CODEX_APP_SERVER_KILL_GRACE_MS;
 var DEFAULT_CODEX_APP_SERVER_MAX_LINE_BYTES = 512 * 1024;
 var MAX_CODEX_APP_SERVER_MAX_LINE_BYTES = 1024 * 1024;
 var MAX_CODEX_THREAD_PAGES = 20;
@@ -32535,6 +32543,7 @@ var DEFAULT_CODEX_REVIEW_CONCURRENCY = 4;
 var MAX_CODEX_REVIEW_CONCURRENCY = DEFAULT_CODEX_REVIEW_CONCURRENCY;
 var DEFAULT_CODEX_REVIEW_DEADLINE_MS = 5e3;
 var MAX_CODEX_REVIEW_DEADLINE_MS = DEFAULT_CODEX_REVIEW_DEADLINE_MS;
+var CODEX_PROVIDER_COLLECTION_ENVELOPE_MS = DEFAULT_CODEX_RPC_TIMEOUT_MS * 2 + CODEX_APP_SERVER_RETRY_SETTLEMENT_MS + MAX_CODEX_THREAD_LIST_DURATION_MS + MAX_CODEX_ENRICHMENT_DEADLINE_MS;
 var CodexAppServerRpcError = class extends Error {
   constructor(code, message) {
     super(message);
@@ -32554,8 +32563,8 @@ function isUnsupportedExperimentalError(error51) {
 }
 var CodexAppServerClient = class {
   constructor(requestTimeoutMs = resolveRpcTimeout(), env = process.env) {
-    this.requestTimeoutMs = requestTimeoutMs;
     this.env = env;
+    this.requestTimeoutMs = clampCodexRpcTimeout(requestTimeoutMs);
     this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
   process = null;
@@ -32566,6 +32575,7 @@ var CodexAppServerClient = class {
   nextId = 1;
   stdoutCleanup = null;
   stdoutLineLimit;
+  requestTimeoutMs;
   pending = /* @__PURE__ */ new Map();
   ready = null;
   experimentalApiEnabled = false;
@@ -32996,6 +33006,7 @@ function classifyCodexReviewTurnPage(thread, response, nowMs) {
   }
   if (summary.status !== "completed") return { kind: "not-ready" };
   if (summary.error !== null) return { kind: "invalid" };
+  if (summary.completedAt === null) return { kind: "not-ready" };
   const completedAt = codexCompletedAt(summary.completedAt, nowMs);
   if (completedAt === null) return { kind: "invalid" };
   return { kind: "ready", signal: {
@@ -33266,7 +33277,10 @@ function listOpenFiles(lockDirectory, env, options = {}) {
 }
 function resolveRpcTimeout(env = process.env) {
   const configured = Number(env.GAJENDRA_RPC_TIMEOUT_MS ?? env.AADI_RPC_TIMEOUT_MS ?? env.PRIORITY_DECK_RPC_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured > 0 ? configured : 15e3;
+  return clampCodexRpcTimeout(configured);
+}
+function clampCodexRpcTimeout(value) {
+  return boundedPositive(value, DEFAULT_CODEX_RPC_TIMEOUT_MS, DEFAULT_CODEX_RPC_TIMEOUT_MS);
 }
 function resolveCodexAppServerStdoutLineLimit(env = process.env) {
   return boundedPositive(
@@ -33350,7 +33364,7 @@ var ThreadSourceRegistry = class {
   constructor(codex = new CodexAppServerClient(), env = process.env) {
     this.env = env;
     this.codex = codex;
-    this.sourceCollectionConcurrency = boundedSourceConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
+    this.sourceCollectionConcurrency = resolveSourceCollectionConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
   codex;
   sourceCollectionConcurrency;
@@ -33386,7 +33400,7 @@ var ThreadSourceRegistry = class {
   }
 };
 async function collectSourceAdapters(adapters, preferences, maxConcurrency = DEFAULT_SOURCE_COLLECTION_CONCURRENCY) {
-  const concurrency = Math.min(boundedSourceConcurrency(maxConcurrency), adapters.length);
+  const concurrency = Math.min(resolveSourceCollectionConcurrency(maxConcurrency), adapters.length);
   const outcomes = new Array(adapters.length);
   let nextAdapter = 0;
   const worker = async () => {
@@ -33825,10 +33839,10 @@ function sourcesConfigByteLimit(env) {
   if (!Number.isSafeInteger(requested) || requested <= 0) return DEFAULT_MAX_SOURCES_CONFIG_BYTES;
   return Math.min(requested, MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES);
 }
-function boundedSourceConcurrency(value) {
+function resolveSourceCollectionConcurrency(value) {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) return DEFAULT_SOURCE_COLLECTION_CONCURRENCY;
-  return Math.min(parsed, MAX_SOURCE_COLLECTION_CONCURRENCY);
+  return Math.min(Math.max(parsed, DEFAULT_SOURCE_COLLECTION_CONCURRENCY), MAX_SOURCE_COLLECTION_CONCURRENCY);
 }
 function resolveSourcesConfigPath(env = process.env) {
   if (env.GAJENDRA_SOURCES_CONFIG) return path3.resolve(env.GAJENDRA_SOURCES_CONFIG);
@@ -34149,14 +34163,16 @@ async function boundedDirectoryEntries(directoryPath, budget) {
 // src/server/service.ts
 var GENERATION_BUSY_MESSAGE = "Gajendra changed repeatedly while sources were loading. Refresh and retry.";
 var MAX_GENERATION_RETRIES = 4;
+var DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS = CODEX_PROVIDER_COLLECTION_ENVELOPE_MS + 9250;
 var GajendraService = class {
   constructor(store = new GajendraStoreRepository(), sources = new ThreadSourceRegistry(), options = {}) {
     this.store = store;
     this.sources = sources;
+    this.now = options.now ?? Date.now;
     this.generationDeadlineMs = boundedPositive2(
       options.generationDeadlineMs,
-      this.store.lockTimeoutMs,
-      Math.max(this.store.lockTimeoutMs, this.store.staleLockMs)
+      DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS,
+      DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS
     );
     this.maxGenerationRetries = boundedPositive2(
       options.maxGenerationRetries,
@@ -34166,12 +34182,13 @@ var GajendraService = class {
   }
   generationDeadlineMs;
   maxGenerationRetries;
+  now;
   async snapshot() {
-    const deadline = Date.now() + this.generationDeadlineMs;
+    const deadline = this.now() + this.generationDeadlineMs;
     const collections = /* @__PURE__ */ new Map();
     let retries = 0;
     for (; ; ) {
-      if (Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      if (this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       const state = await this.store.read();
       let collection;
       try {
@@ -34187,7 +34204,7 @@ var GajendraService = class {
       if (sameSourcePreferences(confirmed.sourcePreferences, state.sourcePreferences)) {
         return buildSnapshot(confirmed, collection.threads, collection.sources, collection.error);
       }
-      if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.safeAuthoritativeSnapshot();
+      if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       collections.clear();
       retries += 1;
     }
@@ -34197,11 +34214,11 @@ var GajendraService = class {
     const request = normalizeRequest(input);
     const fingerprint = mutationFingerprint(request.mutation);
     const idempotencyKeyHash = request.idempotencyKey ? hashIdempotencyKey(request.idempotencyKey) : void 0;
-    const deadline = Date.now() + this.generationDeadlineMs;
+    const deadline = this.now() + this.generationDeadlineMs;
     const collections = /* @__PURE__ */ new Map();
     let retries = 0;
     for (; ; ) {
-      if (Date.now() >= deadline) return this.storeBusyResult();
+      if (this.now() >= deadline) return this.storeBusyResult();
       const stateForSources = await this.store.read();
       let collection;
       try {
@@ -34257,7 +34274,7 @@ var GajendraService = class {
         }, next);
       });
       if (attempt.retry) {
-        if (retries >= this.maxGenerationRetries || Date.now() >= deadline) return this.storeBusyResult();
+        if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.storeBusyResult();
         collections.clear();
         retries += 1;
         continue;
@@ -34297,9 +34314,10 @@ var GajendraService = class {
     const key = sourcePreferencesKey(preferences);
     const cached2 = collections.get(key);
     if (cached2) return cached2;
-    const remaining = deadline - Date.now();
+    const remaining = deadline - this.now();
     if (remaining <= 0) throw new GenerationDeadlineError();
     const collection = await completeBeforeDeadline(this.collect(preferences), remaining);
+    if (this.now() >= deadline) throw new GenerationDeadlineError();
     collections.set(key, collection);
     return collection;
   }
@@ -34365,7 +34383,14 @@ function validateMutation(store, mutation, collection) {
   if (mutation.type === "move" || mutation.type === "set-context") {
     return stored ? null : "invalid-target";
   }
+  if (mutation.type === "set-level") {
+    return store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus" ? "invalid-target" : null;
+  }
   if (mutation.type !== "move-before") return null;
+  if (store.currentFocusThreadId === mutation.threadId && mutation.level !== "focus") {
+    const replacement = Object.hasOwn(mutation, "currentThreadId") ? mutation.currentThreadId : null;
+    if (typeof replacement !== "string" || replacement === mutation.threadId) return "invalid-target";
+  }
   if (!Object.hasOwn(mutation, "currentThreadId") && mutation.isCurrent === true && mutation.level !== "focus") return "invalid-target";
   if (mutation.level === null) {
     if (mutation.beforeThreadId) return "invalid-target";

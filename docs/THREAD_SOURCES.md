@@ -16,15 +16,36 @@ have hard bounds. Process collection stops retaining stdout after its cap/timeou
 TERM-to-KILL/close settlement for an uncooperative child. A provider failure leaves the safe base
 status instead of exposing partial/private data.
 
+Source adapters run with a four-worker floor and an eight-worker hard cap, so a lower
+`GAJENDRA_SOURCE_COLLECTION_CONCURRENCY` value cannot serialize the default-enabled Cursor pass
+after Codex and invalidate the derived generation envelope.
+
 Source preference generation is part of a collection result. The service verifies that generation
 before returning or mutating a snapshot; under sustained change it uses a bounded retry/deadline
 and returns a typed safe busy/error response instead of a stale success.
+
+The outer source-generation budget defaults to a derived 70-second provider/store envelope, not the
+store's 30-second stale-lock recovery window or its 5-second lock-acquisition timeout. Accepted
+Codex bounds cover experimental initialize, bounded fallback teardown, baseline initialize, listing,
+and the hard-capped runtime enrichment; the initial store read is included before provider work.
+This remains an overall safe-fallback budget, not a hard end-to-end snapshot ceiling: lock
+acquisition for a later store operation is capped at five seconds, while the filesystem operation
+itself remains under the native process watchdog. Provider-specific row, byte, worker, and deadline
+bounds continue to apply inside the generation budget. Explicit `generationDeadlineMs` callers may
+choose a tighter bound.
+
+The macOS client gives the local service an 85-second subprocess watchdog over the 70-second
+source-generation budget and later store/process work. At the threshold it initiates TERM/KILL;
+process-group and pipe-drain cleanup follows. Treat 85 seconds as a termination threshold, not a
+strict response-by SLO.
 
 ## Running
 
 Running is an explicit provider status. It is shown across NOW, Focus, Important, and unprioritized
 work without creating a new persisted tier. `resumable` does not mean Running. The registry retains
-explicit active rows when applying background/result caps.
+explicit active rows when applying background/result caps. When a provider later supplies valid
+completion evidence, the next refresh removes that thread from Running and presents it as Ready for
+Review; this is a provider-status transition, not an unread-state transition.
 
 ## Ready for Review
 
@@ -44,11 +65,14 @@ The current local Codex app-server is the only built-in review path. Gajendra op
 experimental API and asks `thread/turns/list` for at most the newest turn with
 `itemsView: "notLoaded"`. A candidate is ready only when the response is structurally exact, returns
 zero items, reports terminal `completed` with no error and a valid completion time, and the thread
-is not Running. Up to the existing 200 newest background candidates are checked by a four-worker,
-five-second bounded pass. An unsupported method, deadline, malformed response, returned item, or
-invalid/future timestamp suppresses the whole built-in review batch. A structurally valid empty,
-active, interrupted, or failed newest turn contributes no Ready signal without poisoning other
-valid candidates.
+is not Running. An otherwise exact safe response with `completedAt: null` is candidate-local omitted
+evidence: it contributes no Ready signal for that one candidate but does not expose content or
+discard another independently valid candidate. Up to the existing 200 newest background candidates
+are checked by a four-worker, five-second bounded pass. An unsupported method, deadline, malformed
+or private-content response, returned item, error on a purported completed turn, or invalid/future
+timestamp suppresses the whole built-in review batch fail-closed. A structurally valid empty,
+active, failed, or interrupted newest turn contributes no Ready signal without exposing its error
+detail or being treated as a private/protocol-error batch failure.
 
 Claude Code, Cursor, and Grok do not currently emit built-in review readiness. Gajendra does not
 translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review signal. Remote

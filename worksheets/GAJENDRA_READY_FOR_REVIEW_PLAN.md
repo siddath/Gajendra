@@ -9,7 +9,7 @@ Visible product language: **Gajendra** — **One clear focus across your AI tool
 promise remains **One NOW. One short queue. One click back to the exact thread.** This plan uses
 NOW, Focus, Important, and Running as plain queue labels.
 
-Owner: Sid approves the contract and rollout. No deadline was supplied.
+Owner: the repository owner approves the contract and rollout. No deadline was supplied.
 
 Decision enabled: use **Ready for Review** below **Running** as a live “agent turn completed and
 awaiting your next input” disclosure, while keeping remote-provider adapters separately gated.

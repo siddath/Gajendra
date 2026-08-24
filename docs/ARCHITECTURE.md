@@ -50,7 +50,15 @@ Built-ins and configured sources contribute bounded normalized metadata. Configu
 unique and cannot collide with built-in or reserved namespaces. Catalog/output reads, process
 capture, source selection, app-server pagination, and enrichment use explicit byte, row, worker,
 and deadline bounds. Source preference changes are generation-checked so a returned snapshot does
-not mix one preference generation with threads collected under another.
+not mix one preference generation with threads collected under another. The outer source-generation
+budget is a derived 70-second provider/store envelope, not the store's 30-second stale-lock recovery
+marker: accepted Codex bounds cover experimental initialize, bounded fallback teardown, baseline
+initialize, listing, and the hard-capped runtime enrichment. The initial private store read is
+included before provider work; explicit `generationDeadlineMs` callers may still choose a tighter
+bound. The native client wraps that source-generation budget in an 85-second process watchdog over
+later store and process work. At the threshold it initiates TERM/KILL, after which process-group and
+pipe-drain cleanup follows; 85 seconds is therefore a termination threshold, not a strict response
+deadline.
 
 An optional adapter `ReviewSignal` remains on the live normalized thread only. The service projects
 explicit non-Running signals by review timestamp for the Ready for Review disclosure; it does not

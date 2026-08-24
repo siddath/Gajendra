@@ -24,13 +24,19 @@ public struct GajendraNodeResolution: Equatable, Sendable {
 }
 
 public struct GajendraProcessLimits: Equatable, Sendable {
+    /// The local service may use its full 70-second generation budget, which includes the initial
+    /// store read, then begin at most two confirmation/transaction/fallback store operations whose
+    /// lock acquisition is capped at 5 seconds. At 85 seconds the watchdog starts the TERM/KILL
+    /// path; process-group and pipe-drain cleanup follows, so this is not a response-by-85s SLO.
+    public static let defaultTimeout: TimeInterval = 85
+
     public let timeout: TimeInterval
     public let stdoutBytes: Int
     public let stderrBytes: Int
     public let terminationGrace: TimeInterval
 
     public init(
-        timeout: TimeInterval = 30,
+        timeout: TimeInterval = GajendraProcessLimits.defaultTimeout,
         stdoutBytes: Int = 4 * 1024 * 1024,
         stderrBytes: Int = 1 * 1024 * 1024,
         terminationGrace: TimeInterval = 0.5

@@ -576,7 +576,7 @@ public struct DeckContentView: View {
                 .disabled(model.isLoading)
             }
             if isPreview {
-                previewRowActions(index: index, count: count)
+                previewRowActions(index: index, count: count, allowsLaneActions: !thread.isCurrent)
             } else {
                 Button {
                     model.apply(.move(threadId: thread.id, direction: .up))
@@ -596,28 +596,30 @@ public struct DeckContentView: View {
                 .disabled(index == count - 1 || model.isLoading)
                 .help("Move down")
                 .accessibilityLabel("Move \(thread.title) down")
-                Menu {
-                    if level == .focus {
-                        Button("Move to Important") {
-                            model.moveToLevel(threadId: thread.id, level: .important)
+                if !thread.isCurrent {
+                    Menu {
+                        if level == .focus {
+                            Button("Move to Important") {
+                                model.moveToLevel(threadId: thread.id, level: .important)
+                            }
+                        } else {
+                            Button("Move to Focus") {
+                                model.moveToLevel(threadId: thread.id, level: .focus)
+                            }
                         }
-                    } else {
-                        Button("Move to Focus") {
-                            model.moveToLevel(threadId: thread.id, level: .focus)
+                        Button("Remove", role: .destructive) {
+                            model.moveToLevel(threadId: thread.id, level: nil)
                         }
+                    } label: {
+                        Image(systemName: "ellipsis")
                     }
-                    Button("Remove", role: .destructive) {
-                        model.moveToLevel(threadId: thread.id, level: nil)
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
+                    .menuIndicator(.hidden)
+                    .menuStyle(.borderlessButton)
+                    .frame(width: 30, height: 28)
+                    .contentShape(Rectangle())
+                    .disabled(model.isLoading)
+                    .accessibilityLabel("Actions for \(thread.title)")
                 }
-                .menuIndicator(.hidden)
-                .menuStyle(.borderlessButton)
-                .frame(width: 30, height: 28)
-                .contentShape(Rectangle())
-                .disabled(model.isLoading)
-                .accessibilityLabel("Actions for \(thread.title)")
             }
         }
         .padding(10)
@@ -682,14 +684,19 @@ public struct DeckContentView: View {
         }
     }
 
-    private func previewRowActions(index: Int, count: Int) -> some View {
+    private func previewRowActions(index: Int, count: Int, allowsLaneActions: Bool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.up")
                 .opacity(index == 0 ? 0.35 : 1)
             Image(systemName: "arrow.down")
                 .opacity(index == count - 1 ? 0.35 : 1)
-            Image(systemName: "ellipsis")
-                .frame(width: 30, height: 28)
+            if allowsLaneActions {
+                Image(systemName: "ellipsis")
+                    .frame(width: 30, height: 28)
+            } else {
+                Color.clear
+                    .frame(width: 30, height: 28)
+            }
         }
         .font(.caption)
         .foregroundStyle(.secondary)
@@ -851,19 +858,21 @@ public struct DeckContentView: View {
                 .controlSize(.small)
                 .disabled(model.isLoading)
             }
-            if thread.level != .important {
-                Button("Important") {
-                    model.moveToLevel(threadId: thread.id, level: .important)
+            if !thread.isCurrent {
+                if thread.level != .important {
+                    Button("Important") {
+                        model.moveToLevel(threadId: thread.id, level: .important)
+                    }
+                    .controlSize(.small)
+                    .disabled(model.isLoading)
                 }
-                .controlSize(.small)
-                .disabled(model.isLoading)
-            }
-            if thread.level != .focus {
-                Button("Focus") {
-                    model.moveToLevel(threadId: thread.id, level: .focus)
+                if thread.level != .focus {
+                    Button("Focus") {
+                        model.moveToLevel(threadId: thread.id, level: .focus)
+                    }
+                    .controlSize(.small)
+                    .disabled(model.isLoading)
                 }
-                .controlSize(.small)
-                .disabled(model.isLoading)
             }
         }
         .padding(10)
@@ -1038,26 +1047,28 @@ public struct DeckContentView: View {
                         .controlSize(.small)
                         .disabled(model.isLoading)
                     }
-                    if thread.level != .important {
-                        Button("Important") {
-                            model.moveToLevel(threadId: thread.id, level: .important)
+                    if !thread.isCurrent {
+                        if thread.level != .important {
+                            Button("Important") {
+                                model.moveToLevel(threadId: thread.id, level: .important)
+                            }
+                            .controlSize(.small)
+                            .disabled(model.isLoading)
                         }
-                        .controlSize(.small)
-                        .disabled(model.isLoading)
-                    }
-                    if thread.level != .focus {
-                        Button("Focus") {
-                            model.moveToLevel(threadId: thread.id, level: .focus)
+                        if thread.level != .focus {
+                            Button("Focus") {
+                                model.moveToLevel(threadId: thread.id, level: .focus)
+                            }
+                            .controlSize(.small)
+                            .disabled(model.isLoading)
                         }
-                        .controlSize(.small)
-                        .disabled(model.isLoading)
-                    }
-                    if thread.level != nil {
-                        Button("Remove") {
-                            model.moveToLevel(threadId: thread.id, level: nil)
+                        if thread.level != nil {
+                            Button("Remove") {
+                                model.moveToLevel(threadId: thread.id, level: nil)
+                            }
+                            .controlSize(.small)
+                            .disabled(model.isLoading)
                         }
-                        .controlSize(.small)
-                        .disabled(model.isLoading)
                     }
                     if !isPreview {
                         queueDragHandle(thread)
@@ -1292,6 +1303,7 @@ public struct DeckContentView: View {
         if threadId == targetId { return true }
         guard !model.isLoading,
               let snapshot = model.snapshot,
+              snapshot.current?.id != threadId || level == .focus,
               !(targetId == nil
                 && snapshot.allThreads.first(where: { $0.id == threadId })?.level == level
                 && GajendraQueueMovePlanner.lane(for: level, snapshot: snapshot).last?.id == threadId) else { return false }
@@ -1326,7 +1338,11 @@ public struct DeckContentView: View {
                     }
             )
             .disabled(model.isLoading)
-            .help("Drag \(thread.title) to reorder or move priority lanes")
+            .help(
+                thread.isCurrent
+                    ? "Drag \(thread.title) within Focus. Make another task NOW before changing its lane."
+                    : "Drag \(thread.title) to reorder or move priority lanes"
+            )
             .accessibilityLabel("Drag \(thread.title)")
             .accessibilityValue(model.isLoading ? "Busy; unavailable" : "Ready")
             .accessibilityHint("Drag with the pointer. Use the row actions for keyboard or VoiceOver moves.")
@@ -1334,6 +1350,7 @@ public struct DeckContentView: View {
     }
 
     private func updateOrganizerDropTarget(at point: CGPoint, sourceThreadId: String) {
+        let sourceIsCurrent = model.snapshot?.current?.id == sourceThreadId
         if organizerTaskFrames[sourceThreadId]?.contains(point) == true {
             organizerTargetThreadId = nil
             organizerTargetLevel = nil
@@ -1342,12 +1359,22 @@ public struct DeckContentView: View {
         if let target = organizerTaskFrames.first(where: {
             $0.key != sourceThreadId && $0.value.contains(point)
         }), let level = model.snapshot?.allThreads.first(where: { $0.id == target.key })?.level {
+            guard !sourceIsCurrent || level == .focus else {
+                organizerTargetThreadId = nil
+                organizerTargetLevel = nil
+                return
+            }
             organizerTargetThreadId = target.key
             organizerTargetLevel = level
             return
         }
         if let section = organizerSectionFrames.first(where: { $0.value.contains(point) }),
            let level = PriorityLevel(rawValue: section.key) {
+            guard !sourceIsCurrent || level == .focus else {
+                organizerTargetThreadId = nil
+                organizerTargetLevel = nil
+                return
+            }
             organizerTargetThreadId = nil
             organizerTargetLevel = level
             return

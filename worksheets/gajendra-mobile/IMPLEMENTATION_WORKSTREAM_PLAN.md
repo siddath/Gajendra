@@ -6,7 +6,7 @@
 
 ## Governance
 
-No product work begins until Sid records approval in
+No product work begins until the repository owner records approval in
 [the decision register](DECISIONS_RISKS_APPROVALS.md). Spike approval does not approve later
 phases, signing, distribution, publication, merge, provider-account changes, or public exposure.
 
@@ -17,7 +17,7 @@ current evidence, and a stop/go decision. Later changes reopen proof they can in
 
 | State | Entry | Exit |
 | --- | --- | --- |
-| plan_generated | This pack exists and checks pass | Sid approves a bounded next phase |
+| plan_generated | This pack exists and checks pass | Repository owner approves a bounded next phase |
 | approved_for_spike | Scope, trust boundary, hosts, and kill criteria recorded | Spike passes or returns to plan_generated |
 | implementation_in_progress | Prior evidence accepted | Phase exit criteria pass |
 | gauntlet_candidate | All implementation phases complete | Full desktop/mobile/device proof |
@@ -109,7 +109,7 @@ Exit: both physical devices pass same-LAN UAT; simulator/emulator evidence is no
   and pre-existing drift only to proven truth.
 - Prepare reversible adoption-trial decision; do not distribute without separate authority.
 
-Exit: named build is verified, receipts sanitized, blockers explicit, and Sid decides on trial.
+Exit: named build is verified, receipts sanitized, blockers explicit, and the repository owner decides on trial.
 
 ## Single-writer ownership
 
@@ -119,7 +119,7 @@ Exit: named build is verified, receipts sanitized, blockers explicit, and Sid de
 | Mobile UI/platform | Luna max | DeckGateway, Capacitor shell, Swift/Kotlin plugins, iOS/Android UI/tests, mobile docs |
 | Integration/review | Sol high | Mac lifecycle/pairing, Open on Mac, manifests/locks, CI, Gauntlet scripts, final docs/evidence |
 | E0 planning amendment | Luna max, sole writer for this pack | Master E0 contract and the linked planning-pack protocol/security, decision, workstream, test, readiness, and index updates; no runtime files |
-| Approval | Sid | Trust boundary, scope, OS targets, distribution, devices, fallback, merge/publication |
+| Approval | Repository owner | Trust boundary, scope, OS targets, distribution, devices, fallback, merge/publication |
 
 These assignments record the requested harness method and verified model usability. Reconfirm them
 when implementation resumes. Exact file ownership is frozen before writers start; no file has

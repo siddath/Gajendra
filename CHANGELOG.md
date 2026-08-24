@@ -20,6 +20,31 @@
   made the nonactivating launcher become key on demand for its first click, coalesced a reveal
   refresh behind in-flight launch loading, scoped double-click Open to the NOW card, and removed
   the clipped launcher blur that could resemble a rectangular shadow.
+- Added compact, purpose-specific priority actions: unprioritized Running and Ready rows open a
+  two-choice **Add to Focus / Add to Important** menu, while non-NOW Focus and Important rows move
+  to the opposite lane in one click. NOW has no lane-changing route. The expanded Ready preview is
+  capped at five rows with an exact Organizer overflow route.
+- Added isolated persistence and real-window interaction coverage for those actions, including
+  primary Open-target separation, NOW immobility, drag/drop coexistence, and a same-host performance
+  comparison against the pre-change revision.
+- Enforced the NOW guard below every native surface, the standalone MCP web surface, and the public
+  mutation service: a direct lane change cannot demote or remove NOW, while an atomic Make-NOW/Undo
+  operation may name a valid replacement. Updated host preflight to validate the current private
+  store schema version.
+- Clarified the Ready evidence boundary: an otherwise exact `completedAt: null` response is
+  candidate-local omitted evidence, while malformed, private-content, unsupported, ambiguous, or
+  purported-completed responses with an error fail the built-in review batch closed. Valid active,
+  failed, and interrupted turns remain candidate-local non-Ready evidence. Ready is provider
+  completion rather than unread state, and a valid provider completion moves from Running to Ready
+  on refresh.
+- Fixed an outer refresh-budget race that could return an empty safe fallback while a bounded Codex
+  collection was still completing. The accepted provider envelope is 60.75 seconds, with tighter-only
+  RPC overrides and a four-worker source-collection floor; the source-generation budget rounds to
+  70 seconds instead of inheriting the store's stale-lock marker. At 85 seconds the native
+  subprocess watchdog starts TERM/KILL; bounded process-group and pipe cleanup follows, so this is
+  not a response-by-85s SLO.
+- Mitigated browser automation collisions with stale local previews by selecting a bounded OS-assigned
+  loopback port when no explicit `GAJENDRA_E2E_PORT` is supplied; valid explicit ports remain exact.
 - Published source remains separate from binary distribution: Developer ID signing, notarization,
   stapling, Gatekeeper, clean-Mac proof, and mobile implementation are still open gates.
 

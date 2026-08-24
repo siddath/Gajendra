@@ -1,6 +1,6 @@
 # Gajendra mobile app implementation plan
 
-**State:** `plan_generated` — product implementation requires Sid's explicit approval.
+**State:** `plan_generated` — product implementation requires the repository owner's explicit approval.
 
 **Product language:** **Gajendra** — **One clear focus across your AI tools.** The portable
 product promise remains **One NOW. One short queue. One click back to the exact thread.** Queue
@@ -32,7 +32,7 @@ MCP-compatible path.
 
 Approve or reject a new same-LAN mobile trust boundary before product code is written.
 
-- Product and approval owner: Sid.
+- Product and approval owner: the repository owner.
 - Implementation owner: Codex orchestration with one writer per artifact.
 - Deadline: none supplied.
 - Stop condition: both platforms pass the mobile and desktop gauntlets plus real-device paired-LAN
@@ -393,11 +393,10 @@ called out below:
   read-only findings.
 - `npm run check` passed 30 tests, type checking, deterministic UI/server builds, and plugin
   validation at the baseline commit; the worktree remained clean before this plan artifact.
-- The current 2026-08-18 isolated `npm run probe:live` observed eight tools, the standard MCP App
-  resource, the global-entry metadata, a reachable Codex app-server, 137 available threads at that run, and
-  four source records without emitting thread content. This is current local provider evidence,
-  not mobile implementation proof; counts and resumability must be rechecked when mobile work is
-  explicitly approved.
+- The 2026-08-18 isolated `npm run probe:live` confirmed that the metadata-only MCP resource and
+  reachable Codex app-server path responded without emitting thread content. No live workload count
+  or identifier is retained in this public plan. This is provider-path evidence, not mobile
+  implementation proof; availability must be rechecked when mobile work is explicitly approved.
 - Full Xcode/CoreSimulator and `simctl` are absent. `xcodebuild` is resolving only to Command Line
   Tools.
 - Android Studio/SDK, `adb`, emulator, `sdkmanager`, and Gradle are absent.
@@ -405,7 +404,7 @@ called out below:
 - Java 25 compatibility with the selected Android Gradle Plugin must be checked; use a supported,
   pinned JDK on the build host.
 - No physical-device proof exists.
-- Gajendra is not registered as an owning project in the Sid AI Harness registry. The Harness was
+- Gajendra is not registered as an owning project in the AI Harness registry. The Harness was
   invoked and its governing workflow/test standards were applied, but live Gajendra repo canon is
   the source of truth.
 

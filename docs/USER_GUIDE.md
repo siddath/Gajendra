@@ -42,10 +42,14 @@ toggle a source or rescan.
 1. **Single-click the floating Gajendra button** to show or hide the focus card. Dock reopen and the
    menu-bar item use the same compact-first surface; open Organizer only for deliberate management.
 2. Put one thread in **NOW**. It remains part of the Focus queue.
-3. Keep the next few threads in **Focus** and lower-pressure work in **Important**.
+3. Keep the next few threads in **Focus** and lower-pressure work in **Important**. Use a compact
+   priority control to add an unprioritized status row to either lane or move a non-NOW queue row to
+   the other lane; NOW is never silently moved.
 4. Glance at **Running** for active provider work and **Ready for Review** for explicit completed
    work that needs human attention.
-   Click **All priority lanes** to shrink or expand Running, or double-click either dock header.
+   Click **All priority lanes** to shrink or expand Running, or double-click either dock header. An
+   expanded Ready preview shows up to five rows, then **Show _N_ more in Organizer** for the exact
+   remaining count.
 5. Double-click the NOW card, or select **Open**, a row, a provider badge, or a Review/Task action,
    to return to the source-owned destination.
 6. Use the search field for a title, project, source, context/tag, priority, Running, or Ready
@@ -70,9 +74,13 @@ toggle a source or rescan.
 - A quick task click remains the direct Open route. Hold a Focus or Important task briefly to select
   and lift it; keep holding and move the visible row to reorder it or change lanes. Releasing a
   stationary hold leaves the selected task in edit mode.
-- Compact rows intentionally have no permanent three-line drag/menu handle. **Edit priorities**
-  exposes full-row drag plus remove controls; hover, selection, and the lifted row provide the
-  pointer feedback.
+- Compact priority controls are purpose-specific: `plus.circle` on an unprioritized Running or Ready
+  row opens **Add to Focus** and **Add to Important**; `arrow.left.arrow.right` moves a
+  non-NOW Focus or Important row to the opposite lane. The queue control is emphasized on hover in
+  a reserved slot, so it does not move the row. These controls are separate from Open, Review, and
+  provider actions; NOW has no lane-changing control.
+- **Edit priorities** still exposes full-row drag plus remove controls; hover, selection, and the
+  lifted row provide the pointer feedback.
 - Organizer provides explicit up/down, lane, context, and overflow actions when drag is not the
   preferred input.
 - Successful changes participate in app-owned Undo/Redo. A conflicting external refresh clears
@@ -83,28 +91,36 @@ toggle a source or rescan.
 Running is derived from an explicit provider status such as active, working, or streaming. It can
 contain NOW, Focus, Important, or unprioritized work and never changes priority by itself. The
 highlighted badge shows the count at a glance. Click **All priority lanes** or double-click the dock
-header to shrink or expand the rows; a single click on the header itself does not change it.
+header to shrink or expand the rows; a single click on the header itself does not change it. When a
+provider later supplies valid completion evidence, refresh moves the thread from Running to Ready
+for Review; that transition is completion evidence, not unread state.
 
 ### Ready for Review
 
 Ready for Review is live provider evidence, not an unread badge. The current local Codex app-server
 path requests only the newest turn's status and completion time with message items explicitly not
 loaded. A valid completed turn appears until a newer turn changes the evidence; opening the thread
-does not clear it. Missing, active, interrupted, failed, malformed, or unsupported metadata appears
-nowhere. Claude Code, Cursor, and Grok are not guessed from idle time or resumability. Configured
-sources may still supply the validated signal directly.
+does not clear it. An otherwise exact safe `completedAt: null` response is candidate-local omitted
+evidence, so it does not make that one thread Ready. Malformed, private-content, unsupported,
+ambiguous, or purported-completed responses with an error suppress the built-in Ready batch
+fail-closed. A structurally valid active, failed, or interrupted newest turn is candidate-local
+non-Ready evidence. Claude Code, Cursor, and Grok are not guessed from idle time or resumability.
+Configured sources may still supply the validated signal directly.
 
 The review row opens the declared **Review** or **Task** destination; the provider badge separately
 opens the owning task. Its highlighted badge shows the number needing attention. Double-click the
 dock header to shrink or expand the rows; a single click does not change it. Gajendra refreshes on
 reveal and periodically while the compact surface is visible, pausing during direct manipulation.
+When expanded in the compact card, Ready shows at most five rows and routes the exact overflow count
+to Organizer.
 
 To experiment without private data, start from [the synthetic review catalog](../examples/review-catalog.json)
 and the boundaries in [Thread sources](THREAD_SOURCES.md).
 
 ## Accessibility and comfort
 
-- The native controls expose labels, values, hints, and keyboard actions.
+- The native controls expose labels, values, hints, keyboard actions, and named priority actions;
+  priority controls identify their target lane instead of relying on their symbol alone.
 - The interface respects Reduce Motion and supports system, light, and dark appearances.
 - Status is never communicated by color alone: Running and Ready for Review include symbols, text,
   counts, and destination labels.
@@ -152,6 +168,15 @@ controls if pointer drag is not your preferred input.
 - **Needs setup:** complete that tool's own local setup, then rescan.
 - **Needs attention:** Gajendra could not read the bounded metadata contract; the provider session
   itself is not changed.
+
+### Running or Ready data is missing after reveal
+
+Keep the compact card visible for the next refresh or use **Rescan**. The current source allows the
+bounded provider collection to use the store's existing overall recovery window instead of cutting
+it off at the shorter lock-acquisition timeout. It still fails closed if that overall budget or a
+provider-specific safety bound expires. To distinguish a provider read failure from a UI issue, run
+`npm run probe:live`; its output contains aggregate status only and does not print task titles,
+thread IDs, prompts, or transcripts.
 
 ### Open fails
 
