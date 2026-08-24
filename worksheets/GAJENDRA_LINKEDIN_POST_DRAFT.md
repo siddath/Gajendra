@@ -8,8 +8,9 @@
 - **Availability boundary:** source-only. There is no signed/notarized downloadable binary, and the
   mobile companion remains a plan rather than a shipped feature.
 - **Verification boundary:** source, native, real-window, privacy, and same-host performance checks
-  pass for [PR #25](https://github.com/siddath/Gajendra/pull/25). Its hosted checks and merged-main
-  proof must pass before posting. This is still not a signed binary or publication claim.
+  passed for [PR #25](https://github.com/siddath/Gajendra/pull/25). Its exact PR-head and merged-main
+  hosted jobs passed, and the exact merged plugin/app installation preserved the private state. This
+  is still not a signed binary or publication claim.
 
 ## Why this time and this shape
 

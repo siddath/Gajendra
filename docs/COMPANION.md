@@ -7,15 +7,14 @@ opening retained in the source product.
 For a short build, first-launch, daily-use, and troubleshooting path, start with the
 [user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
 
-This page records the **source/build contract** and keeps local-candidate, hosted, and installed
-proof separate. The 2026-08-24 working candidate passes source, native self-test/build,
-real-window `npm run companion:ui-test`, measured `npm run companion:ui-performance-test`,
-validation, bundle-readiness, and synthetic launch-asset checks. The latest public baseline remains
-[PR #24](https://github.com/siddath/Gajendra/pull/24) until this candidate's matching PR is merged.
-The earlier PR #17 exact ad-hoc build separately passed its then-current isolated pointer journey
-after local installation. None of those receipts establishes a clean-Mac run, physical VoiceOver,
-login-item or manual human-drag proof, Developer ID signing, notarization, or distribution
-readiness.
+This page records the **source/build contract** and keeps local, hosted, and installed proof
+separate. The 2026-08-24 [PR #25](https://github.com/siddath/Gajendra/pull/25) release passed source,
+native self-test/build, real-window `npm run companion:ui-test`, measured
+`npm run companion:ui-performance-test`, validation, bundle-readiness, and synthetic launch-asset
+checks. Its exact PR-head and merged-main hosted jobs passed; the exact merged plugin/app install
+also passed artifact parity and isolated UI checks without changing private state bytes or
+permissions. None of those receipts establishes a clean-Mac run, physical VoiceOver, login-item or
+manual human-drag proof, Developer ID signing, notarization, or distribution readiness.
 
 ## Source contract
 
@@ -25,8 +24,8 @@ readiness.
   `dev.sid.gajendra`, `Application Support/Gajendra`, and `gajendra://`.
 - The native target floor is macOS **13.5**. Source builds use Node >=20; a bundle must include the
   pinned Node **v24.19.0** runtime, checksum verification, and notices.
-- Launch at Login must change only after an explicit user action. Current local source/self-test and
-  bundle receipts do not make this an installed-app claim; physical login-item proof remains gated.
+- Launch at Login must change only after an explicit user action. Exact local installation does not
+  establish physical login-item behavior; that proof remains gated.
 - The native client consumes the same revision/CAS/idempotency mutation contract as the MCP app.
   Queue reorder is one `move-before` operation, never a sequence of partially applied moves.
 - The floating launcher, Dock reopen, and menu-bar item present the compact focus card by default;
