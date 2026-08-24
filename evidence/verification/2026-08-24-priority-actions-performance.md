@@ -11,14 +11,14 @@ popup regression. The final interaction keeps the two-choice native menu only fo
 Running/Ready rows and uses a direct one-click button for the single Focus/Important lane swap.
 
 Three independent widget journeys were run at the exact pre-change revision `185f9f3769cc` and
-three more against the final working candidate. Every journey also exercised inactive-first-click
+three more against the final merged release. Every journey also exercised inactive-first-click
 recovery, reopen, long-press/drag, dock controls, search, NOW double-click, and isolated Running and
 Ready-for-Review priority mutation paths.
 
 | Build | Prewarmed samples | Cold samples | Warm samples | Median (prewarmed/cold/warm) |
 | --- | --- | --- | --- | --- |
 | Pre-change `185f9f3769cc` | 72, 58, 43 ms | 86, 82, 86 ms | 85, 92, 85 ms | 58 / 86 / 85 ms |
-| Final working candidate | 44, 52, 47 ms | 85, 83, 86 ms | 83, 87, 86 ms | 47 / 85 / 86 ms |
+| Final merged release | 44, 52, 47 ms | 85, 83, 86 ms | 83, 87, 86 ms | 47 / 85 / 86 ms |
 
 **Verdict:** no material popup regression remains; all 18 measured paths stayed below the 200 ms
 local budget. This is a same-host regression receipt, not a cross-machine performance claim. The

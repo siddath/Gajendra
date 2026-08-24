@@ -9,18 +9,15 @@
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
 
-**Current public baseline:** [PR #24](https://github.com/siddath/Gajendra/pull/24), commit
-`185f9f3769cc26571cf0ad554ab5ab3e586b38af`, fixed first interaction, launcher/card readiness,
-All-priority-lanes control behavior, exact NOW double-click, and the clipped rectangular shadow.
-Its plugin and macOS companion checks passed.
-
-**Current working candidate:** [PR #25](https://github.com/siddath/Gajendra/pull/25) from
-`codex/ready-review-priority-actions`. This candidate is locally verified but must not be described
-as merged until its hosted checks and merged-main checks pass.
+**Current public baseline:** [PR #25](https://github.com/siddath/Gajendra/pull/25), merged as
+`d877ff46b9ef09b582ea26e695911222090d290a`. It adds reliable Ready-for-Review sync, direct compact
+priority actions, defense-in-depth NOW protection, an isolated same-task Running-to-Ready journey,
+and bounded provider/service/native deadline handling. Both hosted jobs passed for the exact PR head
+`efa17c428178c970dd63842b673c2c6f827378c9`, and both jobs passed again on the merged revision.
 
 ## Current user-facing state
 
-| Area | Current working-candidate behavior | Boundary that remains open |
+| Area | Current merged behavior | Boundary that remains open |
 | --- | --- | --- |
 | NOW, Focus, Important | One NOW remains inside Focus. Quick click opens; a stationary hold selects and lifts the visible row, and continuing the same press drags it. Unprioritized status rows use **+** to choose Focus or Important; non-NOW prioritized rows swap lanes in one click. NOW may reorder within Focus but cannot move or be removed through compact, Organizer, Search, accessibility, drag/drop, model, or public mutation routes; make another task NOW first. | Physical human-pointer and VoiceOver journeys remain separate evidence. |
 | Running | Explicit provider-reported activity appears across every priority lane without changing priority. The highlighted count remains visible; **All priority lanes** single-click and dock-header double-click expand or contract the list. | Activity is never inferred from age or resumability. |
@@ -48,7 +45,7 @@ as merged until its hosted checks and merged-main checks pass.
 
 ## Current implementation receipts
 
-The working candidate passed locally on 2026-08-24:
+The merged release passed locally and on GitHub Actions on 2026-08-24:
 
 - `npm run check` — script/release regressions, launch privacy validation, TypeScript, **106/106**
   Vitest tests, deterministic plugin build, and plugin validation passed.
@@ -76,15 +73,20 @@ The working candidate passed locally on 2026-08-24:
   including live MCP, native UI, widget performance, **85/85** repeated browser journeys, five
   repeated 106-test unit runs, final-artifact validation, and dependency audit.
 
-These receipts are local and source-candidate scoped. Hosted green belongs only to the exact PR and
-merged-main revisions. The receipts do not close clean-Mac, physical accessibility, signed
+- The exact merged plugin and standalone app were installed locally from `d877ff4`. All nine plugin
+  artifacts matched source; the installed app matched the rebuilt bundle; the isolated installed-app
+  UI journey passed; and the real private state bytes plus `0700`/`0600` permissions were unchanged.
+- GitHub Actions passed the `plugin` and `macos-companion` jobs for both the exact PR head and merged
+  revision `d877ff4`.
+
+Local receipts, hosted receipts, and installation proof are distinct. Together they close the
+authorized source-release gates, but they do not close clean-Mac, physical accessibility, signed
 distribution, mobile, or publication gates.
 
 ## Open gates
 
-- Hosted checks for PR #25, merge, and merged-main verification.
-- Exact installed plugin/app parity while preserving the private state hash and `0700`/`0600`
-  permissions.
+- Reload the Codex desktop host, which was already running when the plugin was installed, then
+  complete the visible in-host icon, open, Search, exact-task return, and persistent-NOW proof.
 - Clean-Mac installation and independent offline-path proof.
 - Physical VoiceOver, status-item accessibility, manual drag, keyboard/system-toggle, and login-item
   receipts.

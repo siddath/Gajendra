@@ -9,5 +9,5 @@ Gajendra is a community-supported open-source project.
 - Use [private vulnerability reporting](https://github.com/siddath/Gajendra/security/advisories/new)
   for security issues.
 
-Current source-candidate evidence and open release gates are in [STATUS.md](STATUS.md). Do not
+Current source-release evidence and open release gates are in [STATUS.md](STATUS.md). Do not
 include private rollout, prompt, transcript, credential, or absolute-path data in a support report.

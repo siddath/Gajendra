@@ -2,7 +2,8 @@
 
 **Date:** 2026-08-24
 
-**Decision:** proceed with a public **source-only** launch after PR #25 and merged-main checks pass
+**Decision:** proceed with a public **source-only** launch; PR #25, merged-main, and exact local
+installation checks passed
 
 **Owner action:** publish the prepared LinkedIn post manually; do not imply a signed download or
 mobile release
@@ -43,11 +44,15 @@ lanes without opening Organizer. Organizer remains available for bulk ordering a
 - Same-host performance comparison against exact revision `185f9f3769cc`; it is not generalized to
   other machines.
 - Public source setup and feature documentation with explicit privacy and distribution boundaries.
+- Hosted `plugin` and `macos-companion` jobs for the exact PR head and merged-main revision.
+- Exact installed plugin/app parity and an isolated installed-app UI journey, with unchanged private
+  state bytes and permissions.
 
 ## Gates deliberately left open
 
 - Developer ID signing, notarization, stapling, Gatekeeper, a release archive, and clean-Mac proof.
 - Physical VoiceOver, status-item accessibility, login-item, and manual human-drag receipts.
+- A Codex desktop reload and visible in-host proof because the active host predates plugin install.
 - The compact widget is cycle-clean under the strict performance journey. The longer synthetic
   Organizer journey passes every functional assertion but can still emit a SwiftUI
   `AttributeGraph` diagnostic after that secondary-window path; this remains a P2 native layout

@@ -119,15 +119,14 @@ from synthetic data. The prepared [LinkedIn draft](GAJENDRA_LINKEDIN_POST_DRAFT.
 owner-reviewed manual publication artifact; repository automation must not publish or engage on
 the owner's behalf.
 
-The post may claim a local-first, source-available macOS project, provider-reported Running and
-Ready states, direct priority actions, synthetic launch imagery, and bounded multi-agent
-development only after the exact hosted and merged-main gates pass. It must not claim a signed
+The exact hosted and merged-main gates passed, so the post may claim a local-first,
+source-available macOS project, provider-reported Running and Ready states, direct priority
+actions, synthetic launch imagery, and bounded multi-agent development. It must not claim a signed
 download, mobile companion, human unread tracking, or universal performance.
 
 ## Remaining release gates
 
-- hosted checks and merged-main verification for the exact release revision;
-- installed app/plugin parity without altering the user's private priority state;
+- Codex desktop reload and visible in-host proof because the active host predates plugin install;
 - clean-Mac and independent offline-path proof;
 - physical VoiceOver, status-item accessibility, manual drag, login-item, and system-toggle proof;
 - a dedicated follow-up for the Organizer-only SwiftUI `AttributeGraph` diagnostic;
