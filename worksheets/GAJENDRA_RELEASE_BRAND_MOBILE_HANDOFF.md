@@ -17,6 +17,29 @@
 candidate, settle the release brand, amend the retained mobile plans, run the right proof, create a
 synthetic launch image, and only then write a LinkedIn post about the experience and lessons.
 
+## 2026-08-24 execution addendum
+
+The desktop continuation described by this historical handoff now has a verified working candidate.
+The Ready classifier treats an otherwise exact safe `completedAt: null` response as omitted evidence
+for that candidate only, so it no longer suppresses independently valid completed siblings. Running
+becomes Ready for Review on the next visible refresh when the provider supplies valid completion
+evidence; Ready remains a completion signal, not an unread flag. The outer source generation budget
+now uses the existing 30-second bounded recovery window instead of racing the prior five-second
+lock timeout, while the native caller's 45-second watchdog covers bounded store settlement and
+process/output margin.
+
+The compact macOS surface now provides a two-choice **+** action for unprioritized Running/Ready
+rows and a one-click lane swap for non-NOW Focus/Important rows. NOW remains immovable across direct,
+context, accessibility, search, edit/remove, and cross-lane drag routes. Native self-tests,
+real-window synthetic UI journeys, isolated persistence checks, launch-asset validation, and a
+same-host performance comparison pass for the working candidate. See [`STATUS.md`](../STATUS.md) and
+the [performance receipt](../evidence/verification/2026-08-24-priority-actions-performance.md) for
+the current proof boundary.
+
+The mobile plan remains documentation-only. Developer ID signing, notarization, clean-Mac and
+physical accessibility evidence, binary distribution, and LinkedIn publication remain separate
+owner/external gates.
+
 This handoff is not implementation approval. It authorizes no merge, push, install, relaunch,
 listener, signing, notarization, distribution, app-store action, or LinkedIn publication.
 

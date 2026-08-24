@@ -50,7 +50,12 @@ Built-ins and configured sources contribute bounded normalized metadata. Configu
 unique and cannot collide with built-in or reserved namespaces. Catalog/output reads, process
 capture, source selection, app-server pagination, and enrichment use explicit byte, row, worker,
 and deadline bounds. Source preference changes are generation-checked so a returned snapshot does
-not mix one preference generation with threads collected under another.
+not mix one preference generation with threads collected under another. The outer generation
+budget uses the store's existing stale-lock recovery window by default, keeping a normal bounded
+provider read from racing the shorter lock-acquisition timeout while still returning a safe
+fallback when the overall budget expires. The native client wraps that 30-second service budget in
+a 45-second process watchdog: up to two bounded five-second store settlements remain possible
+after collection, followed by a final bounded margin for startup, response encoding, and shutdown.
 
 An optional adapter `ReviewSignal` remains on the live normalized thread only. The service projects
 explicit non-Running signals by review timestamp for the Ready for Review disclosure; it does not

@@ -2,11 +2,12 @@
 
 The current Gajendra source-review candidate has a **passing local gauntlet receipt**:
 [`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records 20 passing result
-records on 2026-08-19. The run covers repository scripts, static/behavior/build/plugin checks, live
+records on 2026-08-24. The run covers repository scripts, static/behavior/build/plugin checks, live
 MCP, companion self-test/build/real-window launcher/live checks, measured widget performance,
-pointer queue edits and dock interaction, browser UI, repeated reliability checks, final artifacts,
-and dependency audit. Its current receipt includes 98/98 source tests, 17/17 primary browser
-journeys, five repeated source-test passes, and 85/85 repeated browser journeys.
+direct Running/Ready priority actions, NOW immobility, pointer queue edits and dock interaction,
+browser UI, repeated reliability checks, final artifacts, and dependency audit. Its current receipt
+includes 101/101 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
+85/85 repeated browser journeys.
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
 Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is

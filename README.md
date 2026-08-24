@@ -50,9 +50,9 @@ thread content is used.
 | Capability | What it is for |
 | --- | --- |
 | **NOW** | Keep exactly one current thread visible and open it immediately. Double-click anywhere on the NOW card or select **Open**; NOW always belongs to Focus. |
-| **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact rows stay focused on thread metadata instead of showing a permanent drag/menu handle. Organizer retains explicit queue controls. |
-| **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label. |
-| **Ready for Review** | See a proven completed result awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled; a newer provider turn changes the live signal. Its highlighted count stays visible, and Running takes precedence. |
+| **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact controls add an unprioritized Running/Ready status thread to Focus or Important, or move a non-NOW queue row to the other lane; **NOW** has no lane-changing action. Organizer retains explicit queue controls. |
+| **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label; provider completion becomes Ready for Review on refresh only when valid Ready evidence is available. |
+| **Ready for Review** | See provider-completed work awaiting your next input, not an unread badge, and open its exact Review or Task destination. Opening does not mark it handled; a newer provider turn changes the live signal. Its highlighted count stays visible, Running takes precedence, and an expanded compact preview shows at most five rows before routing the truthful remainder to Organizer. |
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
 | **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
@@ -62,10 +62,13 @@ thread content is used.
 
 Built-in Codex, Claude Code, Cursor, and Grok adapters provide bounded thread metadata. The current
 local Codex app-server can additionally supply a zero-message newest-turn summary: Gajendra maps
-only a valid terminal `completed` turn to Ready for Review and fails closed when that experimental
-metadata method is absent or ambiguous. Claude Code, Cursor, and Grok are never guessed ready from
-idle time, recency, or resumability. An explicitly configured bounded catalog can also supply a
-validated live review signal.
+only a valid terminal `completed` turn to Ready for Review. An otherwise exact `completedAt: null`
+shape is candidate-local omitted evidence, so that one candidate is not Ready; malformed,
+private-content, error, unsupported, or ambiguous responses fail the built-in Ready batch closed.
+Claude Code, Cursor, and Grok are never guessed ready from idle time, recency, or resumability. An
+explicitly configured bounded catalog can also supply a validated live review signal. Focused unit,
+native self-test, and real-window journeys cover the mixed-candidate review boundary and compact
+priority actions; the source project still makes no signed/notarized binary claim.
 
 ## Set it up on macOS
 
@@ -155,7 +158,8 @@ npm run validate:launch-assets
 ```
 
 The repository's current evidence and remaining release gates are recorded in [Status](STATUS.md)
-and the [release checklist](docs/RELEASE_CHECKLIST.md).
+and the [release checklist](docs/RELEASE_CHECKLIST.md). The launch decision and rejected claims are
+captured in the [adversarial launch review](evidence/verification/2026-08-24-adversarial-launch-review.md).
 
 ## Release boundary
 

@@ -20,11 +20,23 @@ Source preference generation is part of a collection result. The service verifie
 before returning or mutating a snapshot; under sustained change it uses a bounded retry/deadline
 and returns a typed safe busy/error response instead of a stale success.
 
+The outer collection budget defaults to the store's existing 30-second stale-lock recovery window,
+not its 5-second lock-acquisition timeout. This avoids discarding a valid bounded provider result
+that is still loading after five seconds. It remains an overall safe-fallback budget, not a promise
+that every provider will finish, and the provider-specific row, byte, worker, and deadline bounds
+continue to apply inside it.
+
+The macOS client gives the local service a 45-second subprocess watchdog. That covers the
+30-second generation budget, up to two bounded five-second store settlements after collection, and
+a final bounded five-second margin for process startup, response encoding, and shutdown.
+
 ## Running
 
 Running is an explicit provider status. It is shown across NOW, Focus, Important, and unprioritized
 work without creating a new persisted tier. `resumable` does not mean Running. The registry retains
-explicit active rows when applying background/result caps.
+explicit active rows when applying background/result caps. When a provider later supplies valid
+completion evidence, the next refresh removes that thread from Running and presents it as Ready for
+Review; this is a provider-status transition, not an unread-state transition.
 
 ## Ready for Review
 
@@ -44,11 +56,14 @@ The current local Codex app-server is the only built-in review path. Gajendra op
 experimental API and asks `thread/turns/list` for at most the newest turn with
 `itemsView: "notLoaded"`. A candidate is ready only when the response is structurally exact, returns
 zero items, reports terminal `completed` with no error and a valid completion time, and the thread
-is not Running. Up to the existing 200 newest background candidates are checked by a four-worker,
-five-second bounded pass. An unsupported method, deadline, malformed response, returned item, or
-invalid/future timestamp suppresses the whole built-in review batch. A structurally valid empty,
-active, interrupted, or failed newest turn contributes no Ready signal without poisoning other
-valid candidates.
+is not Running. An otherwise exact safe response with `completedAt: null` is candidate-local omitted
+evidence: it contributes no Ready signal for that one candidate but does not expose content or
+discard another independently valid candidate. Up to the existing 200 newest background candidates
+are checked by a four-worker, five-second bounded pass. An unsupported method, deadline, malformed
+or private-content response, returned item, declared error, or invalid/future timestamp suppresses
+the whole built-in review batch fail-closed. A structurally valid empty, active, or interrupted
+newest turn contributes no Ready signal without being treated as a private/protocol-error batch
+failure.
 
 Claude Code, Cursor, and Grok do not currently emit built-in review readiness. Gajendra does not
 translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review signal. Remote

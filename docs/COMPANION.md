@@ -7,16 +7,15 @@ opening retained in the source product.
 For a short build, first-launch, daily-use, and troubleshooting path, start with the
 [user guide](USER_GUIDE.md). This page retains the deeper source/build and evidence contract.
 
-This page records the **source/build contract** and the exact-installed automated interaction
-receipt. On 2026-08-19, the source merged in
-[PR #21](https://github.com/siddath/Gajendra/pull/21) passed the real-window
-`npm run companion:ui-test` and `npm run companion:ui-performance-test` journeys,
-`npm run companion:test`, `npm run companion:build`, `npm run companion:validate`, and
-`npm run companion:bundle-readiness`; the aggregate source check passed 98/98 and E2E passed
-17/17. The earlier PR #17 exact ad-hoc build separately passed the complete isolated pointer
-journey after local installation. Those receipts do not establish a
-clean-Mac run, physical VoiceOver, login-item, or a manual human drag,
-Developer ID signing, notarization, or distribution readiness.
+This page records the **source/build contract** and keeps local-candidate, hosted, and installed
+proof separate. The 2026-08-24 working candidate passes source, native self-test/build,
+real-window `npm run companion:ui-test`, measured `npm run companion:ui-performance-test`,
+validation, bundle-readiness, and synthetic launch-asset checks. The latest public baseline remains
+[PR #24](https://github.com/siddath/Gajendra/pull/24) until this candidate's matching PR is merged.
+The earlier PR #17 exact ad-hoc build separately passed its then-current isolated pointer journey
+after local installation. None of those receipts establishes a clean-Mac run, physical VoiceOver,
+login-item or manual human-drag proof, Developer ID signing, notarization, or distribution
+readiness.
 
 ## Source contract
 
@@ -34,9 +33,13 @@ Developer ID signing, notarization, or distribution readiness.
   Organizer remains an explicit management surface from the app menu and queue overflow routes.
 - A quick card-row click remains the Open route. A stationary 280 ms hold selects and visually
   lifts the task; continuing the same local gesture drags the visible row to reorder or change
-  lanes. Compact rows do not expose a permanent drag/menu handle. Organizer retains explicit move
-  controls. Drag geometry stays inside the app, so no pasteboard payload or canonical thread ID is
-  exported.
+  lanes. The approved compact priority route keeps the primary Open/Review and provider actions
+  separate from priority controls: an unprioritized Running or Ready row offers **Add to Focus** and
+  **Add to Important** through `plus.circle`; a non-NOW Focus or Important row offers the opposite
+  lane through `arrow.left.arrow.right`. NOW exposes no lane-changing action. The queue
+  affordance is hover-emphasized in a reserved slot, so its row does not shift. Organizer retains
+  explicit move controls. Drag geometry stays inside the app, so no pasteboard payload or canonical
+  thread ID is exported.
 - Open actions must revalidate the source-specific destination scheme immediately before launch.
 - A primary launcher action always exits move/hide mode before toggling the card. The drag
   recognizer begins at the same 6-point movement threshold used by placement logic, so a natural
@@ -56,11 +59,18 @@ Developer ID signing, notarization, or distribution readiness.
 - Running and Ready metadata refresh immediately on reveal and at a conservative cadence only while
   a compact surface is visible. Refresh pauses during search focus, queue editing, drag, loading, or
   mutation and stops when the card/popover closes; Gajendra does not install a hidden always-on
-  watcher.
+  watcher. The overall source collection uses the existing bounded stale-lock recovery window by
+  default instead of racing the shorter lock-acquisition timeout. The native process watchdog is
+  45 seconds: the service's 30-second overall generation budget, up to two bounded five-second store
+  settlements, and a final five-second startup/output margin. A provider completion changes from
+  Running to Ready for Review on refresh only when it has valid Ready evidence; Ready is not an
+  unread marker.
 - Ready for Review sits below Running in the same single scroll body. Orange is paired with the
   `checkmark.bubble` glyph, label, count, ready time, destination label, and accessibility copy.
   The main review row opens the declared Review or Task destination; its provider badge separately
-  opens the owning task. Review metadata remains live-only and Running has overlap precedence.
+  opens the owning task. Review metadata remains live-only and Running has overlap precedence. An
+  expanded compact preview renders at most five Ready rows and routes the exact remainder to
+  Organizer.
 - Running and Ready for Review use high-visibility numeric badges. Running also exposes an explicit
   **All priority lanes** control that shrinks or expands its rows on one click. A pointer double-click
   on either dock header remains available; a single click on the header is intentionally inert,
@@ -92,6 +102,11 @@ portion, enforces the measured 200 ms popup budget, and rejects any SwiftUI depe
 that journey. Both require a
 logged-in Mac whose invoking test host may post pointer and
 accessibility events; hosted CI compiles the target but does not claim a manual physical journey.
+The focused compact-priority journey uses an isolated synthetic state file. It verifies action
+visibility, NOW suppression, sibling primary-action separation, add/move persistence, absence of an
+accidental Open side effect, and the five-row Ready overflow source contract. The widget-only
+performance comparison is recorded in
+[`evidence/verification/2026-08-24-priority-actions-performance.md`](../evidence/verification/2026-08-24-priority-actions-performance.md).
 Bundle readiness is an inspection, not a release authorization: it checks source-controlled bundle
 requirements and reports ad-hoc signing honestly. Developer ID, notarization, Gatekeeper, archive,
 and distribution receipts are separate, fail-closed steps.

@@ -20,6 +20,25 @@
   made the nonactivating launcher become key on demand for its first click, coalesced a reveal
   refresh behind in-flight launch loading, scoped double-click Open to the NOW card, and removed
   the clipped launcher blur that could resemble a rectangular shadow.
+- Added compact, purpose-specific priority actions: unprioritized Running and Ready rows open a
+  two-choice **Add to Focus / Add to Important** menu, while non-NOW Focus and Important rows move
+  to the opposite lane in one click. NOW has no lane-changing route. The expanded Ready preview is
+  capped at five rows with an exact Organizer overflow route.
+- Added isolated persistence and real-window interaction coverage for those actions, including
+  primary Open-target separation, NOW immobility, drag/drop coexistence, and a same-host performance
+  comparison against the pre-change revision.
+- Enforced the NOW guard below every native surface and the public mutation service: a direct lane
+  change cannot demote or remove NOW, while an atomic Make-NOW/Undo operation may name a valid
+  replacement. Updated host preflight to validate the current private store schema version.
+- Clarified the Ready evidence boundary: an otherwise exact `completedAt: null` response is
+  candidate-local omitted evidence, while malformed, private-content, error, unsupported, or
+  ambiguous responses fail the built-in review batch closed. Ready is provider completion rather
+  than unread state, and a valid provider completion moves from Running to Ready on refresh.
+- Fixed an outer refresh-budget race that could return an empty safe fallback while a bounded Codex
+  collection was still completing. Provider collection now uses the store's existing bounded
+  stale-lock recovery window by default instead of the shorter lock-acquisition timeout, and the
+  native subprocess watchdog covers that budget, two bounded store settlements, and a final
+  startup/output margin.
 - Published source remains separate from binary distribution: Developer ID signing, notarization,
   stapling, Gatekeeper, clean-Mac proof, and mobile implementation are still open gates.
 
