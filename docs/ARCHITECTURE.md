@@ -23,8 +23,9 @@ flowchart LR
 
 - Canonical IDs are `source-id:provider-thread-id`; NOW must belong to Focus.
 - The store persists only IDs, priority order, the bounded Design/Engineering/Life context enum,
-  source preferences, a revision, and bounded SHA-256 idempotency receipts. It never persists live
-  titles, prompts, transcripts, review signals/destinations, source files, credentials, or free-text labels.
+  source preferences, a revision, bounded SHA-256 idempotency receipts, and at most 1,024 SHA-256
+  review acknowledgement receipts. It never persists live titles, prompts, transcripts, review
+  timestamps/statuses/destinations, source files, credentials, or free-text labels.
 - Every mutation goes through the revisioned store authority. `expectedRevision` provides CAS;
   stale writes return a typed conflict with a fresh safe snapshot. The store serializes
   cross-process writers and supports replay-safe idempotency keys.
@@ -62,8 +63,15 @@ deadline.
 
 An optional adapter `ReviewSignal` remains on the live normalized thread only. The service projects
 explicit non-Running signals by review timestamp for the Ready for Review disclosure; it does not
-mutate priority or store the signal. Configured catalogs may declare the validated structure. The
-current local Codex adapter may derive it only from a bounded `thread/turns/list` response requested
+mutate priority or store the signal. An explicit reversible `set-review-acknowledged` mutation
+validates the current non-Running signal and exact timestamp, derives a receipt from the canonical
+thread ID, timestamp, kind, and destination, and suppresses only that matching projection. A newer
+timestamp or changed kind/destination reappears. Opening is side-effect free. The current generation
+identity is limited by the provider metadata that passes the privacy guard: Unix-second timestamp,
+kind, and destination. Two distinct completions in the same second with the same kind and destination
+are therefore indistinguishable until Codex exposes an allow-listed opaque turn identity. Configured
+catalogs may declare the validated structure. The current local Codex adapter may derive it only from
+a bounded `thread/turns/list` response requested
 with `itemsView: notLoaded`: exactly one newest turn, zero items, terminal `completed`, no error, and
 a renderable, non-future Unix-second completion timestamp. A valid non-completed turn emits no
 signal for that candidate; malformed, content-returning, deadline, or invalid-time evidence clears
@@ -75,6 +83,12 @@ thread/review intent at render time and re-resolves that exact destination from 
 authoritative snapshot after its press animation, so mutable DOM attributes or a concurrent refresh
 cannot redirect an Open action. Unknown, whitespace-padded, encoded, `javascript:`, `data:`, and
 `file:` URLs fail closed.
+
+Review acknowledgements reuse the version-3 store as an additive optional field so existing files
+remain readable. Rolling back to an older v3 writer can drop that unknown field on its next write,
+which may make handled Ready items reappear; it does not corrupt priority state. The service replaces
+an older receipt for the same thread and rejects a new-thread acknowledgement at the 1,024-thread
+ceiling rather than silently evicting another handled response.
 
 ## A4 Codex enrichment boundary
 

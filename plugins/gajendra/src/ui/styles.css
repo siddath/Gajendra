@@ -352,10 +352,20 @@ h1 { margin: 0; max-width: 680px; font-size: clamp(28px, 5vw, 42px); line-height
 .review-title { color: var(--text); }
 .review-symbol, .review-mark { color: #d96d00; font-weight: 850; }
 :root[data-theme="dark"] .review-symbol, :root[data-theme="dark"] .review-mark { color: #ffb340; }
+.review-symbol { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
 .review-scope { border-color: rgb(255 159 10 / 34%); background: rgb(255 159 10 / 11%); }
 .review-heading:not(:disabled):hover .review-scope { border-color: rgb(255 159 10 / 52%); background: rgb(255 159 10 / 17%); }
 .review-row { background: color-mix(in srgb, #ff9f0a 5%, transparent); }
 .review-row-main { min-width: 0; flex: 1; }
+.review-done {
+  border-color: color-mix(in srgb, #1f9d55 55%, var(--border));
+  background: color-mix(in srgb, #1f9d55 13%, transparent);
+  color: #147a42;
+  border-radius: 999px;
+  font-weight: 900;
+}
+:root[data-theme="dark"] .review-done { color: #67d391; }
+.review-done:hover { border-color: #1f9d55; color: #116735; }
 .review-primary { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .review-primary > span:nth-child(2) { display: grid; min-width: 0; }
 .review-primary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

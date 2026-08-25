@@ -50,9 +50,9 @@ thread content is used.
 | Capability | What it is for |
 | --- | --- |
 | **NOW** | Keep exactly one current thread visible and open it immediately. Double-click anywhere on the NOW card or select **Open**; NOW always belongs to Focus. |
-| **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact controls add an unprioritized Running/Ready status thread to Focus or Important, or move a non-NOW queue row to the other lane; **NOW** has no lane-changing action. Organizer retains explicit queue controls. |
+| **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact priority rows rely on drag, context-menu, and accessibility actions instead of a duplicate left/right button; Running/Ready status rows retain their separate priority control. Organizer retains explicit queue controls. |
 | **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label; provider completion becomes Ready for Review on refresh only when valid Ready evidence is available. |
-| **Ready for Review** | See provider-completed work awaiting your next input, not an unread badge, and open its exact Review or Task destination. Opening does not mark it handled; a newer provider turn changes the live signal. Its highlighted count stays visible, Running takes precedence, and an expanded compact preview shows at most five rows before routing the truthful remainder to Organizer. |
+| **Ready for Review** | See provider-completed work awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled. Select the green **Mark reviewed** action to remove only that exact response from Ready; Undo restores it, while a later response or corrected destination reappears. Running takes precedence, and an expanded compact preview shows at most five rows before routing the truthful remainder to Organizer. |
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
 | **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
@@ -126,9 +126,9 @@ companion.
 
 - Provider products continue to own sessions, credentials, prompts, transcripts, and source files.
 - Gajendra persists only namespaced thread IDs, priority order, the bounded context enum, source
-  preferences, revision data, and bounded idempotency receipts.
+  preferences, revision data, bounded idempotency receipts, and bounded SHA-256 review acknowledgement receipts.
 - It does **not** persist thread titles, prompts, transcript bodies, tokens, credentials, review
-  results, diffs, or arbitrary provider responses.
+  results, diffs, review timestamps/destinations, or arbitrary provider responses.
 - Every source is explicit and bounded. There is no arbitrary filesystem crawl or shell discovery.
 - Open actions revalidate source-specific URL schemes immediately before launch.
 

@@ -1107,7 +1107,7 @@ struct GajendraReviewStatusMark: View {
     }
 
     var body: some View {
-        Image(systemName: "checkmark.bubble.fill")
+        Image(systemName: "tray.full.fill")
             .font(.system(size: 11 * scale, weight: .semibold))
             .foregroundStyle(Color.orange)
             .accessibilityLabel("Ready for Review")
@@ -1422,7 +1422,7 @@ public struct GajendraHoverCardView: View {
                         }
                         .foregroundStyle(.secondary)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Saving priority change")
+                        .accessibilityLabel("Saving Gajendra change")
                         .accessibilityValue("Busy")
                     }
                     refreshControl
@@ -1510,9 +1510,6 @@ public struct GajendraHoverCardView: View {
                             .lineLimit(visualSettings.hoverCardSize == .compact ? 2 : 3)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                        if current.isReadyForReview {
-                            GajendraReviewStatusMark(scale: contentScale)
-                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background {
@@ -1797,8 +1794,6 @@ public struct GajendraHoverCardView: View {
             HStack(alignment: .firstTextBaseline, spacing: 7) {
                 if thread.isRunning {
                     GajendraLiveActivityMark(scale: contentScale)
-                } else if thread.isReadyForReview {
-                    GajendraReviewStatusMark(scale: contentScale)
                 }
                 Text(thread.title)
                     .font(scaledFont(12.5, weight: .medium))
@@ -1837,11 +1832,7 @@ public struct GajendraHoverCardView: View {
                 && heldQueueThreadId != thread.id
             if useDirectEditSurface {
                 directQueueDragSurface(
-                    HStack(spacing: 0) {
-                        rowLabel
-                        priorityActionReservedSpace()
-                            .padding(.trailing, 8 * contentScale)
-                    },
+                    rowLabel,
                     thread: thread
                 )
                     .background(
@@ -1921,13 +1912,6 @@ public struct GajendraHoverCardView: View {
                         }
                     )
                     .disabled(queueInteractionBlocked)
-
-                    priorityActionMenu(
-                        thread,
-                        surface: "queue",
-                        isEmphasized: hoveredThreadId == thread.id
-                    )
-                    .padding(.trailing, 8 * contentScale)
                 }
             }
 
@@ -2042,7 +2026,7 @@ public struct GajendraHoverCardView: View {
             .help(isQueueEditing ? editingHelp : "Open \(thread.title) in \(thread.sourceName). Hold to select; keep holding to drag.")
             .accessibilityElement(children: .contain)
             .accessibilityLabel(
-                "\(thread.title), \(thread.sourceName)\(thread.isRunning ? ", Running now" : thread.isReadyForReview ? ", Ready for Review" : "")"
+                "\(thread.title), \(thread.sourceName)\(thread.isRunning ? ", Running now" : "")"
             )
             .accessibilityValue(
                 queueInteractionBlocked
@@ -2813,6 +2797,8 @@ public struct GajendraHoverCardView: View {
                 isEmphasized: hoveredThreadId == thread.id
             )
 
+            reviewDoneButton(thread, surface: "review")
+
             Button { model.open(thread) } label: { providerBadge(thread, compact: true) }
                 .buttonStyle(.plain)
                 .help("Open the owning task in \(thread.sourceName)")
@@ -2825,6 +2811,25 @@ public struct GajendraHoverCardView: View {
                 ? thread.id
                 : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
         }
+    }
+
+    private func reviewDoneButton(_ thread: DeckThread, surface: String) -> some View {
+        Button {
+            model.setReviewAcknowledged(thread, acknowledged: true)
+        } label: {
+            Image(systemName: "checkmark.circle.fill")
+                .font(scaledFont(13, weight: .semibold))
+                .foregroundStyle(Color.green)
+                .frame(width: 28 * contentScale, height: 28 * contentScale)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(isPreview || queueInteractionBlocked)
+        .opacity(isPreview ? 0.72 : 1)
+        .help("Mark reviewed")
+        .accessibilityIdentifier("gajendra-review-done-\(surface)")
+        .accessibilityLabel("Mark \(thread.title) reviewed")
+        .accessibilityHint("Removes only this response from Ready for Review. Priority is unchanged.")
     }
 
     private var normalizedSearchQuery: String {
@@ -2955,8 +2960,6 @@ public struct GajendraHoverCardView: View {
                             Image(systemName: "waveform")
                                 .font(scaledFont(8.5, weight: .semibold))
                                 .foregroundStyle(Color.green)
-                        } else if thread.isReadyForReview {
-                            GajendraReviewStatusMark(scale: contentScale)
                         }
                     }
                     HStack(spacing: 5) {

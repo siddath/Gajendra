@@ -4,7 +4,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EMPTY_STORE, type PriorityStore } from "../../src/shared/contracts.js";
+import { EMPTY_STORE, type PriorityStore, type ReviewSignal } from "../../src/shared/contracts.js";
+import { hashReviewAcknowledgement, hashReviewThread } from "../../src/server/review-acknowledgements.js";
 import { GajendraStoreRepository, StoreBusyError, StoreRecoveryError, resolveDataDirectory, resolveLegacyStateFiles } from "../../src/server/store.js";
 
 const temporaryDirectories: string[] = [];
@@ -148,6 +149,36 @@ describe("GajendraStoreRepository", () => {
     const persisted = await readFile(repository.filePath, "utf8");
     expect(persisted).not.toContain(rawKey);
     expect(persisted).not.toMatch(/"key"\s*:/u);
+  });
+
+  it("persists only bounded review identity digests and accepts a missing v3 field", async () => {
+    const directory = await createTemporaryDirectory();
+    const repository = new GajendraStoreRepository(directory, [], { reviewAcknowledgementLimit: 2 });
+    const threadId = "codex:private-review-thread";
+    const reviewUrl = "https://example.test/private-review";
+    const review: ReviewSignal = {
+      state: "ready",
+      kind: "pull-request",
+      updatedAt: 1_787_630_400,
+      destination: { type: "url", url: reviewUrl },
+      providerStatus: "FINISHED",
+    };
+    const state = {
+      ...structuredClone(EMPTY_STORE),
+      reviewAcknowledgements: [{
+        threadHash: hashReviewThread(threadId),
+        signalHash: hashReviewAcknowledgement(threadId, review),
+      }],
+    };
+    await repository.write(state);
+    const persisted = await readFile(repository.filePath, "utf8");
+    expect(persisted).not.toContain(threadId);
+    expect(persisted).not.toContain(String(review.updatedAt));
+    expect(persisted).not.toContain(reviewUrl);
+    await expect(repository.read()).resolves.toEqual(state);
+
+    await writeFile(repository.filePath, JSON.stringify({ ...EMPTY_STORE, reviewAcknowledgements: undefined }), { mode: 0o600 });
+    await expect(repository.read()).resolves.toMatchObject({ reviewAcknowledgements: [] });
   });
 
   it("quarantines corrupt state and restores only a private last-known-good copy", async () => {

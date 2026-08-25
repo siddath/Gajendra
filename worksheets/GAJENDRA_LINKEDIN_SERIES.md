@@ -210,17 +210,26 @@ Gajendra already has user-owned priority: NOW, Focus, and Important. Ready for R
 It is derived live metadata and appears only when an enabled provider emits an explicit, validated
 review-ready signal with a supported destination.
 
+The missing piece was not another automatic transition. It was an explicit human acknowledgement.
+Opening a response only proves navigation; it does not prove I reviewed the work.
+
 That led to a few rules:
 
 - idle, resumable, recently updated, or “last message was from the assistant” is not enough;
 - Running wins if a stale provider reports both running and review-ready;
-- review status never changes queue placement and is never persisted as a third tier;
+- review status never changes NOW, Focus, or Important placement;
 - the main row opens the declared Review or Task destination;
-- the provider badge separately returns to the owning thread;
+- opening is side-effect free, while a separate green Ready-only action acknowledges the exact
+  response;
+- Gajendra persists only a bounded hash receipt for that acknowledgement, not response content,
+  prompts, transcripts, or destinations;
+- a later response or corrected destination produces new evidence and appears again;
 - invalid or failed source data creates no fabricated review row.
 
 The current implementation is proven through the configured-catalog path, native and web views,
-search, empty/one/ten-row previews, and non-persistence tests.
+search, empty/one/ten-row previews, exact-response acknowledgement and undo, receipt bounds, and
+source/build privacy checks. The compact UI keeps the green control inside Ready for Review and no
+longer repeats lane-swap arrows or the orange priority glyph in Focus and Important.
 
 It is not yet a remote-provider integration. That requires a separate credential, network, and
 trust decision.

@@ -309,6 +309,21 @@ enum GajendraSelfTest {
         }
         try require(contextObject["type"] as? String == "set-context", "context mutation type changed")
         try require(contextObject["context"] as? String == "engineering", "bounded context did not encode")
+        let reviewData = try JSONEncoder().encode(
+            DeckMutation.setReviewAcknowledged(
+                threadId: "codex:review-1",
+                reviewUpdatedAt: 1_787_630_400,
+                reviewIdentity: String(repeating: "a", count: 64),
+                acknowledged: true
+            )
+        )
+        guard let reviewObject = try JSONSerialization.jsonObject(with: reviewData) as? [String: Any] else {
+            throw SelfTestError.failed("review acknowledgement did not encode as an object")
+        }
+        try require(reviewObject["type"] as? String == "set-review-acknowledged", "review acknowledgement type changed")
+        try require(reviewObject["reviewUpdatedAt"] as? Double == 1_787_630_400, "review generation did not encode")
+        try require(reviewObject["reviewIdentity"] as? String == String(repeating: "a", count: 64), "review identity did not encode")
+        try require(reviewObject["acknowledged"] as? Bool == true, "review acknowledgement state did not encode")
         let moveBeforeData = try JSONEncoder().encode(
             DeckMutation.moveBefore(
                 threadId: "codex:focus-1",
@@ -1248,6 +1263,10 @@ enum GajendraSelfTest {
             from: "private func queueRow(",
             before: "private func queueRowAccessibility"
         )
+        let reviewRow = try section(
+            from: "private func reviewReadyRow(_ thread: DeckThread)",
+            before: "private func reviewDoneButton"
+        )
         let queueAccessibility = try section(
             from: "private func queueRowAccessibility",
             before: "private func queueRowContextMenu"
@@ -1271,6 +1290,13 @@ enum GajendraSelfTest {
         let searchActions = try section(
             from: "private func searchActions",
             before: "private func relativeUpdateText"
+        )
+        try require(
+            !queueRow.contains("priorityActionMenu(")
+                && !queueRow.contains("priorityActionReservedSpace()")
+                && reviewRow.contains("priorityActionMenu(")
+                && reviewRow.contains("reviewDoneButton(thread"),
+            "compact priority rows must rely on drag/actions while Ready keeps separate priority and review controls"
         )
         try require(
             queueRow.contains("if isQueueEditing && !thread.isCurrent")
@@ -1967,7 +1993,7 @@ enum GajendraSelfTest {
                 let message = await model.errorMessage
                 try require(undoRegistrations == 0, "conflict must not register undo")
                 try require(
-                    message == "That priority changed elsewhere. Refreshing the latest priorities.",
+                    message == "Gajendra changed elsewhere. Refreshing the latest state.",
                     "conflict must preserve a typed generic user error"
                 )
                 return
@@ -2110,7 +2136,7 @@ enum GajendraSelfTest {
         )
         let externalError = await externalModel.mutationErrorMessage
         try require(
-            externalError == "That change is no longer undoable because priorities changed elsewhere.",
+            externalError == "That change is no longer undoable because Gajendra changed elsewhere.",
             "external refresh did not leave a typed fail-closed history error"
         )
     }
@@ -2421,13 +2447,33 @@ enum GajendraSelfTest {
         let last = thread("handler-last", .focus)
         let important = thread("handler-important", .important)
         let available = thread("handler-available", nil)
+        let ready = DeckThread(
+            id: "handler-ready",
+            sourceId: "codex",
+            sourceName: "Codex",
+            title: "Ready handler fixture",
+            project: "Handler fixture",
+            updatedAt: 2,
+            status: "idle",
+            level: nil,
+            isCurrent: false,
+            deepLink: "codex://threads/handler-ready",
+            review: ReviewSignal(
+                state: .ready,
+                kind: .result,
+                updatedAt: 1_787_630_400,
+                destination: ReviewDestination(type: .thread, deepLink: "codex://threads/handler-ready"),
+                providerStatus: "COMPLETED",
+                identity: String(repeating: "b", count: 64)
+            )
+        )
         let handlerSnapshot = DeckSnapshot(
             revision: snapshot.revision,
             generatedAt: snapshot.generatedAt,
             current: now,
             focus: [now, middle, last],
             important: [important],
-            available: [available],
+            available: [available, ready],
             collapsed: snapshot.collapsed,
             focusGuide: snapshot.focusGuide,
             focusOverGuide: false,
@@ -2487,6 +2533,31 @@ enum GajendraSelfTest {
                 currentThreadId: now.id
             ),
             "handler middle-to-end reorder was incorrectly treated as an append no-op"
+        )
+
+        await model.setReviewAcknowledged(ready, acknowledged: true)
+        try await waitUntilIdle(model)
+        requests = await probe.requests()
+        try require(
+            requests.last?.mutation == .setReviewAcknowledged(
+                threadId: ready.id,
+                reviewUpdatedAt: 1_787_630_400,
+                reviewIdentity: String(repeating: "b", count: 64),
+                acknowledged: true
+            ),
+            "Ready handler did not send the exact acknowledgement generation"
+        )
+        await model.undo()
+        try await waitUntilIdle(model)
+        requests = await probe.requests()
+        try require(
+            requests.last?.mutation == .setReviewAcknowledged(
+                threadId: ready.id,
+                reviewUpdatedAt: 1_787_630_400,
+                reviewIdentity: String(repeating: "b", count: 64),
+                acknowledged: false
+            ),
+            "Ready handler undo did not restore the exact acknowledgement generation"
         )
     }
 

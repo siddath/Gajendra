@@ -13,6 +13,7 @@ import {
   type ThreadSourceStatus,
 } from "../../src/shared/contracts.js";
 import { applyMutation, buildSnapshot, canonicalThreadId, normalizeStore } from "../../src/server/domain.js";
+import { hashReviewAcknowledgement } from "../../src/server/review-acknowledgements.js";
 import {
   clampCodexRpcTimeout,
   CODEX_PROVIDER_COLLECTION_ENVELOPE_MS,
@@ -252,8 +253,54 @@ describe("Gajendra domain", () => {
       "codex:now",
     ]);
     expect(runningDeckThreads(snapshot).map((thread) => thread.id)).toEqual(["cursor:running"]);
-    expect(JSON.stringify(initial)).not.toContain("review");
+    expect(JSON.stringify(initial)).not.toContain("https://example.test/review");
     expect(JSON.stringify(initial)).not.toContain("FINISHED");
+  });
+
+  it("acknowledges one exact review generation without changing priority and restores it reversibly", () => {
+    const initial = state([
+      { threadId: "codex:now", level: "focus", addedAt: now.toISOString(), context: "engineering" },
+    ], "codex:now");
+    const ready = agentThread("codex:now", "idle", 400);
+    ready.review = {
+      state: "ready",
+      kind: "diff",
+      updatedAt: 300,
+      destination: { type: "url", url: "https://example.test/review/now" },
+      providerStatus: "FINISHED",
+    };
+    const reviewIdentity = hashReviewAcknowledgement(ready.id, ready.review);
+
+    const acknowledged = applyMutation(initial, {
+      type: "set-review-acknowledged",
+      threadId: ready.id,
+      reviewUpdatedAt: ready.review.updatedAt,
+      reviewIdentity,
+      acknowledged: true,
+    }, now, { review: ready.review });
+    const hidden = buildSnapshot(acknowledged, [ready], sources);
+    expect(hidden.current).toMatchObject({ id: ready.id, level: "focus", isCurrent: true, context: "engineering" });
+    expect(hidden.current?.review).toBeUndefined();
+    expect(reviewReadyDeckThreads(hidden)).toEqual([]);
+    expect(acknowledged.reviewAcknowledgements).toEqual([{
+      threadHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      signalHash: hashReviewAcknowledgement(ready.id, ready.review),
+    }]);
+
+    const changedDestination = {
+      ...ready,
+      review: { ...ready.review, destination: { type: "url" as const, url: "https://example.test/review/corrected" } },
+    };
+    expect(reviewReadyDeckThreads(buildSnapshot(acknowledged, [changedDestination], sources)).map((thread) => thread.id)).toEqual([ready.id]);
+
+    const restored = applyMutation(acknowledged, {
+      type: "set-review-acknowledged",
+      threadId: ready.id,
+      reviewUpdatedAt: ready.review.updatedAt,
+      reviewIdentity,
+      acknowledged: false,
+    }, now, { review: ready.review });
+    expect(reviewReadyDeckThreads(buildSnapshot(restored, [ready], sources)).map((thread) => thread.id)).toEqual([ready.id]);
   });
 
   it("normalizes malformed snapshots to one current task", () => {

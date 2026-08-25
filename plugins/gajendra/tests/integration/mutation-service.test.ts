@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { AgentThread, DeckMutationRequest, SourceState, ThreadSourceStatus } from "../../src/shared/contracts.js";
 import { GajendraService } from "../../src/server/service.js";
 import { GajendraStoreRepository } from "../../src/server/store.js";
+import { hashReviewAcknowledgement } from "../../src/server/review-acknowledgements.js";
 
 const temporaryDirectories: string[] = [];
 const viteNode = createRequire(import.meta.url).resolve("vite-node/vite-node.mjs");
@@ -193,6 +194,7 @@ describe("Gajendra mutation service", () => {
       collapsed: { focus: false, important: false },
       sourcePreferences: { codex: true, claude: true },
       idempotency: [],
+      reviewAcknowledgements: [],
     });
     await expect(runFile(process.execPath, [viteNode, faultWorker], {
       cwd: packageRoot,
@@ -259,6 +261,7 @@ describe("Gajendra mutation service", () => {
       collapsed: { focus: false, important: false },
       sourcePreferences: { codex: true, "disappearing-target": false },
       idempotency: [],
+      reviewAcknowledgements: [],
     });
     let collections = 0;
     const service = new GajendraService(repository, {
@@ -490,6 +493,123 @@ describe("Gajendra mutation service", () => {
     const persisted = await readFile(path.join(directory, "gajendra.v2.json"), "utf8");
     expect(persisted).not.toContain("gajendraReview");
     expect(persisted).not.toContain("completed");
+  });
+
+  it("acknowledges only the exact current non-Running review and supports a reversible restore", async () => {
+    const directory = await temporaryDirectory();
+    const repository = new GajendraStoreRepository(directory);
+    const ready = thread("codex:thread-0", "codex");
+    ready.review = {
+      state: "ready",
+      kind: "result",
+      updatedAt: 1_787_630_400,
+      destination: { type: "thread", deepLink: ready.deepLink },
+      providerStatus: "COMPLETED",
+    };
+    const service = new GajendraService(repository, {
+      collect: async () => ({ threads: [ready], sources: collectionForIds([ready.id]).sources, error: null }),
+      close: async () => undefined,
+    });
+
+    await expectRejected(service, {
+      type: "set-review-acknowledged",
+      threadId: ready.id,
+      reviewUpdatedAt: ready.review.updatedAt - 1,
+      reviewIdentity: hashReviewAcknowledgement(ready.id, ready.review),
+      acknowledged: true,
+    }, "invalid-target");
+    const renderedIdentity = hashReviewAcknowledgement(ready.id, ready.review);
+    ready.review = {
+      ...ready.review,
+      destination: { type: "thread", deepLink: `${ready.deepLink}/corrected` },
+    };
+    await expectRejected(service, {
+      type: "set-review-acknowledged",
+      threadId: ready.id,
+      reviewUpdatedAt: ready.review.updatedAt,
+      reviewIdentity: renderedIdentity,
+      acknowledged: true,
+    }, "invalid-target");
+    const acknowledged = await service.mutate({
+      expectedRevision: 0,
+      mutation: {
+        type: "set-review-acknowledged",
+        threadId: ready.id,
+        reviewUpdatedAt: ready.review.updatedAt,
+        reviewIdentity: hashReviewAcknowledgement(ready.id, ready.review),
+        acknowledged: true,
+      },
+    });
+    expect(acknowledged).toMatchObject({ outcome: "applied", revision: 1 });
+    expect(acknowledged.snapshot.available[0]?.review).toBeUndefined();
+    expect((await repository.read()).entries).toEqual([]);
+
+    const restored = await service.mutate({
+      expectedRevision: 1,
+      mutation: {
+        type: "set-review-acknowledged",
+        threadId: ready.id,
+        reviewUpdatedAt: ready.review.updatedAt,
+        reviewIdentity: hashReviewAcknowledgement(ready.id, ready.review),
+        acknowledged: false,
+      },
+    });
+    expect(restored.snapshot.available[0]?.review?.state).toBe("ready");
+
+    ready.status = "running";
+    await expectRejected(service, {
+      type: "set-review-acknowledged",
+      threadId: ready.id,
+      reviewUpdatedAt: ready.review.updatedAt,
+      reviewIdentity: hashReviewAcknowledgement(ready.id, ready.review),
+      acknowledged: true,
+    }, "invalid-target");
+  });
+
+  it("rejects review acknowledgement capacity overflow without evicting handled work", async () => {
+    const directory = await temporaryDirectory();
+    const repository = new GajendraStoreRepository(directory, [], { reviewAcknowledgementLimit: 1 });
+    const readyThreads = [thread("codex:thread-0", "codex"), thread("codex:thread-1", "codex")];
+    readyThreads.forEach((candidate, index) => {
+      candidate.review = {
+        state: "ready",
+        kind: "result",
+        updatedAt: 1_787_630_400 + index,
+        destination: { type: "thread", deepLink: candidate.deepLink },
+        providerStatus: "COMPLETED",
+      };
+    });
+    const service = new GajendraService(repository, {
+      collect: async () => ({ threads: readyThreads, sources: collectionForIds(readyThreads.map((thread) => thread.id)).sources, error: null }),
+      close: async () => undefined,
+    });
+    const first = readyThreads[0]!;
+    const second = readyThreads[1]!;
+    await service.mutate({ mutation: {
+      type: "set-review-acknowledged", threadId: first.id, reviewUpdatedAt: first.review!.updatedAt,
+      reviewIdentity: hashReviewAcknowledgement(first.id, first.review!), acknowledged: true,
+    } });
+    first.review = { ...first.review!, updatedAt: first.review!.updatedAt + 10 };
+    const replacement = await service.mutate({ mutation: {
+      type: "set-review-acknowledged", threadId: first.id, reviewUpdatedAt: first.review.updatedAt,
+      reviewIdentity: hashReviewAcknowledgement(first.id, first.review), acknowledged: true,
+    } });
+    expect(replacement).toMatchObject({ outcome: "applied" });
+    expect((await repository.read()).reviewAcknowledgements).toHaveLength(1);
+    const restarted = new GajendraService(new GajendraStoreRepository(directory, [], { reviewAcknowledgementLimit: 1 }), {
+      collect: async () => ({ threads: readyThreads, sources: collectionForIds(readyThreads.map((thread) => thread.id)).sources, error: null }),
+      close: async () => undefined,
+    });
+    expect((await restarted.snapshot()).available.find((thread) => thread.id === first.id)?.review).toBeUndefined();
+    await expectRejected(service, {
+      type: "set-review-acknowledged", threadId: second.id, reviewUpdatedAt: second.review!.updatedAt,
+      reviewIdentity: hashReviewAcknowledgement(second.id, second.review!), acknowledged: true,
+    }, "review-acknowledgement-limit");
+    const state = await repository.read();
+    expect(state.reviewAcknowledgements).toHaveLength(1);
+    const snapshot = await service.snapshot();
+    expect(snapshot.available.find((thread) => thread.id === first.id)?.review).toBeUndefined();
+    expect(snapshot.available.find((thread) => thread.id === second.id)?.review?.state).toBe("ready");
   });
 
   it("derives a priority-only concurrent generation from the transaction without recollecting sources", async () => {

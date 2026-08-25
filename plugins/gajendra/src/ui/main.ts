@@ -174,7 +174,7 @@ function currentPanel(current: DeckThread | null): string {
   return `<section class="now-card" aria-labelledby="now-heading">
     <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p></div>
     <div class="now-content">
-      <div><h2 id="now-heading">${escapeHtml(current.title)} ${reviewMark(current)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
+      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
       <div class="now-actions" aria-label="Current task actions">
         <a class="primary-action" ${openThreadAttributes(current)} aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
         ${activitySignal(current)}
@@ -186,9 +186,12 @@ function currentPanel(current: DeckThread | null): string {
 
 function activitySignal(thread: DeckThread): string {
   const running = isRunningThreadStatus(thread.status);
-  return `<div class="activity-signal" data-running="${String(running)}" aria-label="${running ? "Running now" : "Ready to resume"}. ${relativeDate(thread.updatedAt)}">
-    <span class="activity-symbol" aria-hidden="true">${running ? "●" : "◷"}</span>
-    <span><strong>${running ? "Running now" : "Ready to resume"}</strong><small>${relativeDate(thread.updatedAt)}</small></span>
+  const ready = !running && thread.review?.state === "ready";
+  const label = running ? "Running now" : ready ? "Ready for Review" : "Ready to resume";
+  const date = ready ? relativeDate(thread.review?.updatedAt ?? thread.updatedAt) : relativeDate(thread.updatedAt);
+  return `<div class="activity-signal" data-running="${String(running)}" aria-label="${label}. ${date}">
+    <span class="activity-symbol" aria-hidden="true">${running ? "●" : ready ? reviewTrayIcon() : "◷"}</span>
+    <span><strong>${label}</strong><small>${date}</small></span>
   </div>`;
 }
 
@@ -214,7 +217,6 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
     <div class="thread-main">
       <div class="thread-heading-line">
         ${thread.isCurrent ? '<span class="now-pill">NOW</span>' : ""}
-        ${reviewMark(thread)}
         <a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a>
       </div>
       <p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${contextBadge(thread)} ${sourceBadge(thread)}</p>
@@ -252,7 +254,7 @@ function runningRow(thread: DeckThread): string {
 function reviewSection(threads: DeckThread[]): string {
   return `<section class="review-section deck-section" aria-labelledby="review-heading">
     <button class="running-heading review-heading" type="button" data-review-toggle aria-expanded="${String(reviewExpanded)}" aria-controls="review-list" ${threads.length ? "" : "disabled"}>
-      <span><span class="running-title review-title"><span class="review-symbol" aria-hidden="true">✓</span><span id="review-heading">Ready for Review</span><span class="section-count">${threads.length}</span></span>
+      <span><span class="running-title review-title">${reviewTrayIcon()}<span id="review-heading">Ready for Review</span><span class="section-count">${threads.length}</span></span>
       <span class="running-description">Provider-confirmed work where human attention is useful.</span></span>
       <span class="running-scope review-scope"><span>Needs your review</span>${threads.length ? '<span class="review-chevron chevron" aria-hidden="true">⌄</span>' : ""}</span>
     </button>
@@ -265,8 +267,8 @@ function reviewSection(threads: DeckThread[]): string {
 function reviewRow(thread: DeckThread): string {
   const action = thread.review?.destination.type === "thread" ? "Task" : "Review";
   return `<li class="available-row review-row" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="review-${escapeAttribute(thread.id)}">
-    <div class="review-row-main"><a class="review-primary" ${openReviewAttributes(thread)}><span class="review-mark" aria-hidden="true">✓</span><span><strong>${escapeHtml(thread.title)}</strong><small>${relativeDate(thread.review?.updatedAt ?? 0)}</small></span><span class="review-destination-label">${action}</span></a><p class="thread-meta">${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
-    <div class="available-actions">${threadActions(thread)}</div>
+    <div class="review-row-main"><a class="review-primary" ${openReviewAttributes(thread)}>${reviewTrayIcon()}<span><strong>${escapeHtml(thread.title)}</strong><small>${relativeDate(thread.review?.updatedAt ?? 0)}</small></span><span class="review-destination-label">${action}</span></a><p class="thread-meta">${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div class="available-actions">${threadActions(thread)}${reviewDoneButton(thread)}</div>
   </li>`;
 }
 
@@ -292,7 +294,7 @@ function threadSearchFooter(deck: DeckSnapshot, visibleCount: number): string {
 
 function availableRow(thread: DeckThread, isRecent: boolean): string {
   return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(searchableThreadMetadata(thread))}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
-    <div><a ${openThreadAttributes(thread)}>${reviewMark(thread)}${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div><a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
 }
@@ -325,10 +327,13 @@ function placementBadge(thread: DeckThread): string {
   return placement ? `<span class="placement-badge">${placement}</span>` : "";
 }
 
-function reviewMark(thread: DeckThread): string {
-  return thread.review?.state === "ready" && !isRunningThreadStatus(thread.status)
-    ? '<span class="review-mark" aria-label="Ready for Review" title="Provider reports work ready for review">✓</span>'
-    : "";
+function reviewDoneButton(thread: DeckThread): string {
+  if (!thread.review?.identity || isRunningThreadStatus(thread.status)) return "";
+  return `<button type="button" class="icon-action review-done" data-action="review-done" data-thread-id="${escapeAttribute(thread.id)}" data-review-updated-at="${thread.review.updatedAt}" data-review-identity="${escapeAttribute(thread.review.identity)}" aria-label="Mark ${escapeAttribute(thread.title)} reviewed" title="Mark reviewed">✓</button>`;
+}
+
+function reviewTrayIcon(): string {
+  return '<svg class="review-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-2 14H6L4 5Z"/><path d="M7 13h3l2 2 2-2h3"/></svg>';
 }
 
 function threadActions(thread: DeckThread): string {
@@ -616,6 +621,29 @@ async function handleAction(button: HTMLButtonElement): Promise<void> {
     return mutate("gajendra_set_source_enabled", { sourceId, enabled: button.dataset.sourceEnabled !== "true" });
   }
   if (!threadId || !action) return;
+  if (action === "review-done") {
+    const reviewUpdatedAt = Number(button.dataset.reviewUpdatedAt);
+    const reviewIdentity = button.dataset.reviewIdentity;
+    if (!Number.isFinite(reviewUpdatedAt)
+      || reviewUpdatedAt < 0
+      || !reviewIdentity
+      || !/^[a-f0-9]{64}$/iu.test(reviewIdentity)) return;
+    const readyButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
+    const focusIndex = Math.max(0, readyButtons.indexOf(button));
+    return mutate(
+      "gajendra_set_review_acknowledged",
+      { threadId, reviewUpdatedAt, reviewIdentity, acknowledged: true },
+      undefined,
+      "mutation",
+      () => {
+        const nextButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
+        (nextButtons[Math.min(focusIndex, nextButtons.length - 1)]
+          ?? root.querySelector<HTMLButtonElement>("button[data-review-toggle]"))?.focus();
+        const status = root.querySelector<HTMLElement>("[data-refresh-status]");
+        if (status) status.textContent = "Marked reviewed";
+      },
+    );
+  }
   if (action === "current") return mutate("gajendra_set_current", { threadId });
   if (action === "move-up" || action === "move-down") {
     return mutate("gajendra_move", { threadId, direction: action === "move-up" ? "up" : "down" });
@@ -632,9 +660,11 @@ async function mutate(
   args: Record<string, unknown>,
   fixtureMutation?: () => void,
   reason: RenderReason = "mutation",
+  onSuccess?: () => void,
 ): Promise<void> {
   if (busy) return;
   const layoutState = motion.captureLayout();
+  let succeeded = false;
   busy = true;
   motion.setBusy(true, "Updating Gajendra");
   try {
@@ -642,24 +672,28 @@ async function mutate(
       fixtureMutation?.();
       applyFixtureMutation(tool, args);
       render(reason, layoutState);
-      return;
+      succeeded = true;
+    } else {
+      const result = await app.callServerTool({
+        name: tool,
+        arguments: {
+          ...args,
+          protocolVersion: MUTATION_PROTOCOL_VERSION,
+          ...(snapshot ? { expectedRevision: snapshot.revision } : {}),
+          idempotencyKey: mutationKey(),
+        },
+      });
+      acceptSnapshot(result.structuredContent, reason, layoutState);
+      succeeded = isDeckMutationResult(result.structuredContent)
+        && (result.structuredContent.outcome === "applied" || result.structuredContent.outcome === "replayed");
     }
-    const result = await app.callServerTool({
-      name: tool,
-      arguments: {
-        ...args,
-        protocolVersion: MUTATION_PROTOCOL_VERSION,
-        ...(snapshot ? { expectedRevision: snapshot.revision } : {}),
-        idempotencyKey: mutationKey(),
-      },
-    });
-    acceptSnapshot(result.structuredContent, reason, layoutState);
   } catch (error) {
     renderRecoverableError(error, layoutState);
   } finally {
     busy = false;
     motion.setBusy(false);
   }
+  if (succeeded) onSuccess?.();
 }
 
 function applyFixtureMutation(tool: string, args: Record<string, unknown>): void {
@@ -681,6 +715,14 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
     return;
   }
   if (!target) return;
+  if (tool === "gajendra_set_review_acknowledged") {
+    if (target.review?.updatedAt !== Number(args.reviewUpdatedAt)
+      || target.review.identity !== args.reviewIdentity
+      || args.acknowledged !== true) return;
+    delete target.review;
+    snapshot.revision += 1;
+    return;
+  }
   if (tool === "gajendra_set_context") {
     const value = args.context;
     target.context = value === "design" || value === "engineering" || value === "life" ? value : null;

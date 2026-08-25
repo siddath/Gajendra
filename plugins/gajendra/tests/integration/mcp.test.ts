@@ -27,7 +27,7 @@ describe("Gajendra MCP contract", () => {
     expect(open?._meta?.ui).toEqual({ resourceUri: RESOURCE_URI, visibility: ["app"] });
     expect(open?._meta?.["openai/ui"]).toEqual({ entrypoints: [{ type: "global" }] });
     expect(tools.tools.filter((tool) => tool._meta?.["openai/ui"])).toHaveLength(1);
-    expect(tools.tools).toHaveLength(8);
+    expect(tools.tools).toHaveLength(9);
     expect(tools.tools.find((tool) => tool.name === "gajendra_move")?.annotations?.idempotentHint).toBe(false);
 
     const resource = await client.readResource({ uri: RESOURCE_URI });
@@ -68,6 +68,19 @@ describe("Gajendra MCP contract", () => {
       mutation: { type: "set-context", threadId: "claude:focus-2", context: "design" },
     }));
     await client.callTool({
+      name: "gajendra_set_review_acknowledged",
+      arguments: { threadId: "codex:review-1", reviewUpdatedAt: 1_787_630_400, reviewIdentity: "a".repeat(64), acknowledged: true },
+    });
+    expect(mutations.at(-1)).toEqual(expect.objectContaining({
+      mutation: {
+        type: "set-review-acknowledged",
+        threadId: "codex:review-1",
+        reviewUpdatedAt: 1_787_630_400,
+        reviewIdentity: "a".repeat(64),
+        acknowledged: true,
+      },
+    }));
+    await client.callTool({
       name: "gajendra_move_before",
       arguments: {
         threadId: "claude:focus-2",
@@ -84,6 +97,11 @@ describe("Gajendra MCP contract", () => {
       arguments: { threadId: "claude:focus-2", context: "strategy" },
     });
     expect(invalid.isError).toBe(true);
+    const invalidReview = await client.callTool({
+      name: "gajendra_set_review_acknowledged",
+      arguments: { threadId: "codex:review-1", reviewUpdatedAt: -1, reviewIdentity: "a".repeat(64), acknowledged: true },
+    });
+    expect(invalidReview.isError).toBe(true);
   });
 
   it("exposes the same service through the companion JSON command", async () => {

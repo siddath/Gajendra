@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   MUTATION_PROTOCOL_VERSION,
+  isRunningThreadStatus,
   type DeckMutation,
   type DeckMutationRequest,
   type DeckMutationResult,
@@ -11,13 +12,14 @@ import {
 } from "../shared/contracts.js";
 import { applyMutation, buildSnapshot } from "./domain.js";
 import { hashIdempotencyKey } from "./idempotency.js";
+import { hashReviewAcknowledgement, hashReviewThread } from "./review-acknowledgements.js";
 import { GajendraStoreRepository } from "./store.js";
 import { ThreadSourceRegistry, type SourceCollection } from "./thread-sources.js";
 import { CODEX_PROVIDER_COLLECTION_ENVELOPE_MS } from "./codex-app-server.js";
 
 type SourceRegistry = Pick<ThreadSourceRegistry, "collect" | "close">;
 type MutationInput = DeckMutation | DeckMutationRequest;
-type ValidationErrorCode = "unknown-thread" | "unknown-source" | "invalid-target";
+type ValidationErrorCode = "unknown-thread" | "unknown-source" | "invalid-target" | "review-acknowledgement-limit";
 type SourceCollectionCache = Map<string, SourceCollection>;
 type MutationAttempt =
   | { retry: true }
@@ -164,10 +166,24 @@ export class GajendraService {
           return result(conflict(snapshot(), current.revision));
         }
 
-        const validationError = validateMutation(current, request.mutation, collection);
+        const validationError = validateMutation(
+          current,
+          request.mutation,
+          collection,
+          this.store.reviewAcknowledgementLimit,
+        );
         if (validationError) return result(rejected(snapshot(), current.revision, validationError));
 
-        const next = applyMutation(current, request.mutation);
+        const mutationThreadId = "threadId" in request.mutation ? request.mutation.threadId : null;
+        const mutationThread = mutationThreadId
+          ? collection.threads.find((thread) => thread.id === mutationThreadId)
+          : undefined;
+        const next = applyMutation(
+          current,
+          request.mutation,
+          new Date(),
+          mutationThread?.review ? { review: mutationThread.review } : {},
+        );
         next.revision = current.revision + 1;
         if (idempotencyKeyHash) {
           next.idempotency = [
@@ -303,9 +319,10 @@ function mutationFingerprint(mutation: DeckMutation): string {
 }
 
 function validateMutation(
-  store: Pick<PriorityStore, "entries" | "currentFocusThreadId">,
+  store: Pick<PriorityStore, "entries" | "currentFocusThreadId" | "reviewAcknowledgements">,
   mutation: DeckMutation,
   collection: SourceCollection,
+  reviewAcknowledgementLimit: number,
 ): ValidationErrorCode | null {
   if (mutation.type === "set-collapsed") return null;
   if (mutation.type === "set-source-enabled") {
@@ -316,6 +333,24 @@ function validateMutation(
 
   const knownThreadIds = new Set(collection.threads.map((thread) => thread.id));
   if (!knownThreadIds.has(mutation.threadId)) return "unknown-thread";
+  if (mutation.type === "set-review-acknowledged") {
+    const thread = collection.threads.find((candidate) => candidate.id === mutation.threadId);
+    if (!thread?.review
+      || isRunningThreadStatus(thread.status)
+      || thread.review.updatedAt !== mutation.reviewUpdatedAt) return "invalid-target";
+    const signalHash = hashReviewAcknowledgement(mutation.threadId, thread.review);
+    if (mutation.reviewIdentity !== signalHash) return "invalid-target";
+    const exists = store.reviewAcknowledgements.some((receipt) => receipt.signalHash === signalHash);
+    if (exists === mutation.acknowledged) return "invalid-target";
+    const sameThread = store.reviewAcknowledgements.some(
+      (receipt) => receipt.threadHash === hashReviewThread(mutation.threadId),
+    );
+    return mutation.acknowledged
+      && !sameThread
+      && store.reviewAcknowledgements.length >= reviewAcknowledgementLimit
+      ? "review-acknowledgement-limit"
+      : null;
+  }
   const stored = store.entries.find((entry) => entry.threadId === mutation.threadId);
   if (mutation.type === "move" || mutation.type === "set-context") {
     return stored ? null : "invalid-target";
@@ -375,7 +410,8 @@ function rejected(snapshot: DeckSnapshot, revision: number, code: Exclude<Mutati
     "idempotency-key-reused": "This request key was already used for a different change.",
     "unknown-thread": "That thread is no longer available from an enabled source.",
     "unknown-source": "That source is not available in the current Gajendra registry.",
-    "invalid-target": "That priority target is no longer valid. Refresh and retry.",
+    "invalid-target": "That Gajendra target is no longer valid. Refresh and retry.",
+    "review-acknowledgement-limit": "Gajendra's review receipt capacity is full. This item remains Ready for Review.",
   };
   return {
     protocolVersion: MUTATION_PROTOCOL_VERSION,

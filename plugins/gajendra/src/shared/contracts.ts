@@ -2,6 +2,11 @@ export const STORE_VERSION = 3 as const;
 export const MUTATION_PROTOCOL_VERSION = 1 as const;
 export const FOCUS_GUIDE = 5;
 export const DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
+/**
+ * One receipt per acknowledged thread generation. The service rejects new-thread acknowledgements
+ * at this ceiling instead of evicting an older receipt and silently resurrecting handled work.
+ */
+export const DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT = 1_024;
 export const DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"] as const;
 /** One bounded recent-history ceiling shared by provider selection and optional metadata enrichments. */
 export const MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
@@ -74,6 +79,14 @@ export type StoredMutationReceipt = {
   revision: number;
 };
 
+/** Data-minimized local workflow state; neither receipt stores provider prose or destination text in plaintext. */
+export type StoredReviewAcknowledgement = {
+  /** SHA-256 of the canonical thread ID, used only to replace an older generation for that thread. */
+  threadHash: string;
+  /** SHA-256 of canonical thread ID, review timestamp, kind, destination type, and destination. */
+  signalHash: string;
+};
+
 export type PriorityStore = {
   version: typeof STORE_VERSION;
   revision: number;
@@ -82,6 +95,7 @@ export type PriorityStore = {
   collapsed: Record<PriorityLevel, boolean>;
   sourcePreferences: Record<string, boolean>;
   idempotency: StoredMutationReceipt[];
+  reviewAcknowledgements: StoredReviewAcknowledgement[];
 };
 
 export type ResumeCommand = {
@@ -102,6 +116,8 @@ export type ReviewSignal = {
     | { type: "thread"; deepLink: string }
     | { type: "url"; url: string };
   providerStatus: string;
+  /** Server-projected exact identity used to bind an acknowledgement click to this evidence. */
+  identity?: string;
 };
 
 export type AgentThread = {
@@ -184,6 +200,13 @@ export type DeckMutation =
     currentThreadId?: string | null;
   }
   | { type: "set-context"; threadId: string; context: ThreadContext | null }
+  | {
+    type: "set-review-acknowledged";
+    threadId: string;
+    reviewUpdatedAt: number;
+    reviewIdentity: string;
+    acknowledged: boolean;
+  }
   | { type: "set-collapsed"; level: PriorityLevel; collapsed: boolean }
   | { type: "set-source-enabled"; sourceId: string; enabled: boolean };
 
@@ -206,6 +229,7 @@ export type MutationErrorCode =
   | "unknown-thread"
   | "unknown-source"
   | "invalid-target"
+  | "review-acknowledgement-limit"
   | "store-recovery-required"
   | "store-busy";
 
@@ -268,4 +292,5 @@ export const EMPTY_STORE: PriorityStore = {
   collapsed: { focus: false, important: false },
   sourcePreferences: { ...DEFAULT_SOURCE_PREFERENCES },
   idempotency: [],
+  reviewAcknowledgements: [],
 };

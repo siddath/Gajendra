@@ -99,16 +99,20 @@ for Review; that transition is completion evidence, not unread state.
 
 Ready for Review is live provider evidence, not an unread badge. The current local Codex app-server
 path requests only the newest turn's status and completion time with message items explicitly not
-loaded. A valid completed turn appears until a newer turn changes the evidence; opening the thread
-does not clear it. An otherwise exact safe `completedAt: null` response is candidate-local omitted
-evidence, so it does not make that one thread Ready. Malformed, private-content, unsupported,
+loaded. A valid completed turn remains after opening its Task or Review destination. Select the
+green **Mark reviewed** control when you have handled it; this removes only the exact Ready response,
+can be undone in the native app, and does not change its priority. A newer response or corrected
+destination appears again. Codex currently reports completion time to Unix-second precision and no
+allow-listed opaque turn identity, so two distinct completions in the same second with the same kind
+and destination cannot yet be distinguished. An otherwise exact safe `completedAt: null` response
+is candidate-local omitted evidence, so it does not make that one thread Ready. Malformed, private-content, unsupported,
 ambiguous, or purported-completed responses with an error suppress the built-in Ready batch
 fail-closed. A structurally valid active, failed, or interrupted newest turn is candidate-local
 non-Ready evidence. Claude Code, Cursor, and Grok are not guessed from idle time or resumability.
 Configured sources may still supply the validated signal directly.
 
 The review row opens the declared **Review** or **Task** destination; the provider badge separately
-opens the owning task. Its highlighted badge shows the number needing attention. Double-click the
+opens the owning task, and the green check marks the exact response reviewed. Its highlighted badge shows the number needing attention. Double-click the
 dock header to shrink or expand the rows; a single click does not change it. Gajendra refreshes on
 reveal and periodically while the compact surface is visible, pausing during direct manipulation.
 When expanded in the compact card, Ready shows at most five rows and routes the exact overflow count
@@ -194,8 +198,9 @@ open build/Gajendra.app
 
 ## Privacy summary
 
-Gajendra reads bounded local thread metadata and stores only its own priority metadata. It does not
-store prompts, transcripts, tokens, credentials, provider databases, review results, or diffs. The
+Gajendra reads bounded local thread metadata and stores only its own priority metadata plus bounded
+hashed review acknowledgements. It does not store prompts, transcripts, tokens, credentials,
+provider databases, raw review timestamps/destinations, review results, or diffs. The
 source tool continues to own the session and every Open action.
 
 For the precise persisted fields and adapter limits, see [Security](../SECURITY.md),

@@ -31702,6 +31702,7 @@ var STORE_VERSION = 3;
 var MUTATION_PROTOCOL_VERSION = 1;
 var FOCUS_GUIDE = 5;
 var DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
+var DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT = 1024;
 var DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"];
 var MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
@@ -31752,11 +31753,12 @@ var EMPTY_STORE = {
   entries: [],
   collapsed: { focus: false, important: false },
   sourcePreferences: { ...DEFAULT_SOURCE_PREFERENCES },
-  idempotency: []
+  idempotency: [],
+  reviewAcknowledgements: []
 };
 
 // src/server/service.ts
-import { createHash as createHash2 } from "node:crypto";
+import { createHash as createHash3 } from "node:crypto";
 
 // src/server/idempotency.ts
 import { createHash } from "node:crypto";
@@ -31765,6 +31767,19 @@ function hashIdempotencyKey(value) {
 }
 function isSha256Digest(value) {
   return typeof value === "string" && /^[a-f0-9]{64}$/iu.test(value);
+}
+
+// src/server/review-acknowledgements.ts
+import { createHash as createHash2 } from "node:crypto";
+function sha256(value) {
+  return createHash2("sha256").update(value).digest("hex");
+}
+function hashReviewThread(threadId) {
+  return sha256(JSON.stringify([threadId]));
+}
+function hashReviewAcknowledgement(threadId, review) {
+  const destination = review.destination.type === "thread" ? [review.destination.type, review.destination.deepLink] : [review.destination.type, review.destination.url];
+  return sha256(JSON.stringify([threadId, review.updatedAt, review.kind, ...destination]));
 }
 
 // src/server/domain.ts
@@ -31789,10 +31804,11 @@ function normalizeStore(value) {
       important: Boolean(candidate.collapsed?.important)
     },
     sourcePreferences: normalizeSourcePreferences(candidate.sourcePreferences),
-    idempotency: normalizeIdempotency(candidate.idempotency)
+    idempotency: normalizeIdempotency(candidate.idempotency),
+    reviewAcknowledgements: normalizeReviewAcknowledgements(candidate.reviewAcknowledgements)
   };
 }
-function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
+function applyMutation(store, mutation, now = /* @__PURE__ */ new Date(), evidence = {}) {
   const next = normalizeStore(store);
   if (mutation.type === "set-collapsed") {
     next.collapsed[mutation.level] = mutation.collapsed;
@@ -31800,6 +31816,21 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date()) {
   }
   if (mutation.type === "set-source-enabled") {
     next.sourcePreferences[mutation.sourceId] = mutation.enabled;
+    return next;
+  }
+  if (mutation.type === "set-review-acknowledged") {
+    if (!evidence.review || evidence.review.updatedAt !== mutation.reviewUpdatedAt) return next;
+    const threadHash = hashReviewThread(mutation.threadId);
+    const signalHash = hashReviewAcknowledgement(mutation.threadId, evidence.review);
+    if (signalHash !== mutation.reviewIdentity) return next;
+    if (mutation.acknowledged) {
+      next.reviewAcknowledgements = [
+        ...next.reviewAcknowledgements.filter((receipt) => receipt.threadHash !== threadHash),
+        { threadHash, signalHash }
+      ];
+    } else {
+      next.reviewAcknowledgements = next.reviewAcknowledgements.filter((receipt) => receipt.signalHash !== signalHash);
+    }
     return next;
   }
   if (mutation.type === "move-before") {
@@ -31898,7 +31929,15 @@ function repairCurrentFocus(store) {
 }
 function buildSnapshot(store, threads, sources, error51 = null) {
   const normalized = normalizeStore(store);
-  const threadsById = new Map(threads.map((thread) => [thread.id, thread]));
+  const acknowledgedSignals = new Set(normalized.reviewAcknowledgements.map((receipt) => receipt.signalHash));
+  const projectReview = (thread) => {
+    if (!thread.review) return thread;
+    const identity = hashReviewAcknowledgement(thread.id, thread.review);
+    if (!acknowledgedSignals.has(identity)) return { ...thread, review: { ...thread.review, identity } };
+    const { review: _review, ...withoutReview } = thread;
+    return withoutReview;
+  };
+  const threadsById = new Map(threads.map((thread) => [thread.id, projectReview(thread)]));
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry) => {
     const thread = threadsById.get(entry.threadId);
@@ -31911,7 +31950,7 @@ function buildSnapshot(store, threads, sources, error51 = null) {
   };
   const focus = normalized.entries.filter((entry) => entry.level === "focus").map(resolve).filter(isPresent);
   const important = normalized.entries.filter((entry) => entry.level === "important").map(resolve).filter(isPresent);
-  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...thread, level: null, isCurrent: false, context: null }));
+  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...projectReview(thread), level: null, isCurrent: false, context: null }));
   return {
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
     revision: normalized.revision,
@@ -31963,6 +32002,26 @@ function normalizeIdempotency(value) {
     seen.add(keyHash);
     receipts.push({ keyHash, fingerprint: receipt.fingerprint.toLowerCase(), revision: receipt.revision });
     if (receipts.length >= DEFAULT_IDEMPOTENCY_LEDGER_LIMIT) break;
+  }
+  return receipts;
+}
+function normalizeReviewAcknowledgements(value) {
+  if (!Array.isArray(value)) return [];
+  const seenThreads = /* @__PURE__ */ new Set();
+  const seenSignals = /* @__PURE__ */ new Set();
+  const receipts = [];
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const candidate = value[index];
+    if (!candidate || typeof candidate !== "object") continue;
+    const receipt = candidate;
+    if (!isSha256Digest(receipt.threadHash) || !isSha256Digest(receipt.signalHash)) continue;
+    const threadHash = receipt.threadHash.toLowerCase();
+    const signalHash = receipt.signalHash.toLowerCase();
+    if (seenThreads.has(threadHash) || seenSignals.has(signalHash)) continue;
+    seenThreads.add(threadHash);
+    seenSignals.add(signalHash);
+    receipts.unshift({ threadHash, signalHash });
+    if (receipts.length >= DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT) break;
   }
   return receipts;
 }
@@ -32025,6 +32084,7 @@ var GajendraStoreRepository = class {
   lockTimeoutMs;
   staleLockMs;
   idempotencyLimit;
+  reviewAcknowledgementLimit;
   onStaleLockCandidate;
   onBeforeLockPublish;
   onPrimaryWritten;
@@ -32040,6 +32100,10 @@ var GajendraStoreRepository = class {
     this.lockTimeoutMs = positiveInteger(options.lockTimeoutMs, DEFAULT_LOCK_TIMEOUT_MS);
     this.staleLockMs = Math.max(this.lockTimeoutMs, positiveInteger(options.staleLockMs, DEFAULT_STALE_LOCK_MS));
     this.idempotencyLimit = positiveInteger(options.idempotencyLimit, DEFAULT_IDEMPOTENCY_LEDGER_LIMIT);
+    this.reviewAcknowledgementLimit = Math.min(
+      positiveInteger(options.reviewAcknowledgementLimit, DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT),
+      DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT
+    );
     this.onStaleLockCandidate = options.onStaleLockCandidate;
     this.onBeforeLockPublish = options.onBeforeLockPublish;
     this.onPrimaryWritten = options.onPrimaryWritten;
@@ -32175,7 +32239,8 @@ var GajendraStoreRepository = class {
   async writeUnsafe(store) {
     const normalized = normalizeStore({
       ...store,
-      idempotency: store.idempotency.slice(-this.idempotencyLimit)
+      idempotency: store.idempotency.slice(-this.idempotencyLimit),
+      reviewAcknowledgements: store.reviewAcknowledgements.slice(-this.reviewAcknowledgementLimit)
     });
     const contents = `${JSON.stringify(normalized, null, 2)}
 `;
@@ -32471,8 +32536,14 @@ function hasKnownStoreShape(value, purpose) {
   if (version2 >= 2 && !isSourcePreferencesShape(candidate.sourcePreferences)) return false;
   if (version2 === 3) {
     if (!isRevision(candidate.revision) || !Array.isArray(candidate.idempotency) || !candidate.idempotency.every(isStrictReceipt)) return false;
+    if (candidate.reviewAcknowledgements !== void 0 && (!Array.isArray(candidate.reviewAcknowledgements) || candidate.reviewAcknowledgements.length > DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT || !candidate.reviewAcknowledgements.every(isStrictReviewAcknowledgement))) return false;
   }
   return true;
+}
+function isStrictReviewAcknowledgement(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value;
+  return typeof receipt.threadHash === "string" && /^[a-f0-9]{64}$/iu.test(receipt.threadHash) && typeof receipt.signalHash === "string" && /^[a-f0-9]{64}$/iu.test(receipt.signalHash);
 }
 function isStrictStoredEntry(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -34256,9 +34327,21 @@ var GajendraService = class {
         if (request.expectedRevision !== void 0 && request.expectedRevision !== current.revision) {
           return result(conflict(snapshot(), current.revision));
         }
-        const validationError = validateMutation(current, request.mutation, collection);
+        const validationError = validateMutation(
+          current,
+          request.mutation,
+          collection,
+          this.store.reviewAcknowledgementLimit
+        );
         if (validationError) return result(rejected(snapshot(), current.revision, validationError));
-        const next = applyMutation(current, request.mutation);
+        const mutationThreadId = "threadId" in request.mutation ? request.mutation.threadId : null;
+        const mutationThread = mutationThreadId ? collection.threads.find((thread) => thread.id === mutationThreadId) : void 0;
+        const next = applyMutation(
+          current,
+          request.mutation,
+          /* @__PURE__ */ new Date(),
+          mutationThread?.review ? { review: mutationThread.review } : {}
+        );
         next.revision = current.revision + 1;
         if (idempotencyKeyHash) {
           next.idempotency = [
@@ -34370,15 +34453,27 @@ function normalizeRequest(input) {
   return { mutation: input };
 }
 function mutationFingerprint(mutation) {
-  return createHash2("sha256").update(JSON.stringify(mutation)).digest("hex");
+  return createHash3("sha256").update(JSON.stringify(mutation)).digest("hex");
 }
-function validateMutation(store, mutation, collection) {
+function validateMutation(store, mutation, collection, reviewAcknowledgementLimit) {
   if (mutation.type === "set-collapsed") return null;
   if (mutation.type === "set-source-enabled") {
     return collection.sources.some((source) => source.id === mutation.sourceId && source.id !== "configured-sources") ? null : "unknown-source";
   }
   const knownThreadIds = new Set(collection.threads.map((thread) => thread.id));
   if (!knownThreadIds.has(mutation.threadId)) return "unknown-thread";
+  if (mutation.type === "set-review-acknowledged") {
+    const thread = collection.threads.find((candidate) => candidate.id === mutation.threadId);
+    if (!thread?.review || isRunningThreadStatus(thread.status) || thread.review.updatedAt !== mutation.reviewUpdatedAt) return "invalid-target";
+    const signalHash = hashReviewAcknowledgement(mutation.threadId, thread.review);
+    if (mutation.reviewIdentity !== signalHash) return "invalid-target";
+    const exists = store.reviewAcknowledgements.some((receipt) => receipt.signalHash === signalHash);
+    if (exists === mutation.acknowledged) return "invalid-target";
+    const sameThread = store.reviewAcknowledgements.some(
+      (receipt) => receipt.threadHash === hashReviewThread(mutation.threadId)
+    );
+    return mutation.acknowledged && !sameThread && store.reviewAcknowledgements.length >= reviewAcknowledgementLimit ? "review-acknowledgement-limit" : null;
+  }
   const stored = store.entries.find((entry) => entry.threadId === mutation.threadId);
   if (mutation.type === "move" || mutation.type === "set-context") {
     return stored ? null : "invalid-target";
@@ -34427,7 +34522,8 @@ function rejected(snapshot, revision, code) {
     "idempotency-key-reused": "This request key was already used for a different change.",
     "unknown-thread": "That thread is no longer available from an enabled source.",
     "unknown-source": "That source is not available in the current Gajendra registry.",
-    "invalid-target": "That priority target is no longer valid. Refresh and retry."
+    "invalid-target": "That Gajendra target is no longer valid. Refresh and retry.",
+    "review-acknowledgement-limit": "Gajendra's review receipt capacity is full. This item remains Ready for Review."
   };
   return {
     protocolVersion: MUTATION_PROTOCOL_VERSION,
@@ -34458,6 +34554,13 @@ var deckMutationSchema = external_exports.discriminatedUnion("type", [
     currentThreadId: external_exports.string().min(1).nullable().optional()
   }),
   external_exports.object({ type: external_exports.literal("set-context"), threadId: external_exports.string().min(1), context: external_exports.enum(["design", "engineering", "life"]).nullable() }),
+  external_exports.object({
+    type: external_exports.literal("set-review-acknowledged"),
+    threadId: external_exports.string().min(1),
+    reviewUpdatedAt: external_exports.number().finite().nonnegative(),
+    reviewIdentity: external_exports.string().regex(/^[a-f0-9]{64}$/iu),
+    acknowledged: external_exports.boolean()
+  }),
   external_exports.object({ type: external_exports.literal("set-collapsed"), level: external_exports.enum(["focus", "important"]), collapsed: external_exports.boolean() }),
   external_exports.object({ type: external_exports.literal("set-source-enabled"), sourceId: external_exports.string().min(1), enabled: external_exports.boolean() })
 ]);
@@ -34553,6 +34656,23 @@ function createGajendraServer(service = new GajendraService()) {
     expectedRevision,
     idempotencyKey
   ))));
+  K3(server, "gajendra_set_review_acknowledged", {
+    title: "Set review acknowledgement",
+    description: "Mark one exact Ready for Review response handled or restore it without changing task priority.",
+    inputSchema: {
+      threadId: external_exports.string().min(1),
+      reviewUpdatedAt: external_exports.number().finite().nonnegative(),
+      reviewIdentity: external_exports.string().regex(/^[a-f0-9]{64}$/iu),
+      acknowledged: external_exports.boolean(),
+      ...mutationOptionsSchema
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } }
+  }, async ({ threadId, reviewUpdatedAt, reviewIdentity, acknowledged, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-review-acknowledged", threadId, reviewUpdatedAt, reviewIdentity, acknowledged },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
     description: "Persist whether a Gajendra priority section is collapsed.",
@@ -34599,7 +34719,7 @@ function mutationToolResult(result) {
     structuredContent: result,
     content: [{
       type: "text",
-      text: result.error?.message ?? `Gajendra applied a priority change at revision ${result.revision}.`
+      text: result.error?.message ?? `Gajendra applied a change at revision ${result.revision}.`
     }]
   };
 }

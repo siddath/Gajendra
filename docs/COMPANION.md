@@ -67,10 +67,11 @@ manual human-drag proof, Developer ID signing, notarization, or distribution rea
   A provider completion changes from
   Running to Ready for Review on refresh only when it has valid Ready evidence; Ready is not an
   unread marker.
-- Ready for Review sits below Running in the same single scroll body. Orange is paired with the
-  `checkmark.bubble` glyph, label, count, ready time, destination label, and accessibility copy.
+- Ready for Review sits below Running in the same single scroll body. Orange is paired with a
+  non-action tray glyph, label, count, ready time, destination label, and accessibility copy.
   The main review row opens the declared Review or Task destination; its provider badge separately
-  opens the owning task. Review metadata remains live-only and Running has overlap precedence. An
+  opens the owning task. A separate green circled check reversibly acknowledges only that response;
+  opening remains side-effect free. Review metadata remains live-only and Running has overlap precedence. An
   expanded compact preview renders at most five Ready rows and routes the exact remainder to
   Organizer.
 - Running and Ready for Review use high-visibility numeric badges. Running also exposes an explicit

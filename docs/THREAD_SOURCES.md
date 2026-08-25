@@ -77,9 +77,19 @@ detail or being treated as a private/protocol-error batch failure.
 Claude Code, Cursor, and Grok do not currently emit built-in review readiness. Gajendra does not
 translate `idle`, `resumable`, recency, waiting flags, or inactivity into a review signal. Remote
 provider APIs, tokens, and network access remain outside this local implementation. Opening a
-thread does not clear review readiness; only newer provider evidence changes it. Review signals,
-provider statuses, destinations, results, diffs, and PR content are never written to
-`gajendra.v2.json`.
+thread does not clear review readiness. The green **Mark reviewed** action stores a bounded digest
+for the exact current response and removes only that Ready projection; Undo restores it, while newer
+timestamps or corrected kinds/destinations reappear. Review signals, raw timestamps, provider
+statuses, destinations, results, diffs, and PR content are never written to `gajendra.v2.json`.
+At 1,024 distinct acknowledged threads, Gajendra leaves additional rows visible and reports capacity
+instead of evicting an older receipt.
+
+The acknowledgement identity is as precise as the guarded provider metadata: thread, Unix-second
+completion timestamp, kind, and destination. If two distinct completions for one thread occur in the
+same second with the same kind and destination, the current Codex response does not expose an
+allow-listed opaque generation ID with which Gajendra can distinguish them. That collision remains a
+documented provider-boundary limitation; a changed timestamp, kind, or destination creates a new
+review generation.
 
 ## Codex activity enrichment
 

@@ -13,7 +13,7 @@ The following are stable compatibility identifiers and must not be renamed with 
 | Executable and bundle path | `Gajendra` / `Gajendra.app` |
 | Default state path | `~/Library/Application Support/Gajendra/gajendra.v2.json` |
 | Context values | `design`, `engineering`, `life` |
-| Store behavior | revision/CAS/idempotency and bounded recovery metadata |
+| Store behavior | revision/CAS/idempotency, bounded hashed review acknowledgements, and bounded recovery metadata |
 
 ## Data compatibility
 
@@ -37,8 +37,10 @@ portable through an old catalog.
 
 Configured catalog version 1 accepts the optional live-only `review` structure. Omitting it remains
 fully compatible. Invalid state/kind/timestamp/destination shapes fail the configured source closed;
-they are not downgraded to idle work. Review metadata never changes the version-3 priority store,
-and therefore creates no persisted migration or new priority level.
+they are not downgraded to idle work. Live review metadata never enters the priority store. An
+explicit acknowledgement adds only bounded identity digests to an optional version-3 field and
+creates no new priority level. Older v3 writers can read the file but will drop the unknown field on
+their next write, causing handled Ready rows to reappear without changing priority state.
 
 ## Build versus binary compatibility
 

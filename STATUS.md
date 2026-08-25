@@ -4,7 +4,7 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-08-24
+**Reconciled:** 2026-08-25
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
@@ -19,13 +19,13 @@ and bounded provider/service/native deadline handling. Both hosted jobs passed f
 
 | Area | Current merged behavior | Boundary that remains open |
 | --- | --- | --- |
-| NOW, Focus, Important | One NOW remains inside Focus. Quick click opens; a stationary hold selects and lifts the visible row, and continuing the same press drags it. Unprioritized status rows use **+** to choose Focus or Important; non-NOW prioritized rows swap lanes in one click. NOW may reorder within Focus but cannot move or be removed through compact, Organizer, Search, accessibility, drag/drop, model, or public mutation routes; make another task NOW first. | Physical human-pointer and VoiceOver journeys remain separate evidence. |
+| NOW, Focus, Important | One NOW remains inside Focus. Quick click opens; a stationary hold selects and lifts the visible row, and continuing the same press drags it. Compact priority rows no longer duplicate drag/drop with a left/right lane button; context-menu and accessibility alternatives remain. Unprioritized Running/Ready rows still use **+** to choose Focus or Important. | Physical human-pointer and VoiceOver journeys remain separate evidence. |
 | Running | Explicit provider-reported activity appears across every priority lane without changing priority. The highlighted count remains visible; **All priority lanes** single-click and dock-header double-click expand or contract the list. | Activity is never inferred from age or resumability. |
-| Ready for Review | Provider-completed work appears independently of priority and opens the exact Task/Review destination. It is completion evidence, not an unread badge; opening does not clear it. A valid completion replaces Running on the next visible refresh. Expanded compact view shows five rows and the exact Organizer overflow. | Codex currently supplies built-in completion evidence; Claude Code, Cursor, and Grok are not guessed ready. |
+| Ready for Review | Provider-completed work appears independently of priority and opens the exact Task/Review destination. Opening does not clear it. A Ready-only green action reversibly acknowledges the exact response without changing NOW, Focus, Important, or Running; later or corrected evidence reappears. Expanded compact view shows five rows and the exact Organizer overflow. | Codex currently supplies built-in completion evidence; Claude Code, Cursor, and Grok are not guessed ready. A 1,024-thread receipt ceiling rejects overflow visibly instead of evicting handled work. |
 | Ready sync fix | One exact safe legacy `completedAt: null` summary is treated as missing evidence for that candidate only. It no longer suppresses valid completed siblings. The derived 70-second source-generation envelope no longer races the 30-second stale-lock marker; at 85 seconds the native watchdog initiates TERM/KILL, followed by process-group and pipe cleanup. It is not a strict response-by-85s SLO. Private items, errors on purported completed turns, malformed shapes, invalid/future timestamps, timeouts, and unsupported metadata still fail the built-in batch closed. | The provider does not expose a trustworthy human opened/unread field, so Gajendra does not claim one. |
 | Test isolation | Native transition proof mutates only a temporary synthetic catalog. Browser automation selects a bounded OS-assigned loopback port unless an explicit test port is supplied, so an interrupted preview on fixed port `4173` no longer creates that deterministic failure. | Automated real-window proof does not replace physical VoiceOver or clean-Mac testing; a narrow port-release-to-bind race remains possible. |
 | Launcher and performance | The circular launcher has no clipped rectangular blur, recovers the inactive first click, and prewarms the card. Three final widget samples measured median 47 ms prewarmed, 85 ms cold, and 86 ms warm against 58/86/85 ms at the exact pre-change revision; all paths stayed under the local 200 ms budget. | Same-host automation is not a cross-machine performance claim; the system AX tree did not expose the status item. |
-| Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists namespaced IDs and its own priority metadata, not titles, prompts, transcripts, credentials, review bodies, or provider databases. | Installed-provider and clean-account proof remain separate. |
+| Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists namespaced IDs, its own priority metadata, and bounded hashed review acknowledgements—not titles, prompts, transcripts, credentials, review bodies, destinations, or provider databases. | Installed-provider and clean-account proof remain separate. |
 | Native app | macOS 13.5 source build, bundled Node v24.19.0/notices, service parity, strict ad-hoc codesign verification, and local bundle readiness pass. | Developer ID, notarization, stapling, Gatekeeper, clean-Mac, and binary distribution are not complete. |
 | Mobile | A documentation-only transport/security plan exists. | No listener, relay, mobile app, credential, signing, or store submission exists. |
 
@@ -34,14 +34,16 @@ and bounded provider/service/native deadline handling. Both hosted jobs passed f
 - The README documents source setup, the daily workflow, direct priority actions, review semantics,
   privacy, and the source-only distribution boundary.
 - High-resolution screenshots are rendered from the real SwiftUI views using synthetic fixtures.
-- The [hero image](evidence/launch/gajendra-hero.png) visibly labels the data synthetic and is
-  embedded on the repository front page.
+- The [repository hero](evidence/launch/gajendra-hero.png) visibly labels the data synthetic and is
+  embedded on the repository front page. The separate
+  [Ready acknowledgement hero](evidence/launch/gajendra-linkedin-ready-review-v2.png) is the proposed
+  LinkedIn attachment.
 - The [launch-media receipt](evidence/launch/README.md) records dimensions, hashes, reproduction,
   and privacy validation.
 - The [adversarial launch review](evidence/verification/2026-08-24-adversarial-launch-review.md)
   records challenged claims, accepted evidence, and gates that remain deliberately open.
 - The [LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends manual publication at
-  **10:00 PM IST on Monday, 24 August 2026**, within a 9:55–10:05 PM window. It is not published.
+  **4:00 PM IST on Wednesday, 26 August 2026**, within a 3:55–4:05 PM window. It is not published.
 
 ## Current implementation receipts
 
