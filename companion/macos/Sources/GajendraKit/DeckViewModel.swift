@@ -101,7 +101,7 @@ public final class DeckViewModel: ObservableObject {
                     let hadHistory = canUndo || canRedo
                     invalidateHistory()
                     if hadHistory {
-                        errorChannels.mutationFailed("That change is no longer undoable because priorities changed elsewhere.")
+                        errorChannels.mutationFailed("That change is no longer undoable because Gajendra changed elsewhere.")
                     }
                 }
                 snapshot = next
@@ -198,11 +198,26 @@ public final class DeckViewModel: ObservableObject {
         )
     }
 
+    public func setReviewAcknowledged(_ thread: DeckThread, acknowledged: Bool) {
+        guard thread.isReadyForReview,
+              let review = thread.review,
+              let reviewIdentity = review.identity else { return }
+        apply(
+            .setReviewAcknowledged(
+                threadId: thread.id,
+                reviewUpdatedAt: review.updatedAt,
+                reviewIdentity: reviewIdentity,
+                acknowledged: acknowledged
+            ),
+            actionName: acknowledged ? "Mark reviewed" : "Restore review"
+        )
+    }
+
     public func undo() {
         guard !isLoading, let entry = undoStack.last else { return }
         guard snapshot?.revision == historyWatermark else {
             invalidateHistory()
-            errorChannels.mutationFailed("That change is no longer undoable because priorities changed elsewhere.")
+            errorChannels.mutationFailed("That change is no longer undoable because Gajendra changed elsewhere.")
             return
         }
         undoStack.removeLast()
@@ -220,7 +235,7 @@ public final class DeckViewModel: ObservableObject {
         guard !isLoading, let entry = redoStack.last else { return }
         guard snapshot?.revision == historyWatermark else {
             invalidateHistory()
-            errorChannels.mutationFailed("That change is no longer redoable because priorities changed elsewhere.")
+            errorChannels.mutationFailed("That change is no longer redoable because Gajendra changed elsewhere.")
             return
         }
         redoStack.removeLast()
@@ -238,7 +253,7 @@ public final class DeckViewModel: ObservableObject {
         guard let client else { return }
         let baseRevision = snapshot?.revision
         guard let materialized = materialize(action) else {
-            errorChannels.mutationFailed("That priority change is no longer available.")
+            errorChannels.mutationFailed("That Gajendra change is no longer available.")
             restoreHistoryAfterFailureIfNeeded(action, invalidate: false)
             runNextQueuedOperationIfNeeded()
             return
@@ -368,6 +383,13 @@ public final class DeckViewModel: ObservableObject {
         case let .setContext(threadId, _):
             guard let thread = snapshot.allThreads.first(where: { $0.id == threadId }) else { return nil }
             return .setContext(threadId: threadId, context: thread.context)
+        case let .setReviewAcknowledged(threadId, reviewUpdatedAt, reviewIdentity, acknowledged):
+            return .setReviewAcknowledged(
+                threadId: threadId,
+                reviewUpdatedAt: reviewUpdatedAt,
+                reviewIdentity: reviewIdentity,
+                acknowledged: !acknowledged
+            )
         case let .setCollapsed(level, _):
             let collapsed = level == .focus ? snapshot.collapsed.focus : snapshot.collapsed.important
             return .setCollapsed(level: level, collapsed: collapsed)
@@ -529,7 +551,7 @@ public final class DeckViewModel: ObservableObject {
         if let clientError = error as? DeckClient.ClientError, clientError == .invalidResponse {
             return "Gajendra returned an invalid priority response."
         }
-        return "Gajendra could not apply that priority change."
+        return "Gajendra could not apply that change."
     }
 
     private func runNextQueuedOperationIfNeeded() {

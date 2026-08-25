@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Kept Ready for Review independent of NOW, Focus, and Important; added a separate green,
+  exact-response review acknowledgement with Undo, bounded SHA-256 receipts, Running precedence,
+  and side-effect-free Open behavior. Removed duplicate compact lane arrows and Ready glyphs from
+  priority rows, and refreshed the matching native/browser proof, docs, and launch media.
 - Restored the visible **Gajendra** identity with the descriptor **One clear focus across your AI
   tools.** and promise **One NOW. One short queue. One click back to the exact thread.**, while
   retaining the established package, URL, bundle, executable, and state compatibility identifiers.

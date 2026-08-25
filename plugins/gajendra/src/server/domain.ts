@@ -1,5 +1,6 @@
 import {
   DEFAULT_IDEMPOTENCY_LEDGER_LIMIT,
+  DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT,
   DEFAULT_SOURCE_PREFERENCES,
   EMPTY_STORE,
   FOCUS_GUIDE,
@@ -9,12 +10,15 @@ import {
   type DeckSnapshot,
   type DeckThread,
   type PriorityStore,
+  type ReviewSignal,
   type StoredEntry,
   type StoredMutationReceipt,
+  type StoredReviewAcknowledgement,
   type ThreadSourceStatus,
   type ThreadContext,
 } from "../shared/contracts.js";
 import { hashIdempotencyKey, isSha256Digest } from "./idempotency.js";
+import { hashReviewAcknowledgement, hashReviewThread } from "./review-acknowledgements.js";
 
 export function canonicalThreadId(sourceId: string, threadId: string): string {
   return `${sourceId}:${threadId}`;
@@ -49,10 +53,16 @@ export function normalizeStore(value: unknown): PriorityStore {
     },
     sourcePreferences: normalizeSourcePreferences(candidate.sourcePreferences),
     idempotency: normalizeIdempotency(candidate.idempotency),
+    reviewAcknowledgements: normalizeReviewAcknowledgements(candidate.reviewAcknowledgements),
   };
 }
 
-export function applyMutation(store: PriorityStore, mutation: DeckMutation, now = new Date()): PriorityStore {
+export function applyMutation(
+  store: PriorityStore,
+  mutation: DeckMutation,
+  now = new Date(),
+  evidence: { review?: ReviewSignal } = {},
+): PriorityStore {
   const next = normalizeStore(store);
 
   if (mutation.type === "set-collapsed") {
@@ -61,6 +71,21 @@ export function applyMutation(store: PriorityStore, mutation: DeckMutation, now 
   }
   if (mutation.type === "set-source-enabled") {
     next.sourcePreferences[mutation.sourceId] = mutation.enabled;
+    return next;
+  }
+  if (mutation.type === "set-review-acknowledged") {
+    if (!evidence.review || evidence.review.updatedAt !== mutation.reviewUpdatedAt) return next;
+    const threadHash = hashReviewThread(mutation.threadId);
+    const signalHash = hashReviewAcknowledgement(mutation.threadId, evidence.review);
+    if (signalHash !== mutation.reviewIdentity) return next;
+    if (mutation.acknowledged) {
+      next.reviewAcknowledgements = [
+        ...next.reviewAcknowledgements.filter((receipt) => receipt.threadHash !== threadHash),
+        { threadHash, signalHash },
+      ];
+    } else {
+      next.reviewAcknowledgements = next.reviewAcknowledgements.filter((receipt) => receipt.signalHash !== signalHash);
+    }
     return next;
   }
 
@@ -189,7 +214,15 @@ export function buildSnapshot(
   error: string | null = null,
 ): DeckSnapshot {
   const normalized = normalizeStore(store);
-  const threadsById = new Map(threads.map((thread) => [thread.id, thread]));
+  const acknowledgedSignals = new Set(normalized.reviewAcknowledgements.map((receipt) => receipt.signalHash));
+  const projectReview = (thread: AgentThread): AgentThread => {
+    if (!thread.review) return thread;
+    const identity = hashReviewAcknowledgement(thread.id, thread.review);
+    if (!acknowledgedSignals.has(identity)) return { ...thread, review: { ...thread.review, identity } };
+    const { review: _review, ...withoutReview } = thread;
+    return withoutReview;
+  };
+  const threadsById = new Map(threads.map((thread) => [thread.id, projectReview(thread)]));
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry: StoredEntry): DeckThread | null => {
     const thread = threadsById.get(entry.threadId);
@@ -205,7 +238,7 @@ export function buildSnapshot(
   const available = threads
     .filter((thread) => !entriesById.has(thread.id))
     .sort((left, right) => right.updatedAt - left.updatedAt)
-    .map((thread) => ({ ...thread, level: null, isCurrent: false, context: null }));
+    .map((thread) => ({ ...projectReview(thread), level: null, isCurrent: false, context: null }));
 
   return {
     generatedAt: new Date().toISOString(),
@@ -273,6 +306,27 @@ function normalizeIdempotency(value: unknown): StoredMutationReceipt[] {
     seen.add(keyHash);
     receipts.push({ keyHash, fingerprint: receipt.fingerprint.toLowerCase(), revision: receipt.revision });
     if (receipts.length >= DEFAULT_IDEMPOTENCY_LEDGER_LIMIT) break;
+  }
+  return receipts;
+}
+
+function normalizeReviewAcknowledgements(value: unknown): StoredReviewAcknowledgement[] {
+  if (!Array.isArray(value)) return [];
+  const seenThreads = new Set<string>();
+  const seenSignals = new Set<string>();
+  const receipts: StoredReviewAcknowledgement[] = [];
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const candidate = value[index];
+    if (!candidate || typeof candidate !== "object") continue;
+    const receipt = candidate as Partial<StoredReviewAcknowledgement>;
+    if (!isSha256Digest(receipt.threadHash) || !isSha256Digest(receipt.signalHash)) continue;
+    const threadHash = receipt.threadHash.toLowerCase();
+    const signalHash = receipt.signalHash.toLowerCase();
+    if (seenThreads.has(threadHash) || seenSignals.has(signalHash)) continue;
+    seenThreads.add(threadHash);
+    seenSignals.add(signalHash);
+    receipts.unshift({ threadHash, signalHash });
+    if (receipts.length >= DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT) break;
   }
   return receipts;
 }

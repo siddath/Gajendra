@@ -468,9 +468,10 @@ test("discloses provider-confirmed review work with Running precedence and exact
     "review-agent:available-review",
   ]);
 
-  await expect(page.locator('.thread-row[data-thread-id="review-agent:focus-review"] .review-mark')).toBeVisible();
-  await expect(page.locator('.thread-row[data-thread-id="review-agent:important-review"] .review-mark')).toBeVisible();
-  await expect(page.locator('.running-row[data-thread-id="windsurf:available-2"] .review-mark')).toHaveCount(0);
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:focus-review"] .review-mark')).toHaveCount(0);
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:important-review"] .review-mark')).toHaveCount(0);
+  await expect(page.locator('.now-card .review-mark, .running-row .review-done, .thread-row .review-done, #available-list .review-done')).toHaveCount(0);
+  await expect(review.locator(".review-done")).toHaveCount(3);
   await expect(review.locator('.review-row[data-thread-id="review-agent:focus-review"] .placement-badge')).toHaveText("Focus");
   await expect(review.locator('.review-row[data-thread-id="review-agent:important-review"] .placement-badge')).toHaveText("Important");
 
@@ -482,10 +483,20 @@ test("discloses provider-confirmed review work with Running precedence and exact
   await expect(reviewDestination).toHaveAttribute("data-open-thread", "https://example.invalid/reviews/focus-review");
   await reviewDestination.click();
   await expect(page.locator("#app")).toHaveAttribute("data-last-opened-thread", "https://example.invalid/reviews/focus-review");
+  await expect(review.locator(".review-row")).toHaveCount(3);
 
   const owningTask = review.locator('.review-row[data-thread-id="review-agent:focus-review"] .source-badge');
   await owningTask.click();
   await expect(page.locator("#app")).toHaveAttribute("data-last-opened-thread", "review-agent://threads/focus-review");
+  await expect(review.locator(".review-row")).toHaveCount(3);
+
+  await review.getByRole("button", { name: "Mark Review the provider boundary patch reviewed" }).click();
+  await expect(review.locator('.review-row[data-thread-id="review-agent:focus-review"]')).toHaveCount(0);
+  await expect(review.locator(".review-row")).toHaveCount(2);
+  await expect(review.getByRole("button", { name: "Mark Inspect the generated accessibility receipt reviewed" })).toBeFocused();
+  await expect(page.locator("[data-refresh-status]")).toHaveText("Marked reviewed");
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:focus-review"]')).toBeVisible();
+  await expect(page.locator('.thread-row[data-thread-id="review-agent:focus-review"]')).toContainText("Review the provider boundary patch");
 
   const taskFallback = review.locator('.review-row[data-thread-id="review-agent:important-review"] .review-primary');
   await expect(taskFallback).toContainText("Task");

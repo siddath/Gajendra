@@ -24,13 +24,14 @@
 6. **Metadata-first rows.** Compact tasks show the thread title, project, context/tag when present,
    provider, and an applicable Running/Review mark. Hover and hold create selection feedback; a
    selected row lifts for app-local drag instead of carrying generic menu/drag chrome. A stable
-   trailing slot may hold a purpose-specific add/swap control, but NOW never exposes a lane-changing
-   action and the control must remain separate from the row's Open target.
+   trailing slot may hold a purpose-specific status-row priority control, but compact Focus and
+   Important rows rely on drag/context/accessibility movement instead of a duplicate lane-swap button.
+   NOW never exposes a lane-changing action and every control remains separate from the row's Open target.
 
-Green is reserved for provider-confirmed activity. System orange supports Ready for Review and is
-always paired with a static `checkmark.bubble` glyph, the visible status label, ready time, and
-destination text. It never means failure, warning, provider identity, or review quality. The mark
-does not loop or pulse, so Reduce Motion receives the same complete static state.
+Green supports provider-confirmed activity and the explicit Ready-row **Mark reviewed** action.
+System orange identifies Ready for Review and is paired with a static tray glyph, the visible status
+label, ready time, and destination text. Orange never implies a completed user action. The mark does
+not loop or pulse, so Reduce Motion receives the same complete static state.
 
 ## Surface contract
 

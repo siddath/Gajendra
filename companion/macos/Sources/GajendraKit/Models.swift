@@ -120,19 +120,22 @@ public struct ReviewSignal: Codable, Equatable, Sendable {
     public let updatedAt: Double
     public let destination: ReviewDestination
     public let providerStatus: String
+    public let identity: String?
 
     public init(
         state: ReviewState = .ready,
         kind: ReviewKind,
         updatedAt: Double,
         destination: ReviewDestination,
-        providerStatus: String
+        providerStatus: String,
+        identity: String? = nil
     ) {
         self.state = state
         self.kind = kind
         self.updatedAt = updatedAt
         self.destination = destination
         self.providerStatus = providerStatus
+        self.identity = identity
     }
 
     public var isReady: Bool { state == .ready }
@@ -429,6 +432,7 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
         currentThreadId: String?
     )
     case setContext(threadId: String, context: ThreadContext?)
+    case setReviewAcknowledged(threadId: String, reviewUpdatedAt: Double, reviewIdentity: String, acknowledged: Bool)
     case setCollapsed(level: PriorityLevel, collapsed: Bool)
     case setSourceEnabled(sourceId: String, enabled: Bool)
 
@@ -438,7 +442,7 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, threadId, level, direction, beforeThreadId, context, currentThreadId, collapsed, sourceId, enabled
+        case type, threadId, level, direction, beforeThreadId, context, currentThreadId, reviewUpdatedAt, reviewIdentity, acknowledged, collapsed, sourceId, enabled
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -466,6 +470,12 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
             try container.encode("set-context", forKey: .type)
             try container.encode(threadId, forKey: .threadId)
             try container.encode(context, forKey: .context)
+        case let .setReviewAcknowledged(threadId, reviewUpdatedAt, reviewIdentity, acknowledged):
+            try container.encode("set-review-acknowledged", forKey: .type)
+            try container.encode(threadId, forKey: .threadId)
+            try container.encode(reviewUpdatedAt, forKey: .reviewUpdatedAt)
+            try container.encode(reviewIdentity, forKey: .reviewIdentity)
+            try container.encode(acknowledged, forKey: .acknowledged)
         case let .setCollapsed(level, collapsed):
             try container.encode("set-collapsed", forKey: .type)
             try container.encode(level, forKey: .level)
@@ -538,19 +548,21 @@ public struct DeckMutationResult: Codable, Equatable, Sendable {
     public var genericUserMessage: String {
         switch error?.code {
         case "stale-revision", "conflict":
-            return "That priority changed elsewhere. Refreshing the latest priorities."
+            return "Gajendra changed elsewhere. Refreshing the latest state."
         case "unknown-thread":
             return "That thread is no longer available."
         case "unknown-source":
             return "That source is unavailable."
         case "invalid-target", "invalid-mutation":
-            return "That priority change is no longer available."
+            return "That Gajendra change is no longer available."
+        case "review-acknowledgement-limit":
+            return "Gajendra's review receipt capacity is full. This item remains Ready for Review."
         case "store-recovery-required":
-            return "Gajendra needs to recover its priority store before changing priorities."
+            return "Gajendra needs to recover its local store before applying changes."
         case "store-busy":
             return "Gajendra is busy. Try again in a moment."
         default:
-            return "Gajendra could not apply that priority change."
+            return "Gajendra could not apply that change."
         }
     }
 }

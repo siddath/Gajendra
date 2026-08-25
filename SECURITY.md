@@ -7,8 +7,10 @@ installed-app or binary-distribution claim.
 
 The private state contains canonical thread IDs, NOW/Focus/Important order, the bounded
 `design`/`engineering`/`life` context enum, preferences, monotonic revision, and bounded SHA-256
-idempotency receipts. It does not contain titles, prompts, transcript bodies, previews, source
-files, review signals or destinations, tokens, credentials, free-text labels, or arbitrary provider responses.
+idempotency and review-acknowledgement receipts. Review receipts hash the canonical thread ID,
+timestamp, kind, and destination; they minimize stored data but are not claimed to be secret against
+dictionary testing. The state does not contain titles, prompts, transcript bodies, previews, source
+files, raw review signals/timestamps/destinations, tokens, credentials, free-text labels, or arbitrary provider responses.
 
 The default state directory and recovery material are owner-private (`0700` directory, `0600`
 files). Writes use a private cross-process lock and atomic replacement. Store validation precedes

@@ -1,28 +1,30 @@
-# Gajendra LinkedIn launch post
+# Gajendra LinkedIn iteration post
 
 - **Status:** final owner-review draft — not scheduled or published.
-- **Primary image:** [`evidence/launch/gajendra-hero.png`](../evidence/launch/gajendra-hero.png)
-- **Manual publish window:** **Monday, 24 August 2026, 9:55–10:05 PM IST**; aim to post at
-  **10:00 PM IST**. Do not schedule or automate publication.
-- **Image disclosure:** the attached image uses synthetic demo data only.
-- **Availability boundary:** source-only. There is no signed/notarized downloadable binary, and the
-  mobile companion remains a plan rather than a shipped feature.
-- **Verification boundary:** source, native, real-window, privacy, and same-host performance checks
-  passed for [PR #25](https://github.com/siddath/Gajendra/pull/25). Its exact PR-head and merged-main
-  hosted jobs passed, and the exact merged plugin/app installation preserved the private state. This
-  is still not a signed binary or publication claim.
+- **Primary image:**
+  [`evidence/launch/gajendra-linkedin-ready-review-v2.png`](../evidence/launch/gajendra-linkedin-ready-review-v2.png)
+- **Recommended manual publish window:** **Wednesday, 26 August 2026, 3:55–4:05 PM IST**;
+  aim for **4:00 PM IST**. Do not automate publication.
+- **Image disclosure:** the product surface is a real SwiftUI render using synthetic demo data;
+  only the abstract background is generated.
+- **Availability boundary:** use this copy only after the Ready acknowledgement source PR is merged
+  and its hosted checks pass. The project remains source-only; there is no signed/notarized
+  download, and the mobile companion remains a future gate rather than a shipped feature.
+- **Verification boundary:** local source, browser, native real-window, installed-path, privacy,
+  and same-host performance checks must remain green on the exact merged candidate. This does not
+  prove a clean-Mac, Developer ID, notarization, distribution, adoption, or LinkedIn-publication
+  claim.
 
 ## Why this time and this shape
 
-Buffer's July 2026 analysis of 4.8 million LinkedIn posts ranks **10:00 PM local time** as Monday's
-strongest slot, ahead of 5:00 PM and 9:00 PM. It also finds Monday weaker overall than Wednesday
-through Friday, so this recommendation is a same-day launch choice rather than a universal optimum:
+Buffer's July 2026 analysis of 4.8 million LinkedIn posts ranks Wednesday as the strongest day and
+4:00 PM local time as its strongest slot. It explicitly notes that individual audiences differ, so
+this is a starting point rather than a guarantee:
 [Buffer's 2026 LinkedIn timing analysis](https://buffer.com/resources/best-time-to-post-on-linkedin/).
 
 LinkedIn says it is reducing recycled generic content, engagement bait, automated comments, and
-inauthentic engagement in favor of useful professional insight and real perspectives. The post
-therefore leads with the attention-handoff problem, states the product and release boundaries, and
-asks for one concrete workflow gap instead of using a generic “thoughts?” prompt:
+inauthentic engagement in favor of genuine professional insight. The post therefore leads with one
+specific product lesson and asks for a concrete workflow boundary rather than a generic reaction:
 [LinkedIn's 2026 feed update](https://news.linkedin.com/2026/ImprovingTheFeed).
 
 ## Ready-to-paste post
@@ -30,45 +32,73 @@ asks for one concrete workflow gap instead of using a generic “thoughts?” pr
 When work moves between AI tools, the hard part is not finding a thread. It is knowing what deserves
 attention next.
 
-I built **Gajendra**, a small self-contained macOS utility, to make that handoff clearer.
+I kept running into the same gap.
 
-It gives me one NOW, a short Focus and Important queue, a view of work still Running, and a separate
-Ready for Review signal when a provider reports a completed result.
+A build could still be running in Codex. A task could be waiting in Claude. A finished result could
+need my review. Everything was accessible, but nothing gave me one clear picture of where my
+attention should go.
 
-That distinction matters: execution state, review state, and my own priority are related, but they
-are not the same thing.
+So I built Gajendra, a small, self-contained macOS utility for managing that handoff.
 
-**One NOW. One short queue. One click back to the exact thread.**
+🎯 NOW keeps one thread unmistakably current.
 
-The app is local-first. Gajendra keeps only its own small priority layer; the source tools continue
-to own their sessions, prompts, transcripts, and credentials.
+⭐ Focus and Important preserve my own priorities.
 
-The development process mirrored the product: bounded specialist agents worked in parallel, while
-one orchestrator owned the contract, integration, privacy checks, and release decision.
+🏃 Running shows work the provider says is still active.
 
-I am sharing the source while I keep building it in public. The image uses synthetic demo data. The
-project is source-only today; a signed/notarized app and mobile companion are later gates, not
-shipped claims.
+👀 Ready for Review separates provider-completed work that needs a human decision. It stays
+independent of NOW, Focus, and Important, while Running takes precedence.
+
+✅ The green check means I reviewed that exact response. Opening a task does not silently clear it.
+The check removes only its Ready signal, preserves its priority, and new completion evidence makes
+it appear again.
+
+🔗 Open takes me back to the exact thread in the tool that owns it.
+
+The principle is simple:
+
+One NOW. One short queue. One click back to the exact thread.
+
+Gajendra is local-first. It remembers only my small priority layer and bounded hashed review
+acknowledgements, while Codex, Claude, Cursor, and Grok continue to own their sessions, prompts,
+transcripts, and credentials.
+
+The development process mirrored the product.
+
+I used bounded specialist agents for the native experience, provider logic, testing, and review.
+One orchestrator retained ownership of the product contract, integration decisions, privacy checks,
+and release. An adversarial reviewer then tried to break the finished result.
+
+That approach surfaced problems a happy-path demo would have missed, while keeping the app focused
+and self-contained.
+
+The source is public and buildable. The launch image uses a real SwiftUI render with synthetic demo
+data over a generated abstract background. It is source-only today; a signed downloadable app and
+mobile companion remain future gates, not shipped claims.
 
 Repository: https://github.com/siddath/Gajendra
 
-If this workflow is familiar, I would value one concrete place where your AI-tool handoff still
-breaks.
+If you work across multiple AI tools, I would genuinely value one concrete example of where your
+handoff between them still breaks.
 
 #BuildInPublic #LocalFirst #DeveloperTools #AIEngineering
 
 ## Suggested alt text
 
-Gajendra macOS utility shown with synthetic demo data. The interface displays one NOW task, Focus
-and Important queues, provider-reported Running work, and a Ready for Review section; no private
-thread content is shown.
+Wide Gajendra product hero on a soft ivory and pale-blue abstract background. The left side says
+“Gajendra” and “Review is a decision, not an unread badge.” The right side shows the real macOS app
+with synthetic demo data: one Ready for Review item, an orange tray status, a separate green
+circular reviewed control, an Important task, and an empty Running section. No private thread data
+is shown.
 
 ## Manual publication checklist
 
-- At 9:55 PM IST, open LinkedIn and perform the final privacy and accuracy read.
-- Attach `gajendra-hero.png` as the first image and paste the suggested alt text.
-- Post manually at 10:00 PM IST, within the 9:55–10:05 PM IST window; do not use scheduling or
-  third-party posting automation.
-- Reply in your own voice after posting.
-- Keep the source-only boundary. Do not add a download CTA until Developer ID, notarization,
-  Gatekeeper, archive, and clean-Mac gates are complete.
+- Before publication, confirm that the Ready acknowledgement PR is merged, its hosted checks pass,
+  and the public repository contains the exact source described above. If not, do not use the
+  public/buildable sentence yet.
+- At 3:55 PM IST on Wednesday, open LinkedIn and perform the final privacy and accuracy read.
+- Attach `gajendra-linkedin-ready-review-v2.png` and paste the suggested alt text.
+- Post manually at 4:00 PM IST, within the 3:55–4:05 PM window.
+- Reply in your own voice after posting; do not automate comments or engagement.
+- Do not add a download CTA until Developer ID, notarization, Gatekeeper, archive, and clean-Mac
+  gates are complete.

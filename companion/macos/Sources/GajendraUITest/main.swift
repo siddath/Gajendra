@@ -68,11 +68,11 @@ enum GajendraUITest {
                 )
             } else if scope == "widget" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -467,11 +467,24 @@ enum GajendraUITest {
             scrollToVisible: true,
             requiresSemanticHit: false
         )
+        let readyDoneAction = try waitForStableHittableElement(
+            pid: pid,
+            label: "Mark Inspect the finished UI proof reviewed",
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
         try requireSeparatePriorityAndOpenTargets(
             pid: pid,
             priorityAction: readyAddAction,
             primaryRow: readyPrimary,
             phase: "unprioritized Ready for Review row"
+        )
+        try requireSeparatePriorityAndOpenTargets(
+            pid: pid,
+            priorityAction: readyDoneAction,
+            primaryRow: readyPrimary,
+            phase: "Ready for Review acknowledgement"
         )
         let beforeReadyAdd = try readState(stateURL)
         try openPriorityMenu(readyAddAction)
@@ -698,6 +711,27 @@ enum GajendraUITest {
         guard try readState(stateURL) == beforePriority else {
             throw GajendraUITestError.failed(
                 "opening the transitioned Ready row changed persisted priority state or NOW"
+            )
+        }
+        let done = try waitForStableHittableElement(
+            pid: pid,
+            label: "Mark \(taskTitle) reviewed",
+            value: nil,
+            scrollToVisible: true,
+            requiresSemanticHit: false
+        )
+        guard AXUIElementPerformAction(done, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("the transitioned Ready row did not expose its acknowledgement action")
+        }
+        _ = try waitForStableDockHeader(
+            pid: pid,
+            label: "Ready for Review, 1 thread",
+            value: "Expanded"
+        )
+        try requireElementAbsent(pid: pid, label: readyRowLabel, duration: 0.45)
+        guard try readState(stateURL) == beforePriority else {
+            throw GajendraUITestError.failed(
+                "acknowledging the transitioned Ready row changed priority state or NOW"
             )
         }
         return true

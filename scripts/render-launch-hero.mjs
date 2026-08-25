@@ -7,10 +7,39 @@ import { chromium } from "@playwright/test";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const launchRoot = path.join(repositoryRoot, "evidence", "launch");
-const background = await pngDataUrl(path.join(launchRoot, "gajendra-hero-background.png"));
-const product = await pngDataUrl(path.join(launchRoot, "gajendra-launch-overview.png"));
+const heroVariant = process.env.GAJENDRA_HERO_VARIANT ?? "launch";
+if (heroVariant !== "launch" && heroVariant !== "review") {
+  throw new Error(`Unsupported Gajendra hero variant: ${heroVariant}`);
+}
+const reviewVariant = heroVariant === "review";
+const backgroundName = reviewVariant
+  ? "gajendra-ready-review-hero-background-v2.png"
+  : "gajendra-hero-background.png";
+const productName = reviewVariant
+  ? "gajendra-launch-ready-for-review.png"
+  : "gajendra-launch-overview.png";
+const outputName = reviewVariant
+  ? "gajendra-linkedin-ready-review-v2.png"
+  : "gajendra-hero.png";
+const heroCopy = reviewVariant
+  ? {
+      tagline: "Review is a decision, not an unread badge.",
+      promise: "Running stays live. Ready stays visible until you mark the exact response reviewed.",
+      features: ["Running", "Ready for Review", "Reviewed"],
+      sources: "Priority remains separate: NOW · Focus · Important",
+      productAlt: "Gajendra Ready for Review interface with synthetic data",
+    }
+  : {
+      tagline: "One clear focus across your AI tools.",
+      promise: "One NOW. One short queue. One click back to the exact thread.",
+      features: ["NOW", "Running", "Ready for Review"],
+      sources: "Local-first macOS utility for Codex and Claude workflows",
+      productAlt: "Gajendra app overview with synthetic data",
+    };
+const background = await pngDataUrl(path.join(launchRoot, backgroundName));
+const product = await pngDataUrl(path.join(launchRoot, productName));
 const mark = await svgDataUrl(path.join(repositoryRoot, "plugins", "gajendra", "assets", "gajendra.svg"));
-const output = path.join(launchRoot, "gajendra-hero.png");
+const output = path.join(launchRoot, outputName);
 
 const browser = await chromium.launch();
 try {
@@ -85,9 +114,9 @@ try {
     .product {
       position: absolute;
       z-index: 3;
-      width: 800px;
-      right: 52px;
-      top: 72px;
+      width: ${reviewVariant ? "760px" : "800px"};
+      right: ${reviewVariant ? "42px" : "52px"};
+      top: ${reviewVariant ? "46px" : "72px"};
       filter: drop-shadow(0 35px 55px rgba(20, 35, 50, .27));
     }
     .caption {
@@ -109,16 +138,14 @@ try {
       <img class="mark" src="${mark}" alt="" />
       <h1>Gajendra</h1>
     </div>
-    <p class="tagline">One clear focus across your AI tools.</p>
-    <p class="promise">One NOW. One short queue. One click back to the exact thread.</p>
+    <p class="tagline">${heroCopy.tagline}</p>
+    <p class="promise">${heroCopy.promise}</p>
     <div class="features">
-      <span class="chip">NOW</span>
-      <span class="chip">Running</span>
-      <span class="chip">Ready for Review</span>
+      ${heroCopy.features.map((feature) => `<span class="chip">${feature}</span>`).join("\n      ")}
     </div>
-    <p class="sources">Local-first macOS utility for Codex and Claude workflows</p>
+    <p class="sources">${heroCopy.sources}</p>
   </main>
-  <img class="product" src="${product}" alt="Gajendra app overview with synthetic data" />
+  <img class="product" src="${product}" alt="${heroCopy.productAlt}" />
   <div class="caption">Actual app UI · Synthetic demo data</div>
 </body>
 </html>`);
@@ -148,6 +175,8 @@ async function updateLaunchReceipt() {
     "gajendra-launch-queue-editing.png",
     "gajendra-launch-organizer.png",
     "gajendra-hero-background.png",
+    "gajendra-linkedin-ready-review-v2.png",
+    "gajendra-ready-review-hero-background-v2.png",
   ];
   let receipt = await readFile(receiptPath, "utf8");
   for (const name of assetNames) {

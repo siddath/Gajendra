@@ -175,7 +175,7 @@ public struct DeckContentView: View {
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Saving priority change")
+                        .accessibilityLabel("Saving Gajendra change")
                         .accessibilityValue("Busy")
                     } else if model.isLoading {
                         Text("Refreshing")
@@ -344,9 +344,6 @@ public struct DeckContentView: View {
                                 .font(.title3.weight(.semibold))
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
-                            if current.isReadyForReview {
-                                GajendraReviewStatusMark()
-                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         HStack(spacing: 6) {
@@ -543,8 +540,6 @@ public struct DeckContentView: View {
                         }
                         if thread.isRunning {
                             GajendraLiveActivityMark()
-                        } else if thread.isReadyForReview {
-                            GajendraReviewStatusMark()
                         }
                         Text(thread.title)
                             .lineLimit(1)
@@ -1003,6 +998,22 @@ public struct DeckContentView: View {
             .buttonStyle(.plain)
             .help("Open \(thread.review?.destination.actionLabel.lowercased() ?? "review") for \(thread.title)")
             .accessibilityLabel("\(thread.title), Ready for Review, \(thread.review?.destination.actionLabel ?? "Review") destination")
+
+            Button {
+                model.setReviewAcknowledged(thread, acknowledged: true)
+            } label: {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.green)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(isPreview || model.isMutating)
+            .help("Mark reviewed")
+            .accessibilityIdentifier("gajendra-organizer-review-done")
+            .accessibilityLabel("Mark \(thread.title) reviewed")
+            .accessibilityHint("Removes only this response from Ready for Review. Priority is unchanged.")
 
             Button { model.open(thread) } label: { sourceBadge(thread) }
                 .buttonStyle(.plain)

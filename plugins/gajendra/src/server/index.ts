@@ -39,6 +39,13 @@ const deckMutationSchema = z.discriminatedUnion("type", [
     currentThreadId: z.string().min(1).nullable().optional(),
   }),
   z.object({ type: z.literal("set-context"), threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable() }),
+  z.object({
+    type: z.literal("set-review-acknowledged"),
+    threadId: z.string().min(1),
+    reviewUpdatedAt: z.number().finite().nonnegative(),
+    reviewIdentity: z.string().regex(/^[a-f0-9]{64}$/iu),
+    acknowledged: z.boolean(),
+  }),
   z.object({ type: z.literal("set-collapsed"), level: z.enum(["focus", "important"]), collapsed: z.boolean() }),
   z.object({ type: z.literal("set-source-enabled"), sourceId: z.string().min(1), enabled: z.boolean() }),
 ]);
@@ -136,6 +143,22 @@ export function createGajendraServer(service: DeckService = new GajendraService(
     { type: "set-context", threadId, context }, expectedRevision, idempotencyKey,
   ))));
 
+  registerAppTool(server, "gajendra_set_review_acknowledged", {
+    title: "Set review acknowledgement",
+    description: "Mark one exact Ready for Review response handled or restore it without changing task priority.",
+    inputSchema: {
+      threadId: z.string().min(1),
+      reviewUpdatedAt: z.number().finite().nonnegative(),
+      reviewIdentity: z.string().regex(/^[a-f0-9]{64}$/iu),
+      acknowledged: z.boolean(),
+      ...mutationOptionsSchema,
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } },
+  }, async ({ threadId, reviewUpdatedAt, reviewIdentity, acknowledged, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-review-acknowledged", threadId, reviewUpdatedAt, reviewIdentity, acknowledged }, expectedRevision, idempotencyKey,
+  ))));
+
   registerAppTool(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
     description: "Persist whether a Gajendra priority section is collapsed.",
@@ -186,7 +209,7 @@ function mutationToolResult(result: DeckMutationResult) {
     content: [{
       type: "text" as const,
       text: result.error?.message
-        ?? `Gajendra applied a priority change at revision ${result.revision}.`,
+        ?? `Gajendra applied a change at revision ${result.revision}.`,
     }],
   };
 }

@@ -381,13 +381,49 @@ try {
     throw new Error("The synthetic snapshot exposed an invalid NOW task.");
   }
 
+  const reviewUpdatedAt = snapshot.current?.review?.updatedAt;
+  const reviewIdentity = snapshot.current?.review?.identity;
+  if (typeof reviewUpdatedAt !== "number" || typeof reviewIdentity !== "string") {
+    throw new Error("The validator lost the synthetic Ready evidence before acknowledgement.");
+  }
+  const acknowledgementResult = runService(
+    ["--mutate-json"],
+    isolatedServiceEnvironment,
+    JSON.stringify({
+      protocolVersion: 1,
+      expectedRevision: 1,
+      idempotencyKey: "companion-validator-review-probe",
+      mutation: {
+        type: "set-review-acknowledged",
+        threadId: probeId,
+        reviewUpdatedAt,
+        reviewIdentity,
+        acknowledged: true,
+      },
+    }),
+  );
+  if (acknowledgementResult.outcome !== "applied"
+      || acknowledgementResult.revision !== 2
+      || acknowledgementResult.snapshot?.current?.review !== undefined) {
+    throw new Error("The isolated review acknowledgement did not suppress only the matching projection.");
+  }
+
   const statePath = path.join(dataDirectory, "gajendra.v2.json");
   const stateContents = await readFile(statePath, "utf8");
-  if (/title|preview|transcript|prompt|review|providerStatus|destination/iu.test(stateContents)) {
+  if (/title|preview|transcript|prompt|providerStatus|destination|reviewUpdatedAt/iu.test(stateContents)) {
     throw new Error("The validator found persisted live thread content.");
   }
-  if (!stateContents.includes('"context": "design"') || !stateContents.includes('"revision": 1')) {
-    throw new Error("The validator did not persist the bounded design context and revision.");
+  const persistedState = JSON.parse(stateContents);
+  if (!Array.isArray(persistedState.reviewAcknowledgements)
+      || persistedState.reviewAcknowledgements.length !== 1
+      || !persistedState.reviewAcknowledgements.every((receipt) => (
+        /^[a-f0-9]{64}$/u.test(receipt?.threadHash)
+        && /^[a-f0-9]{64}$/u.test(receipt?.signalHash)
+      ))) {
+    throw new Error("The validator did not persist exactly one data-minimized review receipt.");
+  }
+  if (!stateContents.includes('"context": "design"') || !stateContents.includes('"revision": 2')) {
+    throw new Error("The validator did not persist the bounded design context and final revision.");
   }
   if (((await stat(dataDirectory)).mode & 0o777) !== 0o700) {
     throw new Error("The isolated data directory is not private.");
@@ -430,11 +466,12 @@ console.log(JSON.stringify({
   syntheticValidation: {
     configuredSourceOnly: true,
     builtInsDisabled: true,
-    appliedMutationRevision: 1,
+    appliedMutationRevision: 2,
     persistedContext: "design",
     privateState: true,
     privateContentRecorded: false,
     reviewSignalPersisted: false,
+    hashedReviewAcknowledgementPersisted: true,
     isolatedPointerFixturesPrivacyChecked: true,
   },
   evidenceBoundary: [

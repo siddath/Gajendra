@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   DEFAULT_IDEMPOTENCY_LEDGER_LIMIT,
+  DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT,
   EMPTY_STORE,
   type PriorityStore,
 } from "../shared/contracts.js";
@@ -23,6 +24,7 @@ export type StoreOptions = {
   lockTimeoutMs?: number;
   staleLockMs?: number;
   idempotencyLimit?: number;
+  reviewAcknowledgementLimit?: number;
   /** Deterministic interleaving hook used only by the lock regression suite. */
   onStaleLockCandidate?: (lockPath: string) => Promise<void> | void;
   /** Pauses a fully private candidate before it is atomically published as the fixed lock path. */
@@ -76,6 +78,7 @@ export class GajendraStoreRepository {
   readonly lockTimeoutMs: number;
   readonly staleLockMs: number;
   readonly idempotencyLimit: number;
+  readonly reviewAcknowledgementLimit: number;
   private readonly onStaleLockCandidate: StoreOptions["onStaleLockCandidate"];
   private readonly onBeforeLockPublish: StoreOptions["onBeforeLockPublish"];
   private readonly onPrimaryWritten: StoreOptions["onPrimaryWritten"];
@@ -94,6 +97,10 @@ export class GajendraStoreRepository {
     this.lockTimeoutMs = positiveInteger(options.lockTimeoutMs, DEFAULT_LOCK_TIMEOUT_MS);
     this.staleLockMs = Math.max(this.lockTimeoutMs, positiveInteger(options.staleLockMs, DEFAULT_STALE_LOCK_MS));
     this.idempotencyLimit = positiveInteger(options.idempotencyLimit, DEFAULT_IDEMPOTENCY_LEDGER_LIMIT);
+    this.reviewAcknowledgementLimit = Math.min(
+      positiveInteger(options.reviewAcknowledgementLimit, DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT),
+      DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT,
+    );
     this.onStaleLockCandidate = options.onStaleLockCandidate;
     this.onBeforeLockPublish = options.onBeforeLockPublish;
     this.onPrimaryWritten = options.onPrimaryWritten;
@@ -243,6 +250,7 @@ export class GajendraStoreRepository {
     const normalized = normalizeStore({
       ...store,
       idempotency: store.idempotency.slice(-this.idempotencyLimit),
+      reviewAcknowledgements: store.reviewAcknowledgements.slice(-this.reviewAcknowledgementLimit),
     });
     const contents = `${JSON.stringify(normalized, null, 2)}\n`;
     if (Buffer.byteLength(contents) > this.maxStoreBytes) throw new StoreRecoveryError();
@@ -578,8 +586,21 @@ function hasKnownStoreShape(value: unknown, purpose: "primary" | "backup" | "leg
   if (version >= 2 && !isSourcePreferencesShape(candidate.sourcePreferences)) return false;
   if (version === 3) {
     if (!isRevision(candidate.revision) || !Array.isArray(candidate.idempotency) || !candidate.idempotency.every(isStrictReceipt)) return false;
+    if (candidate.reviewAcknowledgements !== undefined
+      && (!Array.isArray(candidate.reviewAcknowledgements)
+        || candidate.reviewAcknowledgements.length > DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT
+        || !candidate.reviewAcknowledgements.every(isStrictReviewAcknowledgement))) return false;
   }
   return true;
+}
+
+function isStrictReviewAcknowledgement(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const receipt = value as Record<string, unknown>;
+  return typeof receipt.threadHash === "string"
+    && /^[a-f0-9]{64}$/iu.test(receipt.threadHash)
+    && typeof receipt.signalHash === "string"
+    && /^[a-f0-9]{64}$/iu.test(receipt.signalHash);
 }
 
 function isStrictStoredEntry(value: unknown): boolean {
