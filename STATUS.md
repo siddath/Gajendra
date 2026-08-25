@@ -9,11 +9,11 @@
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
 
-**Current public baseline:** [PR #25](https://github.com/siddath/Gajendra/pull/25), merged as
-`d877ff46b9ef09b582ea26e695911222090d290a`. It adds reliable Ready-for-Review sync, direct compact
-priority actions, defense-in-depth NOW protection, an isolated same-task Running-to-Ready journey,
-and bounded provider/service/native deadline handling. Both hosted jobs passed for the exact PR head
-`efa17c428178c970dd63842b673c2c6f827378c9`, and both jobs passed again on the merged revision.
+**Ready acknowledgement source release:** [PR #27](https://github.com/siddath/Gajendra/pull/27).
+It keeps Ready for Review independent of priority, adds a bounded exact-response acknowledgement,
+preserves Running precedence, removes duplicate compact lane controls and priority-row Ready glyphs,
+and updates the matching source, privacy, tests, launch evidence, and public copy. Hosted and merge
+receipts remain distinct from the local receipts below.
 
 ## Current user-facing state
 
@@ -47,9 +47,9 @@ and bounded provider/service/native deadline handling. Both hosted jobs passed f
 
 ## Current implementation receipts
 
-The merged release passed locally and on GitHub Actions on 2026-08-24:
+The Ready acknowledgement release candidate passed locally on 2026-08-25:
 
-- `npm run check` — script/release regressions, launch privacy validation, TypeScript, **106/106**
+- `npm run check` — script/release regressions, launch privacy validation, TypeScript, **110/110**
   Vitest tests, deterministic plugin build, and plugin validation passed.
 - A local metadata-only provider probe confirmed that valid completed candidates remain visible
   when an unrelated legacy candidate has no completion timestamp. No live workload counts, task
@@ -57,23 +57,23 @@ The merged release passed locally and on GitHub Actions on 2026-08-24:
 - `npm run companion:test` and `npm run companion:build` — native model/source invariants, isolated
   persistence/undo paths, bundled runtime, service parity, and strict ad-hoc signature checks passed.
 - `npm run companion:ui-test` — full synthetic real-window journey passed with
-  `priorityActions:true`, `readyPriorityActions:true`, `organizerNowGuard:true`, and
-  `runningToReadyTransition:true`, including
+  `priorityActions:true`, `readyPriorityActions:true`, `readyAcknowledgement:true`,
+  `organizerNowGuard:true`, and `runningToReadyTransition:true`, including
   inactive-first-click recovery, reopen, quick Open versus long-press/drag, direct Ready/Running
-  priority changes, the same visible row moving from Running to Ready on refresh, unchanged NOW,
-  exact destination opening, dock controls, Search, and Organizer drag/drop. The exact final
-  full run measured 33 ms prewarmed, 84 ms cold, and 89 ms warm; the focused widget run measured
-  64/83/92 ms.
+  priority changes, exact-response acknowledgement and undo, the same visible row moving from
+  Running to Ready on refresh, unchanged NOW, exact destination opening, dock controls, Search, and
+  Organizer drag/drop. The exact final full run measured 55 ms prewarmed, 87 ms cold, and 83 ms
+  warm; the focused widget run measured 67/86/91 ms.
 - `npm run companion:ui-performance-test` — three final widget journeys passed the 200 ms budget
   and dependency-cycle gate. See the
   [same-host comparison](evidence/verification/2026-08-24-priority-actions-performance.md).
 - `npm run launch:assets` and `npm run validate:launch-assets` — the real SwiftUI screenshot suite
-  and hero regenerated; **7/7** expected privacy-safe launch assets passed.
+  and Ready acknowledgement hero regenerated; **9/9** expected privacy-safe launch assets passed.
 - `npm run companion:validate` and `npm run companion:bundle-readiness` passed; local readiness
   correctly reports `distributionReady:false` and ad-hoc signing.
 - `npm run gauntlet` — **20** fail-fast gate receipts passed against the final source candidate,
   including live MCP, native UI, widget performance, **85/85** repeated browser journeys, five
-  repeated 106-test unit runs, final-artifact validation, and dependency audit.
+  repeated 110-test unit runs, final-artifact validation, and dependency audit.
 
 - The exact merged plugin and standalone app were installed locally from `d877ff4`. All nine plugin
   artifacts matched source; the installed app matched the rebuilt bundle; the isolated installed-app
