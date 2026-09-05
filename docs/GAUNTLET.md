@@ -1,19 +1,19 @@
 # Release gauntlet
 
 The current Gajendra source-review candidate has a **passing local gauntlet receipt**:
-[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records 20 passing result
-records on 2026-08-24. The run covers repository scripts, static/behavior/build/plugin checks, live
-MCP, companion self-test/build/real-window launcher/live checks, measured widget performance,
+[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records 21 passing result
+records on 2026-09-05 at implementation commit `e63a948`. The run covers repository scripts, static/behavior/build/plugin checks, live
+MCP, companion self-test/build/real-window launcher/full-screen reopen/live checks, measured widget performance,
 direct Running/Ready priority actions, NOW immobility, pointer queue edits and dock interaction,
 browser UI, repeated reliability checks, final artifacts, and dependency audit. Its current receipt
-includes 106/106 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
+includes 112/112 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
 85/85 repeated browser journeys.
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
 Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is
 the required rerun sequence if the candidate changes.
 
-After the passing run, a [privacy-reviewed synthetic image](../evidence/launch/README.md) and an
+After the earlier August run, a [privacy-reviewed synthetic image](../evidence/launch/README.md) and an
 evidence-bounded [local post draft](../worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) were created.
 They remain unapproved and unpublished, and do not extend the gauntlet's proof boundary.
 
@@ -22,6 +22,7 @@ They remain unapproved and unpublished, and do not extend the gauntlet's proof b
 1. Freeze all writers; capture the exact worktree/commit boundary.
 2. Run focused server/store/source tests, npm run check, and npm run test:e2e.
 3. Freeze native source, then run companion self-tests, build, isolated real-window launcher UI,
+   the synthetic full-screen launcher and Dock/reopen journey (`npm run companion:ui-fullscreen-test`),
    measured widget-performance journey, companion validator, and local bundle-readiness.
 4. Verify Gajendra visible copy, stable compatibility IDs, state privacy/recovery, A4 hostile-tail
    boundary/kill switch, A5 navigation blocks, and source bounds.
