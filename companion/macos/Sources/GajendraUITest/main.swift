@@ -303,6 +303,7 @@ enum GajendraUITest {
             }
         }
         func setSize(_ value: Double) throws -> CGRect {
+            fputs("Sizing: adjusting to \(value)\n", stderr)
             guard let slider = matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
                 .first(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
                 throw GajendraUITestError.failed("widget size slider disappeared")
