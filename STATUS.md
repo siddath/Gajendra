@@ -4,10 +4,28 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-09-05
+**Reconciled:** 2026-09-06
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
+
+## Local widget update, awaiting publication approval
+
+The [independent widget-sizing update](docs/WIDGET-SIZING-2026-09-06.md) is implemented and installed
+locally. Compact, Comfortable, and Expanded change task layout; a separate slider changes the outer
+widget size on release. Preferences persist independently, old dimensions migrate once, and the
+settings popover remains interactive outside the card bounds.
+
+Implementation/test commit `13d8fa1` passed all 21 gauntlet gates, including the full native,
+full-screen, widget-performance, and 102 browser journeys. The exact installed app also passed the
+bottom-right sizing journey, signature/parity verification, and direct UI inspection; priorities
+were unchanged and a verified rollback is retained. The notes retain an earlier 224 ms timing
+failure alongside its passing unchanged-code recheck and final full-run receipt.
+
+This update is not published or merged. Public `main` remains `fbb9e60` and no PR was created:
+automatic approval review requires explicit owner approval for this exact public payload. Hosted CI
+must run on the eventual PR before merge. Later material in this file describes already-merged
+behavior or explicitly dated receipts.
 
 **Ready acknowledgement source release:** [PR #27](https://github.com/siddath/Gajendra/pull/27).
 It keeps Ready for Review independent of priority, adds a bounded exact-response acknowledgement,
@@ -73,7 +91,7 @@ validation evidence. Earlier dated launch receipts below do not substitute for t
 - The [LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends manual publication at
   **4:00 PM IST on Wednesday, 26 August 2026**, within a 3:55–4:05 PM window. It is not published.
 
-## Current implementation receipts
+## Dated August implementation receipts
 
 The Ready acknowledgement release candidate passed locally on 2026-08-25:
 

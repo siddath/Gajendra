@@ -34,8 +34,42 @@ Native self-tests cover independent persistence, legacy migration, non-finite/ou
 monotonic interpolation, and display bounds. The native UI journey checks actual layout selection,
 fixed window geometry across modes, pointer slider movement, resizing in both directions, reopening,
 and byte-identical synthetic priority state. Visual-preference mutations use a unique disposable
-UserDefaults suite; CFFIXED_USER_HOME alone did not isolate cfprefsd writes on this host. This journey runs in the ordinary and performance UI
-suites, and can be isolated with `GAJENDRA_UI_TEST_SCOPE=widget-sizing npm run companion:ui-test`.
+UserDefaults suite; CFFIXED_USER_HOME alone did not isolate cfprefsd writes on this host. This journey runs in the ordinary and
+performance UI suites, and can be isolated with `GAJENDRA_UI_TEST_SCOPE=widget-sizing npm run companion:ui-test`.
 
-Final gauntlet, hosted CI, merge, and installation receipts are recorded in the PR and current status.
-These checks do not establish physical VoiceOver or signed/notarized distribution readiness.
+### Final local receipt
+
+Implementation/test commit: `13d8fa14d100a3efc695c6e779a10bcdf9d550ca`. Later edits are documentation
+and evidence only. The complete gauntlet passed all 21 gates from 2026-09-05 19:17:06 through 19:25:24
+UTC (September 6 locally): 115 source tests plus five complete repeats, 17 browser journeys plus
+85 repeated journeys, native self-test/build, full native interaction, full-screen reopen, widget
+performance, live MCP, artifact validation, and zero production vulnerabilities. The preview
+executable also compiled. See [the machine-readable report](../evidence/gauntlet/report.json).
+
+| Final native journey | Prewarmed reveal | Cold open | Warm open |
+| --- | ---: | ---: | ---: |
+| Full interaction | 36 ms | 84 ms | 85 ms |
+| Widget/performance | 38 ms | 89 ms | 84 ms |
+
+The existing 200 ms budget was unchanged. An earlier gauntlet stopped on a 224 ms prewarmed reveal
+(cold 85 ms, warm 90 ms). Its failure receipt is retained privately; the isolated unchanged-code
+recheck passed at 63/88/85 ms with no AttributeGraph cycles, and the final complete run above passed.
+The outlier's cause was not established by a controlled experiment. These observations are not a
+cross-machine or provider-refresh performance guarantee.
+
+### Installed result and publication boundary
+
+The exact app was installed at `~/Applications/Gajendra.app`, with strict ad-hoc signature validation
+and executable/service/runtime parity against the tested build. Native executable SHA-256:
+`1e7e59ae2a5aa9a2cccd8cda85dc4382dc6745fbe1b5b4e443030818ce207550`.
+The installed bottom-right sizing journey passed. A direct inspection of the live installed app
+confirmed both independent controls and the migrated dimensions. Priority state remained byte-for-byte
+unchanged with mode 0600. The previous app remains available as
+`~/Applications/Gajendra-rollback-20260906-widget-sizing.app`; the redundant temporary replacement
+was removed only after a complete file/symlink manifest comparison.
+
+At this local closeout, public `main` remains `fbb9e608eaaec53a15054c537439528ceef94376` and no PR was
+created. Automatic approval review blocked public publication and requires owner approval for this
+exact update to `siddath/Gajendra`. Current-head hosted CI and merge are therefore pending; old CI
+receipts are not claimed for this update. These checks do not establish physical VoiceOver or
+signed/notarized distribution readiness.

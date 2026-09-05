@@ -67,8 +67,8 @@ toggle a source or rescan.
 - Open **Settings** in the widget or Organizer. **Task layout** selects
   Compact, Comfortable, or Expanded spacing and detail without changing the widget dimensions.
   **Widget size** is an independent Minimum–Maximum slider; 0% means the smallest usable widget,
-  not a hidden widget. Release the slider to apply its size. Both choices are saved. The maximum fits the available display and launcher
-  position. Existing installations retain their previous starting dimensions on migration.
+  not a hidden widget. Release the slider to apply its size. Both choices are saved. The maximum
+  fits the available display and launcher position. Existing installations retain their previous starting dimensions on migration.
 - Appearance can follow the system or use an
   explicit light/dark choice.
 
