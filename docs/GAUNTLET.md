@@ -1,18 +1,19 @@
 # Release gauntlet
 
-The current Gajendra source-review candidate has a **passing local gauntlet receipt**:
-[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records 21 passing result
-records on 2026-09-05 for the final Running/interruption correction in [PR #32](https://github.com/siddath/Gajendra/pull/32). The run covers repository scripts, static/behavior/build/plugin checks, live
-MCP, companion self-test/build/real-window launcher/full-screen reopen/live checks, measured widget performance,
-direct Running/Ready priority actions, NOW immobility, pointer queue edits and dock interaction,
-browser UI, repeated reliability checks, final artifacts, and dependency audit. Its current receipt
-includes 115/115 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
-85/85 repeated browser journeys.
+The current dependency-review candidate has a **passing local gauntlet receipt**:
+[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records all 21 gates passing on
+2026-09-05 (18:09–18:16 UTC) for implementation `5b4b085` in
+[PR #23](https://github.com/siddath/Gajendra/pull/23), including the Zod update from
+[PR #29](https://github.com/siddath/Gajendra/pull/29). It covers 115 source tests plus five complete
+repeats, 17 primary browser journeys plus 85 repeated journeys, live MCP, native self-test/build,
+real-window interaction, synthetic full-screen reopen, widget performance, final artifacts, and
+zero production vulnerabilities. Native priority, Ready, Running, NOW, search, and pointer
+interaction assertions all pass.
 
-The runtime gauntlet boundary is `055ccc3`. A subsequent test-only controlled-clock correction
-addresses hosted scheduler sensitivity; its renewed 115-test source check and final hosted results
-are documented in the [Running reconciliation](RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md).
-The production source and runtime artifacts are unchanged by that correction.
+The [dependency review](DEPENDENCY-REVIEW-2026-09-05.md) records compatibility fixes, aggregate
+benchmark evidence, hosted CI, installed parity, and remaining proof boundaries. Later changes to
+this candidate are documentation and evidence only. The previous Running/interruption gauntlet is
+preserved in [the merged PR #32 receipt](https://github.com/siddath/Gajendra/blob/8ddcb78bf01628809250a7e9ede934dacba4f4c6/evidence/gauntlet/report.json).
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
 Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is
