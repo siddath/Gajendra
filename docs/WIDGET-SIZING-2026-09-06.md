@@ -115,5 +115,6 @@ The immediately previous build is retained at
 `~/Applications/Gajendra-rollback-20260906-settings-polish.app`.
 
 The owner explicitly authorized the sizing update, aligned dropdowns, settings/layout animation,
-publication, and merge on September 6. Current-head hosted CI and merge remain pending at this
-local receipt boundary. These local checks do not establish signed/notarized distribution readiness.
+publication, and merge on September 6. The reviewed source update is published in
+[PR #33](https://github.com/siddath/Gajendra/pull/33); its hosted checks and merge event are the
+publication receipts. These local checks do not establish signed/notarized distribution readiness.

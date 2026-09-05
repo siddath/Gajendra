@@ -9,7 +9,7 @@
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
 
-## Locally verified widget update and settings polish
+## Widget update and settings polish
 
 The [independent widget-sizing update](docs/WIDGET-SIZING-2026-09-06.md) is implemented and installed.
 Compact, Comfortable, and Expanded change task layout; a separate slider changes the outer widget
@@ -25,9 +25,10 @@ interaction recheck, direct UI inspection, and a retained rollback.
 The notes preserve an earlier 224 ms timing failure alongside its passing unchanged-code recheck
 and both complete gauntlet receipts.
 
-The owner authorized publication and merge. Current-head hosted CI and merge remain pending at
-this local verification boundary; public `main` is still `fbb9e60`. Later material in this file
-describes already-merged behavior or explicitly dated receipts.
+Publication is tracked in [PR #33](https://github.com/siddath/Gajendra/pull/33), with hosted CI and
+merge receipts on that PR. The local validation above remains anchored to its tested implementation;
+it does not substitute for the hosted checks. Later material in this file describes earlier merged
+behavior or explicitly dated receipts.
 
 **Ready acknowledgement source release:** [PR #27](https://github.com/siddath/Gajendra/pull/27).
 It keeps Ready for Review independent of priority, adds a bounded exact-response acknowledgement,

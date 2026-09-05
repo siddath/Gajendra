@@ -10,8 +10,8 @@ full-screen reopen, strict widget performance, final artifacts, and zero product
 
 The [widget-sizing notes](WIDGET-SIZING-2026-09-06.md) record the initial sizing receipt, earlier
 failed timing sample, unchanged-code recheck, final settings-polish timings, and installed result.
-The owner authorized publication and merge; current-head hosted CI and merge are still pending at
-this local receipt boundary. The previous dependency gauntlet remains available in
+Publication, hosted CI, and merge receipts are tracked in
+[PR #33](https://github.com/siddath/Gajendra/pull/33), separately from this local receipt. The previous dependency gauntlet remains available in
 [the merged PR #23 receipt](https://github.com/siddath/Gajendra/blob/fbb9e608eaaec53a15054c537439528ceef94376/evidence/gauntlet/report.json).
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
