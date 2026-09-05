@@ -11,6 +11,7 @@ sources_fixture="$repo_root/plugins/gajendra/tests/fixtures/ui-interactions-sour
 threads_fixture="$repo_root/plugins/gajendra/tests/fixtures/ui-interactions-threads.json"
 test_root=$(/usr/bin/mktemp -d "${TMPDIR:-/tmp}/gajendra-ui-test.XXXXXX")
 app_pid=""
+visual_defaults_suite="dev.sid.gajendra.ui-test.${test_root:t}"
 
 cleanup() {
   if [[ -n "$app_pid" ]] && /bin/kill -0 "$app_pid" 2>/dev/null; then
@@ -24,6 +25,7 @@ cleanup() {
     fi
     wait "$app_pid" 2>/dev/null || true
   fi
+  /usr/bin/defaults delete "$visual_defaults_suite" >/dev/null 2>&1 || true
   if [[ -n "$test_root" && "${test_root:t}" == gajendra-ui-test.* ]]; then
     /bin/rm -rf -- "$test_root"
   fi
@@ -78,6 +80,7 @@ env \
   GAJENDRA_DATA_DIR="$test_root/state" \
   GAJENDRA_SOURCES_CONFIG="$test_sources_fixture" \
   GAJENDRA_UI_TEST_PROBE=1 \
+  GAJENDRA_UI_TEST_DEFAULTS_SUITE="$visual_defaults_suite" \
   "$app_binary" \
   -ApplePersistenceIgnoreState YES \
   -gajendra.onboarding.sources.completed.v1 YES \

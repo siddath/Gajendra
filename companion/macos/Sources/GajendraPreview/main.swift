@@ -465,7 +465,7 @@ enum GajendraPreview {
             hoverCardSize: size
         )
         let cardSize = GajendraHoverCardSizing.size(
-            for: size,
+            widgetSize: settings.widgetSize,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
         try render(
@@ -507,11 +507,11 @@ enum GajendraPreview {
         try render(
             GajendraHoverCardView(model: cardModel, visualSettings: setting, isPreview: true),
             width: GajendraHoverCardSizing.size(
-                for: .comfortable,
+                widgetSize: 25,
                 visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
             ).width,
             height: GajendraHoverCardSizing.size(
-                for: .comfortable,
+                widgetSize: 25,
                 visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
             ).height,
             destination: card,

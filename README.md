@@ -56,7 +56,7 @@ thread content is used.
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
 | **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
-| **Adapt the surface** | Choose compact, comfortable, or expanded cards; light, dark, or system appearance; native or Focus Deck styling; and a preferred screen position. |
+| **Adapt the surface** | Set task layout to Compact, Comfortable, or Expanded and independently resize the widget with a slider; light, dark, or system appearance; native or Focus Deck styling; and a preferred screen position. |
 | **Open quickly** | The floating launcher, Dock reopen, and menu-bar item lead to the compact focus card. Organizer remains an explicit management destination. The card is prebuilt before first use, becomes pointer-ready on reveal, and queues a fresh read even when launch loading is still finishing. |
 | **Start quietly** | Choose sources on first launch and enable Launch at Login only through an explicit action. |
 

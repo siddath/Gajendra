@@ -60,6 +60,8 @@ enum GajendraUITest {
             let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
             if scope == "full-screen" {
                 print(#"{"status":"passed","scope":"full-screen","launcherHitOverFullScreen":true,"cardVisibleOnSameSpace":true,"fullScreenHostRemainsVisible":true,"dockReopenOnSameSpace":true}"#)
+            } else if scope == "widget-sizing" {
+                print(#"{"status":"passed","scope":"widget-sizing","layoutDoesNotResize":true,"sliderResizesBothDirections":true,"reopenPreservesSize":true,"prioritiesUnchanged":true}"#)
             } else if scope == "running-dock" {
                 print(
                     #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"runningToReadyTransition":false}"#
@@ -109,6 +111,17 @@ enum GajendraUITest {
 
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "full-screen" {
             try verifyFullScreenOverlay(pid: rawPID, appURL: appURL)
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
+                warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
+                runningToReadyTransition: false
+            )
+        }
+
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget-sizing" {
+            try tapCurrentPill(pid: rawPID)
+            try waitForCard(pid: rawPID, visible: true, label: "sizing card")
+            try verifyWidgetSizing(pid: rawPID, stateURL: stateURL)
             return GajendraUIJourneyMetrics(
                 prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
                 warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
@@ -232,6 +245,7 @@ enum GajendraUITest {
             label: "Ready for Review, 1 thread",
             collapsedValue: "Collapsed"
         )
+        try verifyWidgetSizing(pid: rawPID, stateURL: stateURL)
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget" {
             try verifyCompactPriorityActions(pid: rawPID, stateURL: stateURL)
             let runningToReadyTransition = try verifyRunningToReadyTransition(
@@ -263,6 +277,101 @@ enum GajendraUITest {
             statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved,
             runningToReadyTransition: runningToReadyTransition
         )
+    }
+
+    private static func verifyWidgetSizing(pid: pid_t, stateURL: URL) throws {
+        func sizingFrame(pid: pid_t, label: String) throws -> CGRect {
+            let search = try waitForElement(pid: pid, label: "Search every AI-agent thread")
+            guard let rawWindow = attribute(search, kAXWindowAttribute),
+                  CFGetTypeID(rawWindow) == AXUIElementGetTypeID() else {
+                throw GajendraUITestError.failed("sizing card window is missing: \(label)")
+            }
+            return try elementFrame(rawWindow as! AXUIElement)
+        }
+        let originalState = try Data(contentsOf: stateURL)
+        let original = try sizingFrame(pid: pid, label: "original size")
+        try tap(try elementFrame(waitForElement(pid: pid, label: "Open Gajendra settings")).center)
+        _ = try waitForElement(pid: pid, label: "Widget size")
+
+        func selectLayout(_ title: String) throws {
+            fputs("Sizing: selecting \(title)\n", stderr)
+            let control = try waitForElement(pid: pid, label: title)
+            try tap(try elementFrame(control).center)
+            let selected = try waitForElement(pid: pid, label: title)
+            guard (attribute(selected, kAXValueAttribute) as? NSNumber)?.intValue == 1 else {
+                throw GajendraUITestError.failed("layout control did not select \(title)")
+            }
+        }
+        func setSize(_ value: Double) throws -> CGRect {
+            guard let slider = matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
+                .first(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
+                throw GajendraUITestError.failed("widget size slider disappeared")
+            }
+            // SwiftUI sliders expose increment/decrement actions rather than writable AXValue.
+            for _ in 0...100 {
+                guard let current = attribute(slider, kAXValueAttribute) as? NSNumber else {
+                    throw GajendraUITestError.failed("slider did not expose a numeric value")
+                }
+                if abs(current.doubleValue - value) < 0.5 { break }
+                let action = current.doubleValue < value ? kAXIncrementAction : kAXDecrementAction
+                guard AXUIElementPerformAction(slider, action as CFString) == .success else {
+                    throw GajendraUITestError.failed("slider accessibility adjustment failed")
+                }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            guard let current = attribute(slider, kAXValueAttribute) as? NSNumber,
+                  abs(current.doubleValue - value) < 0.5 else {
+                throw GajendraUITestError.failed("slider did not reach \(value)")
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+            return try sizingFrame(pid: pid, label: "slider size")
+        }
+        for title in ["Expanded", "Comfortable", "Compact"] {
+            try selectLayout(title)
+            let frame = try sizingFrame(pid: pid, label: "layout size")
+            guard frame.size == original.size else {
+                throw GajendraUITestError.failed("\(title) changed outer widget dimensions")
+            }
+        }
+        guard let pointerSlider = matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
+            .first(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
+            throw GajendraUITestError.failed("pointer slider missing")
+        }
+        let sliderFrame = try elementFrame(pointerSlider)
+        try drag(from: CGPoint(x: sliderFrame.minX + 8, y: sliderFrame.midY),
+                 to: CGPoint(x: sliderFrame.midX, y: sliderFrame.midY))
+        guard try sizingFrame(pid: pid, label: "pointer slider growth").width > original.width else {
+            throw GajendraUITestError.failed("pointer drag did not grow the widget")
+        }
+        let largest = try setSize(100)
+        let middle = try setSize(25)
+        let smallest = try setSize(0)
+        guard largest.width > middle.width, middle.width > smallest.width,
+              largest.height > middle.height, middle.height > smallest.height,
+              smallest.size == original.size else {
+            throw GajendraUITestError.failed("slider did not grow and shrink the actual widget predictably")
+        }
+        _ = try setSize(25)
+        try selectLayout("Expanded")
+        guard try sizingFrame(pid: pid, label: "expanded at chosen size").size == middle.size else {
+            throw GajendraUITestError.failed("layout overwrote slider choice")
+        }
+        try tap(try elementFrame(waitForElement(pid: pid, label: "Done")).center)
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "sizing close")
+        try tapCurrentPill(pid: pid)
+        guard try sizingFrame(pid: pid, label: "sizing reopen").size == middle.size else {
+            throw GajendraUITestError.failed("reopen lost chosen widget size")
+        }
+        // Restore the fixture's starting layout and size for the remaining interaction journey.
+        try tap(try elementFrame(waitForElement(pid: pid, label: "Open Gajendra settings")).center)
+        _ = try waitForElement(pid: pid, label: "Widget size")
+        try selectLayout("Compact")
+        _ = try setSize(0)
+        try tap(try elementFrame(waitForElement(pid: pid, label: "Done")).center)
+        guard try Data(contentsOf: stateURL) == originalState else {
+            throw GajendraUITestError.failed("visual controls changed priority state")
+        }
     }
 
     private static func verifyApplicationReopenSurface(

@@ -728,28 +728,39 @@ enum GajendraSelfTest {
         let topCardFrame = CGRect(origin: belowTopPillOrigin, size: CGSize(width: 660, height: 610))
         try require(!topCardFrame.intersects(topPillFrame), "hover card must move below a top-edge launcher instead of covering it")
         let referenceCardSize = GajendraHoverCardSizing.size(
-            for: .comfortable,
+            widgetSize: 25,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
         try require(referenceCardSize == CGSize(width: 660, height: 610), "14-inch reference card size changed")
         let compactCardSize = GajendraHoverCardSizing.size(
-            for: .compact,
+            widgetSize: 0,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
         let expandedCardSize = GajendraHoverCardSizing.size(
-            for: .expanded,
+            widgetSize: 50,
             visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
         )
-        try require(compactCardSize.width < referenceCardSize.width, "Compact must be narrower than Comfortable")
-        try require(expandedCardSize.width > referenceCardSize.width, "Expanded must be wider than Comfortable")
+        try require(compactCardSize.width < referenceCardSize.width, "Smaller slider value must produce a narrower widget")
+        try require(expandedCardSize.width > referenceCardSize.width, "Larger slider value must produce a wider widget")
         let smallDisplayCardSize = GajendraHoverCardSizing.size(
-            for: .expanded,
+            widgetSize: 50,
             visibleFrame: CGRect(x: 0, y: 0, width: 620, height: 500)
         )
         try require(
             smallDisplayCardSize.width <= 596 && smallDisplayCardSize.height <= 476,
             "card size must clamp to a small display's visible frame"
         )
+        for frame in [CGRect(x: 0, y: 0, width: 1512, height: 949),
+                      CGRect(x: -620, y: 0, width: 620, height: 500),
+                      CGRect(x: 0, y: 0, width: 300, height: 280)] {
+            var previous = CGSize.zero
+            for value in 0...100 {
+                let size = GajendraHoverCardSizing.size(widgetSize: Double(value), visibleFrame: frame)
+                try require(size.width >= previous.width && size.height >= previous.height, "slider must grow monotonically")
+                try require(size.width <= frame.width - 24 && size.height <= frame.height - 24, "slider overflowed the visible display")
+                previous = size
+            }
+        }
         let smallVisibleFrame = CGRect(x: 0, y: 0, width: 620, height: 500)
         let smallCenterPillOrigin = GajendraOverlayPlacement.origin(
             for: .center,
@@ -926,6 +937,7 @@ enum GajendraSelfTest {
             defer { defaults.removePersistentDomain(forName: suiteName) }
 
             var settings = GajendraVisualSettings(defaults: defaults)
+            try require(defaults.object(forKey: GajendraVisualSettings.widgetSizeKey) == nil, "fresh settings must not manufacture prior native state and skip onboarding")
             try require(settings.theme == .nativePopover, "Native Popover must be the default theme")
             try require(settings.appearance == .automatic, "Auto must be the default appearance")
             try require(settings.hoverCardSize == .compact, "Compact must be the default hover-card size")
@@ -939,6 +951,29 @@ enum GajendraSelfTest {
             try require(settings.appearance == .dark, "appearance choice did not survive reinitialization")
             try require(settings.hoverCardSize == .expanded, "hover-card size did not survive reinitialization")
             try require(settings.pillAnchor == .bottomCenter, "launcher hotspot did not survive reinitialization")
+            // Changing layout must neither resize now nor remap size on relaunch.
+            settings.widgetSize = 73
+            for layout in GajendraHoverCardSize.allCases {
+                settings.hoverCardSize = layout
+                try require(settings.widgetSize == 73, "layout changed widget size")
+                settings = GajendraVisualSettings(defaults: defaults)
+                try require(settings.widgetSize == 73 && settings.hoverCardSize == layout, "independent settings did not persist")
+            }
+            settings.widgetSize = 200
+            try require(settings.widgetSize == 100, "oversized preference was not clamped")
+            settings.widgetSize = -10
+            try require(settings.widgetSize == 0, "negative preference was not clamped")
+            settings.widgetSize = .nan
+            try require(settings.widgetSize == 0, "non-finite preference was not normalized")
+            for layout in GajendraHoverCardSize.allCases {
+                defaults.removeObject(forKey: GajendraVisualSettings.widgetSizeKey)
+                defaults.set(layout.rawValue, forKey: GajendraVisualSettings.hoverCardSizeKey)
+                settings = GajendraVisualSettings(defaults: defaults)
+                try require(settings.widgetSize == GajendraHoverCardSizing.initialWidgetSize(for: layout), "legacy dimensions were not migrated")
+                settings.hoverCardSize = .compact
+                let reloaded = GajendraVisualSettings(defaults: defaults)
+                try require(reloaded.widgetSize == settings.widgetSize, "migration ran again after a layout change")
+            }
             defaults.set("command-capsule", forKey: GajendraVisualSettings.themeKey)
             defaults.set("sepia", forKey: GajendraVisualSettings.appearanceKey)
             defaults.set("cinema", forKey: GajendraVisualSettings.hoverCardSizeKey)
@@ -1672,18 +1707,18 @@ enum GajendraSelfTest {
             try require(organizerHost.fittingSize.width >= 520, "actual organizer view violated its minimum width")
 
             let compact = GajendraHoverCardSizing.size(
-                for: .compact,
+                widgetSize: 0,
                 visibleFrame: CGRect(x: 0, y: 0, width: 420, height: 380)
             )
             let expanded = GajendraHoverCardSizing.size(
-                for: .expanded,
+                widgetSize: 50,
                 visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 949)
             )
             try require(compact.width >= 320 && compact.height >= 356, "actual compact view size violated minimum bounds")
             try require(expanded.width <= 1512 && expanded.height <= 949, "actual expanded view exceeded visible bounds")
 
             let minimumCardSize = GajendraHoverCardSizing.size(
-                for: .compact,
+                widgetSize: 0,
                 visibleFrame: CGRect(x: 0, y: 0, width: 344, height: 380)
             )
             let minimumSettings = GajendraVisualSettings(
