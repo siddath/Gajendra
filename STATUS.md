@@ -4,10 +4,31 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-09-05
+**Reconciled:** 2026-09-06
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
+
+## Widget update and settings polish
+
+The [independent widget-sizing update](docs/WIDGET-SIZING-2026-09-06.md) is implemented and installed.
+Compact, Comfortable, and Expanded change task layout; a separate slider changes the outer widget
+size on release. Preferences persist independently, old dimensions migrate once, and the settings
+popover remains interactive outside the card bounds. Theme, Appearance, and Lotus position share
+an equally spaced dropdown column. Settings opening and task layout changes have short transitions
+that respect macOS Reduce Motion.
+
+Implementation/test freeze `bd43025` passed all 21 gauntlet gates, including full native,
+synthetic full-screen, strict widget performance, and 102 browser journeys. The tested app is
+installed with signature/parity verification, unchanged priority data, an installed bottom-right
+interaction recheck, direct UI inspection, and a retained rollback.
+The notes preserve an earlier 224 ms timing failure alongside its passing unchanged-code recheck
+and both complete gauntlet receipts.
+
+Publication is tracked in [PR #33](https://github.com/siddath/Gajendra/pull/33), with hosted CI and
+merge receipts on that PR. The local validation above remains anchored to its tested implementation;
+it does not substitute for the hosted checks. Later material in this file describes earlier merged
+behavior or explicitly dated receipts.
 
 **Ready acknowledgement source release:** [PR #27](https://github.com/siddath/Gajendra/pull/27).
 It keeps Ready for Review independent of priority, adds a bounded exact-response acknowledgement,
@@ -73,7 +94,7 @@ validation evidence. Earlier dated launch receipts below do not substitute for t
 - The [LinkedIn draft](worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) recommends manual publication at
   **4:00 PM IST on Wednesday, 26 August 2026**, within a 3:55–4:05 PM window. It is not published.
 
-## Current implementation receipts
+## Dated August implementation receipts
 
 The Ready acknowledgement release candidate passed locally on 2026-08-25:
 

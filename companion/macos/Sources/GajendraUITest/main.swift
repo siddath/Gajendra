@@ -60,6 +60,8 @@ enum GajendraUITest {
             let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
             if scope == "full-screen" {
                 print(#"{"status":"passed","scope":"full-screen","launcherHitOverFullScreen":true,"cardVisibleOnSameSpace":true,"fullScreenHostRemainsVisible":true,"dockReopenOnSameSpace":true}"#)
+            } else if scope == "widget-sizing" {
+                print(#"{"status":"passed","scope":"widget-sizing","layoutDoesNotResize":true,"sliderResizesBothDirections":true,"reopenPreservesSize":true,"prioritiesUnchanged":true}"#)
             } else if scope == "running-dock" {
                 print(
                     #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"runningToReadyTransition":false}"#
@@ -70,11 +72,11 @@ enum GajendraUITest {
                 )
             } else if scope == "widget" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -109,6 +111,17 @@ enum GajendraUITest {
 
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "full-screen" {
             try verifyFullScreenOverlay(pid: rawPID, appURL: appURL)
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
+                warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
+                runningToReadyTransition: false
+            )
+        }
+
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget-sizing" {
+            try tapCurrentPill(pid: rawPID)
+            try waitForCard(pid: rawPID, visible: true, label: "sizing card")
+            try verifyWidgetSizing(pid: rawPID, stateURL: stateURL)
             return GajendraUIJourneyMetrics(
                 prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
                 warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
@@ -232,6 +245,7 @@ enum GajendraUITest {
             label: "Ready for Review, 1 thread",
             collapsedValue: "Collapsed"
         )
+        try verifyWidgetSizing(pid: rawPID, stateURL: stateURL)
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget" {
             try verifyCompactPriorityActions(pid: rawPID, stateURL: stateURL)
             let runningToReadyTransition = try verifyRunningToReadyTransition(
@@ -263,6 +277,130 @@ enum GajendraUITest {
             statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved,
             runningToReadyTransition: runningToReadyTransition
         )
+    }
+
+    private static func verifyWidgetSizing(pid: pid_t, stateURL: URL) throws {
+        func sizingFrame(pid: pid_t, label: String) throws -> CGRect {
+            let search = try waitForElement(pid: pid, label: "Search every AI-agent thread")
+            guard let rawWindow = attribute(search, kAXWindowAttribute),
+                  CFGetTypeID(rawWindow) == AXUIElementGetTypeID() else {
+                throw GajendraUITestError.failed("sizing card window is missing: \(label)")
+            }
+            return try elementFrame(rawWindow as! AXUIElement)
+        }
+        let originalState = try Data(contentsOf: stateURL)
+        let original = try sizingFrame(pid: pid, label: "original size")
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Open Gajendra settings", value: nil)).center)
+        _ = try waitForElement(pid: pid, label: "Widget size")
+
+        let dropdownFrames = try ["Theme", "Appearance", "Lotus position"].map { label in
+            try elementFrame(waitForStableHittableElement(pid: pid, label: label, value: nil))
+        }
+        guard dropdownFrames.allSatisfy({ abs($0.minX - dropdownFrames[0].minX) <= 1
+            && abs($0.width - dropdownFrames[0].width) <= 1 }),
+              abs((dropdownFrames[1].midY - dropdownFrames[0].midY)
+                  - (dropdownFrames[2].midY - dropdownFrames[1].midY)) <= 1 else {
+            throw GajendraUITestError.failed("settings dropdowns do not share a column and equal spacing: \(dropdownFrames)")
+        }
+        for appearance in ["Dark", "Auto"] {
+            let popup = try waitForStableHittableElement(pid: pid, label: "Appearance", value: nil)
+            try tap(try elementFrame(popup).center)
+            // Start at the popup: its native menu can exceed the app-root traversal depth.
+            let deadline = Date().addingTimeInterval(timeout)
+            var option: AXUIElement?
+            repeat {
+                option = firstElement(in: popup, depth: 0, label: appearance)
+                if option != nil { break }
+                Thread.sleep(forTimeInterval: 0.05)
+            } while Date() < deadline
+            guard let option else {
+                throw GajendraUITestError.failed("appearance popup did not expose \(appearance)")
+            }
+            try tap(try elementFrame(option).center)
+            _ = try waitForElement(pid: pid, label: "Appearance", value: appearance)
+        }
+
+        func selectLayout(_ title: String) throws {
+            fputs("Sizing: selecting \(title)\n", stderr)
+            let control = try waitForStableHittableElement(pid: pid, label: title, value: nil)
+            try tap(try elementFrame(control).center)
+            let selected = try waitForElement(pid: pid, label: title)
+            guard (attribute(selected, kAXValueAttribute) as? NSNumber)?.intValue == 1 else {
+                throw GajendraUITestError.failed("layout control did not select \(title)")
+            }
+        }
+        func setSize(_ value: Double) throws -> CGRect {
+            fputs("Sizing: adjusting to \(value)\n", stderr)
+            guard let slider = matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
+                .first(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
+                throw GajendraUITestError.failed("widget size slider disappeared")
+            }
+            // SwiftUI sliders expose increment/decrement actions rather than writable AXValue.
+            for _ in 0...100 {
+                guard let current = attribute(slider, kAXValueAttribute) as? NSNumber else {
+                    throw GajendraUITestError.failed("slider did not expose a numeric value")
+                }
+                if abs(current.doubleValue - value) < 0.5 { break }
+                let action = current.doubleValue < value ? kAXIncrementAction : kAXDecrementAction
+                guard AXUIElementPerformAction(slider, action as CFString) == .success else {
+                    throw GajendraUITestError.failed("slider accessibility adjustment failed")
+                }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+            guard let current = attribute(slider, kAXValueAttribute) as? NSNumber,
+                  abs(current.doubleValue - value) < 0.5 else {
+                throw GajendraUITestError.failed("slider did not reach \(value)")
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+            return try sizingFrame(pid: pid, label: "slider size")
+        }
+        for title in ["Expanded", "Comfortable", "Compact"] {
+            try selectLayout(title)
+            let frame = try sizingFrame(pid: pid, label: "layout size")
+            guard frame.size == original.size else {
+                throw GajendraUITestError.failed("\(title) changed outer widget dimensions")
+            }
+        }
+        guard matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
+            .contains(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
+            throw GajendraUITestError.failed("pointer slider missing")
+        }
+        let stableSlider = try waitForStableHittableElement(pid: pid, label: "Widget size", value: nil)
+        let sliderFrame = try elementFrame(stableSlider)
+        try drag(from: CGPoint(x: sliderFrame.minX + 8, y: sliderFrame.midY),
+                 to: CGPoint(x: sliderFrame.midX, y: sliderFrame.midY))
+        guard try sizingFrame(pid: pid, label: "pointer slider growth").width > original.width else {
+            throw GajendraUITestError.failed("pointer drag did not grow the widget")
+        }
+        let largest = try setSize(100)
+        let middle = try setSize(25)
+        let smallest = try setSize(0)
+        guard largest.width > middle.width, middle.width > smallest.width,
+              largest.height > middle.height, middle.height > smallest.height,
+              smallest.size == original.size else {
+            throw GajendraUITestError.failed("slider did not grow and shrink the actual widget predictably")
+        }
+        _ = try setSize(25)
+        try selectLayout("Expanded")
+        guard try sizingFrame(pid: pid, label: "expanded at chosen size").size == middle.size else {
+            throw GajendraUITestError.failed("layout overwrote slider choice")
+        }
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Done", value: nil)).center)
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "sizing close")
+        try tapCurrentPill(pid: pid)
+        guard try sizingFrame(pid: pid, label: "sizing reopen").size == middle.size else {
+            throw GajendraUITestError.failed("reopen lost chosen widget size")
+        }
+        // Restore the fixture's starting layout and size for the remaining interaction journey.
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Open Gajendra settings", value: nil)).center)
+        _ = try waitForElement(pid: pid, label: "Widget size")
+        try selectLayout("Compact")
+        _ = try setSize(0)
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Done", value: nil)).center)
+        guard try Data(contentsOf: stateURL) == originalState else {
+            throw GajendraUITestError.failed("visual controls changed priority state")
+        }
     }
 
     private static func verifyApplicationReopenSurface(

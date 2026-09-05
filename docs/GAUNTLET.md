@@ -1,19 +1,18 @@
 # Release gauntlet
 
-The current dependency-review candidate has a **passing local gauntlet receipt**:
+The widget-sizing and settings-polish candidate has a **passing local gauntlet receipt**:
 [`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records all 21 gates passing on
-2026-09-05 (18:09–18:16 UTC) for implementation `5b4b085` in
-[PR #23](https://github.com/siddath/Gajendra/pull/23), including the Zod update from
-[PR #29](https://github.com/siddath/Gajendra/pull/29). It covers 115 source tests plus five complete
-repeats, 17 primary browser journeys plus 85 repeated journeys, live MCP, native self-test/build,
-real-window interaction, synthetic full-screen reopen, widget performance, final artifacts, and
-zero production vulnerabilities. Native priority, Ready, Running, NOW, search, and pointer
-interaction assertions all pass.
+2026-09-05 (20:09–20:18 UTC; September 6 locally) for implementation/test commit
+`bd43025d94bf46264c9be8c3517e7266cf8503bf`. It covers 115 source tests plus five complete repeats,
+17 primary browser journeys plus 85 repeated journeys, live MCP, native self-test/build, real-window
+interaction including aligned dropdown selection and independent layout/size controls, synthetic
+full-screen reopen, strict widget performance, final artifacts, and zero production vulnerabilities.
 
-The [dependency review](DEPENDENCY-REVIEW-2026-09-05.md) records compatibility fixes, aggregate
-benchmark evidence, hosted CI, installed parity, and remaining proof boundaries. Later changes to
-this candidate are documentation and evidence only. The previous Running/interruption gauntlet is
-preserved in [the merged PR #32 receipt](https://github.com/siddath/Gajendra/blob/8ddcb78bf01628809250a7e9ede934dacba4f4c6/evidence/gauntlet/report.json).
+The [widget-sizing notes](WIDGET-SIZING-2026-09-06.md) record the initial sizing receipt, earlier
+failed timing sample, unchanged-code recheck, final settings-polish timings, and installed result.
+Publication, hosted CI, and merge receipts are tracked in
+[PR #33](https://github.com/siddath/Gajendra/pull/33), separately from this local receipt. The previous dependency gauntlet remains available in
+[the merged PR #23 receipt](https://github.com/siddath/Gajendra/blob/fbb9e608eaaec53a15054c537439528ceef94376/evidence/gauntlet/report.json).
 
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
 Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is

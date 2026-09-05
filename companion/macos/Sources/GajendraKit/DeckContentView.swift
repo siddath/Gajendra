@@ -197,46 +197,17 @@ public struct DeckContentView: View {
         .frame(height: 42, alignment: .center)
     }
 
+    @State private var showsLayoutControls = false
+
     private var visualSettingsMenu: some View {
-        Menu {
-            Button {
-                onManageSources()
-            } label: {
-                Label("Manage AI tools…", systemImage: "point.3.connected.trianglepath.dotted")
+        Button { showsLayoutControls = true } label: { settingsIcon }
+            .buttonStyle(.plain)
+            .popover(isPresented: $showsLayoutControls) {
+                GajendraWidgetLayoutControls(settings: visualSettings, onManageSources: onManageSources)
             }
-            Divider()
-            Picker("Theme", selection: $visualSettings.theme) {
-                ForEach(GajendraVisualTheme.allCases) { theme in
-                    Text(theme.title).tag(theme)
-                }
-            }
-            Divider()
-            Picker("Appearance", selection: $visualSettings.appearance) {
-                ForEach(GajendraAppearance.allCases) { appearance in
-                    Text(appearance.title).tag(appearance)
-                }
-            }
-            Divider()
-            Picker("Hover card size", selection: $visualSettings.hoverCardSize) {
-                ForEach(GajendraHoverCardSize.allCases) { size in
-                    Text(size.title).tag(size)
-                }
-            }
-            Divider()
-            Picker("Lotus position", selection: $visualSettings.pillAnchor) {
-                ForEach(GajendraPillAnchor.allCases) { anchor in
-                    Text(anchor.title).tag(anchor)
-                }
-            }
-        } label: {
-            settingsIcon
-        }
-        .menuIndicator(.hidden)
-        .menuStyle(.borderlessButton)
-        .fixedSize()
-        .help("Gajendra settings")
-        .accessibilityLabel("Open Gajendra settings")
-        .accessibilityHint("Manage AI tools or choose theme, appearance, card size, and lotus position")
+            .help("Gajendra settings")
+            .accessibilityLabel("Open Gajendra settings")
+            .accessibilityHint("Manage AI tools or choose theme, appearance, task layout, widget size, and lotus position")
     }
 
     private var settingsIcon: some View {

@@ -125,7 +125,7 @@ enum GajendraMenuBarMain {
 @MainActor
 final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     let model: DeckViewModel
-    let visualSettings = GajendraVisualSettings()
+    let visualSettings: GajendraVisualSettings
     let pillEditController = GajendraPillEditController()
     let cardInteractionSession = GajendraCardInteractionSession()
     private var organizerWindow: NSWindow?
@@ -143,7 +143,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var pillVisibilityItem: NSMenuItem?
     private var pillAnchorItems: [GajendraPillAnchor: NSMenuItem] = [:]
     private var appearanceCancellable: AnyCancellable?
-    private var hoverCardSizeCancellable: AnyCancellable?
+    private var widgetSizeCancellable: AnyCancellable?
     private var pillAnchorCancellable: AnyCancellable?
     private var pillEditCancellable: AnyCancellable?
     private var historyCancellable: AnyCancellable?
@@ -171,6 +171,17 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     override init() {
         let environment = ProcessInfo.processInfo.environment
+        // CFFIXED_USER_HOME alone does not isolate cfprefsd writes on every macOS version.
+        // UI journeys that mutate visual preferences must use a unique, disposable suite.
+        if environment["GAJENDRA_UI_TEST_PROBE"] == "1",
+           let suite = environment["GAJENDRA_UI_TEST_DEFAULTS_SUITE"],
+           suite.hasPrefix("dev.sid.gajendra.ui-test."),
+           let defaults = UserDefaults(suiteName: suite) {
+            visualSettings = GajendraVisualSettings(defaults: defaults)
+        } else {
+            visualSettings = GajendraVisualSettings()
+        }
+
         if environment["GAJENDRA_UI_TEST_PROBE"] == "1",
            let dataDirectory = environment["GAJENDRA_DATA_DIR"] {
             let marker = URL(fileURLWithPath: dataDirectory)
@@ -695,6 +706,14 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func eventTargetsPresentedSurface(_ event: NSEvent) -> Bool {
+        // SwiftUI settings popovers are child windows and may extend beyond the card.
+        // Their clicks belong to this surface even when outside the card's rectangle.
+        var ancestor = event.window?.parent
+        while let window = ancestor {
+            if window === cardWindow { return true }
+            ancestor = window.parent
+        }
+        if event.window?.identifier == GajendraVisualSettings.settingsWindowIdentifier { return true }
         if event.window === cardWindow || event.window === pillWindow { return true }
         if event.window?.level == .popUpMenu { return true }
         return pointTargetsPresentedSurface(NSEvent.mouseLocation)
@@ -702,6 +721,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func pointTargetsPresentedSurface(_ point: CGPoint) -> Bool {
         pillWindow?.frame.contains(point) == true || cardWindow?.frame.contains(point) == true
+            || NSApplication.shared.windows.contains {
+                $0.identifier == GajendraVisualSettings.settingsWindowIdentifier
+                    && $0.isVisible && $0.frame.contains(point)
+            }
     }
 
     private func dismissCardIfOutside() {
@@ -727,7 +750,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func resizeCard(for screen: NSScreen, animated: Bool) {
         guard let panel = cardWindow else { return }
         let preferredSize = GajendraHoverCardSizing.size(
-            for: visualSettings.hoverCardSize,
+            widgetSize: visualSettings.widgetSize,
             visibleFrame: screen.visibleFrame
         )
         let maximumSize = GajendraOverlayPlacement.cardMaximumSize(
@@ -941,12 +964,17 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         appearanceCancellable = visualSettings.$appearance.sink { appearance in
             NSApplication.shared.appearance = appearance.appKitName.flatMap(NSAppearance.init(named:))
         }
-        hoverCardSizeCancellable = visualSettings.$hoverCardSize
-            .removeDuplicates()
+        widgetSizeCancellable = Publishers.CombineLatest(
+            visualSettings.$widgetSize.removeDuplicates(),
+            visualSettings.$isAdjustingWidgetSize.removeDuplicates()
+        )
             .dropFirst()
+            // @Published emits before assignment; resize only after the new value is stored.
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self else { return }
-                self.resizeCard(for: self.pillWindow?.screen ?? self.preferredScreen(), animated: true)
+                guard let self, !self.visualSettings.isAdjustingWidgetSize else { return }
+                // Keep the popover and slider stationary during a pointer drag.
+                self.resizeCard(for: self.pillWindow?.screen ?? self.preferredScreen(), animated: false)
                 self.updatePopoverSize(for: self.preferredScreen())
             }
     }
@@ -1132,7 +1160,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func updatePopoverSize(for screen: NSScreen) {
         let size = GajendraHoverCardSizing.size(
-            for: visualSettings.hoverCardSize,
+            widgetSize: visualSettings.widgetSize,
             visibleFrame: screen.visibleFrame
         )
         popover.contentSize = NSSize(width: size.width, height: size.height)
@@ -1282,7 +1310,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private func makeCardPanel() -> GajendraOverlayPanel {
         let screen = pillWindow?.screen ?? preferredScreen()
         let preferredSize = GajendraHoverCardSizing.size(
-            for: visualSettings.hoverCardSize,
+            widgetSize: visualSettings.widgetSize,
             visibleFrame: screen.visibleFrame
         )
         let maximumSize = GajendraOverlayPlacement.cardMaximumSize(
@@ -1376,6 +1404,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             GajendraVisualSettings.themeKey,
             GajendraVisualSettings.appearanceKey,
             GajendraVisualSettings.hoverCardSizeKey,
+            GajendraVisualSettings.widgetSizeKey,
             GajendraVisualSettings.pillAnchorKey,
         ].contains { defaults.object(forKey: $0) != nil }
     }

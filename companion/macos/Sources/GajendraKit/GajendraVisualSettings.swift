@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 public enum GajendraVisualTheme: String, CaseIterable, Identifiable, Sendable {
     case nativePopover = "native-popover"
@@ -81,19 +82,41 @@ public enum GajendraHoverCardSize: String, CaseIterable, Identifiable, Sendable 
 public enum GajendraHoverCardSizing {
     private static let referenceFrame = CGSize(width: 1512, height: 949)
 
-    public static func size(
-        for preference: GajendraHoverCardSize,
-        visibleFrame: CGRect
-    ) -> CGSize {
-        let baseSize: CGSize
-        switch preference {
-        case .compact:
-            baseSize = CGSize(width: 560, height: 570)
-        case .comfortable:
-            baseSize = CGSize(width: 660, height: 610)
-        case .expanded:
-            baseSize = CGSize(width: 760, height: 680)
+    // Keep the old presets as migration points; layout no longer controls window geometry.
+    public static func initialWidgetSize(for layout: GajendraHoverCardSize) -> Double {
+        switch layout {
+        case .compact: return 0
+        case .comfortable: return 25
+        case .expanded: return 50
         }
+    }
+
+    public static func boundedWidgetSize(_ value: Double) -> Double {
+        value.isFinite ? min(max(value, 0), 100) : 0
+    }
+
+    public static func size(widgetSize: Double, visibleFrame: CGRect) -> CGSize {
+        let value = boundedWidgetSize(widgetSize)
+        let start: CGSize
+        let end: CGSize
+        let fraction: Double
+        if value <= 25 {
+            start = CGSize(width: 560, height: 570)
+            end = CGSize(width: 660, height: 610)
+            fraction = value / 25
+        } else if value <= 50 {
+            start = CGSize(width: 660, height: 610)
+            end = CGSize(width: 760, height: 680)
+            fraction = (value - 25) / 25
+        } else {
+            start = CGSize(width: 760, height: 680)
+            end = CGSize(width: 960, height: 850)
+            fraction = (value - 50) / 50
+        }
+        let baseSize = CGSize(
+            width: start.width + (end.width - start.width) * fraction,
+            height: start.height + (end.height - start.height) * fraction
+        )
 
         let displayScale = min(
             visibleFrame.width / referenceFrame.width,
@@ -101,8 +124,8 @@ public enum GajendraHoverCardSizing {
         )
         let boundedScale = min(max(displayScale, 0.88), 1.18)
         let maximumSize = CGSize(
-            width: max(320, visibleFrame.width - 24),
-            height: max(360, visibleFrame.height - 24)
+            width: max(1, visibleFrame.width - 24),
+            height: max(1, visibleFrame.height - 24)
         )
         return CGSize(
             width: min((baseSize.width * boundedScale).rounded(), maximumSize.width),
@@ -121,9 +144,11 @@ public enum GajendraHoverCardSizing {
 
 @MainActor
 public final class GajendraVisualSettings: ObservableObject {
+    public static let settingsWindowIdentifier = NSUserInterfaceItemIdentifier("gajendra-settings-popover")
     public static let themeKey = "gajendra.visual.theme"
     public static let appearanceKey = "gajendra.visual.appearance"
     public static let hoverCardSizeKey = "gajendra.visual.hover-card-size"
+    public static let widgetSizeKey = "gajendra.visual.widget-size"
     public static let pillAnchorKey = "gajendra.visual.pill-anchor"
 
     @Published public var theme: GajendraVisualTheme {
@@ -135,7 +160,20 @@ public final class GajendraVisualSettings: ObservableObject {
     }
 
     @Published public var hoverCardSize: GajendraHoverCardSize {
-        didSet { persist(hoverCardSize.rawValue, forKey: Self.hoverCardSizeKey) }
+        didSet {
+            persist(hoverCardSize.rawValue, forKey: Self.hoverCardSizeKey)
+            defaults?.set(widgetSize, forKey: Self.widgetSizeKey)
+        }
+    }
+
+    @Published public var isAdjustingWidgetSize = false
+
+    @Published public var widgetSize: Double {
+        didSet {
+            let bounded = GajendraHoverCardSizing.boundedWidgetSize(widgetSize)
+            if widgetSize != bounded { widgetSize = bounded }
+            defaults?.set(bounded, forKey: Self.widgetSizeKey)
+        }
     }
 
     @Published public var pillAnchor: GajendraPillAnchor {
@@ -148,24 +186,198 @@ public final class GajendraVisualSettings: ObservableObject {
         self.defaults = defaults
         theme = GajendraVisualTheme(rawValue: defaults.string(forKey: Self.themeKey) ?? "") ?? .nativePopover
         appearance = GajendraAppearance(rawValue: defaults.string(forKey: Self.appearanceKey) ?? "") ?? .automatic
-        hoverCardSize = GajendraHoverCardSize(rawValue: defaults.string(forKey: Self.hoverCardSizeKey) ?? "") ?? .compact
+        let savedLayout = GajendraHoverCardSize(rawValue: defaults.string(forKey: Self.hoverCardSizeKey) ?? "") ?? .compact
+        hoverCardSize = savedLayout
+        widgetSize = (defaults.object(forKey: Self.widgetSizeKey) as? NSNumber).map {
+            GajendraHoverCardSizing.boundedWidgetSize($0.doubleValue)
+        } ?? GajendraHoverCardSizing.initialWidgetSize(for: savedLayout)
+        // Persist the migration once so a later layout change cannot remap the saved size.
         pillAnchor = GajendraPillAnchor(rawValue: defaults.string(forKey: Self.pillAnchorKey) ?? "") ?? .bottomTrailing
+        if defaults.object(forKey: Self.hoverCardSizeKey) != nil
+            || defaults.object(forKey: Self.widgetSizeKey) != nil {
+            defaults.set(widgetSize, forKey: Self.widgetSizeKey)
+        }
     }
 
     public init(
         theme: GajendraVisualTheme,
         appearance: GajendraAppearance,
         hoverCardSize: GajendraHoverCardSize = .compact,
+        widgetSize: Double? = nil,
         pillAnchor: GajendraPillAnchor = .bottomTrailing
     ) {
         defaults = nil
         self.theme = theme
         self.appearance = appearance
         self.hoverCardSize = hoverCardSize
+        self.widgetSize = GajendraHoverCardSizing.boundedWidgetSize(
+            widgetSize ?? GajendraHoverCardSizing.initialWidgetSize(for: hoverCardSize)
+        )
         self.pillAnchor = pillAnchor
     }
 
     private func persist(_ value: String, forKey key: String) {
         defaults?.set(value, forKey: key)
     }
+}
+
+/// Shared by the floating card and Organizer settings.
+struct GajendraWidgetLayoutControls: View {
+    @ObservedObject var settings: GajendraVisualSettings
+    var onManageSources: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPresented = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Gajendra settings").font(.headline)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Task layout")
+                Picker("Task layout", selection: $settings.hoverCardSize) {
+                    ForEach(GajendraHoverCardSize.allCases) { layout in
+                        Text(layout.title).tag(layout)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settings.hoverCardSize)
+                Text("Adjust task spacing and detail.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Widget size")
+                    Spacer()
+                    Text("\(Int(settings.widgetSize))%").monospacedDigit()
+                }
+                Slider(value: $settings.widgetSize, in: 0...100, step: 1) { editing in
+                    settings.isAdjustingWidgetSize = editing
+                }
+                    .accessibilityLabel("Widget size")
+                    .accessibilityValue("\(Int(settings.widgetSize)) percent")
+                HStack {
+                    Text("Minimum")
+                    Spacer()
+                    Text("Maximum")
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                Text("Release to resize within the available screen space.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Divider()
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 12) {
+                GridRow {
+                    Text("Theme")
+                    GajendraSettingsPicker(
+                        title: "Theme", selection: $settings.theme,
+                        options: GajendraVisualTheme.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
+                GridRow {
+                    Text("Appearance")
+                    GajendraSettingsPicker(
+                        title: "Appearance", selection: $settings.appearance,
+                        options: GajendraAppearance.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
+                GridRow {
+                    Text("Lotus position")
+                    GajendraSettingsPicker(
+                        title: "Lotus position", selection: $settings.pillAnchor,
+                        options: GajendraPillAnchor.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
+            }
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack {
+                Button("Manage AI tools…") {
+                    dismiss()
+                    onManageSources()
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+            }
+        }
+        .padding(20)
+        .frame(width: 340)
+        .opacity(isPresented || reduceMotion ? 1 : 0)
+        .offset(y: isPresented || reduceMotion ? 0 : 4)
+        .background(GajendraSettingsWindowMarker())
+        .onAppear {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+                isPresented = true
+            }
+        }
+        .onDisappear {
+            isPresented = false
+            settings.isAdjustingWidgetSize = false
+        }
+    }
+
+}
+
+/// SwiftUI's macOS menu picker keeps its intrinsic button width inside a flexible frame.
+/// A native popup fills the shared column, including its entire clickable area.
+private struct GajendraSettingsPicker<Value: Hashable>: NSViewRepresentable {
+    let title: String
+    @Binding var selection: Value
+    let options: [Value]
+    let optionTitle: (Value) -> String
+
+    final class PopupButton: NSPopUpButton {
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: NSView.noIntrinsicMetric, height: super.intrinsicContentSize.height)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: GajendraSettingsPicker
+        init(_ parent: GajendraSettingsPicker) { self.parent = parent }
+
+        @objc func selectOption(_ sender: NSPopUpButton) {
+            guard parent.options.indices.contains(sender.indexOfSelectedItem) else { return }
+            parent.selection = parent.options[sender.indexOfSelectedItem]
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> PopupButton {
+        let button = PopupButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectOption(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: PopupButton, context: Context) {
+        context.coordinator.parent = self
+        let titles = options.map(optionTitle)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            button.addItems(withTitles: titles)
+        }
+        if let index = options.firstIndex(of: selection) {
+            button.selectItem(at: index)
+        }
+        button.setAccessibilityLabel(title)
+    }
+}
+
+/// NSPopover windows do not consistently expose their owner through NSWindow.parent.
+private struct GajendraSettingsWindowMarker: NSViewRepresentable {
+    final class MarkerView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.identifier = GajendraVisualSettings.settingsWindowIdentifier
+        }
+    }
+
+    func makeNSView(context: Context) -> MarkerView { MarkerView() }
+    func updateNSView(_ view: MarkerView, context: Context) {}
 }

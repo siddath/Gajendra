@@ -64,7 +64,14 @@ toggle a source or rescan.
 - Double-click anywhere inside the NOW card to open that exact thread. Double-clicking another dock
   or blank part of the widget does not substitute a different action.
 - Open the app menu to show or hide the lotus, manage sources, change appearance, or quit.
-- Card size can be Compact, Comfortable, or Expanded. Appearance can follow the system or use an
+- Open **Settings** in the widget or Organizer. **Task layout** selects
+  Compact, Comfortable, or Expanded spacing and detail without changing the widget dimensions.
+  Settings opens with a brief transition, and layout changes animate smoothly. Both respect macOS
+  **Reduce Motion**. Theme, Appearance, and Lotus position use an aligned dropdown column.
+  **Widget size** is an independent Minimum–Maximum slider; 0% means the smallest usable widget,
+  not a hidden widget. Release the slider to apply its size. Both choices are saved. The maximum
+  fits the available display and launcher position. Existing installations retain their previous starting dimensions on migration.
+- Appearance can follow the system or use an
   explicit light/dark choice.
 
 ### Priorities
