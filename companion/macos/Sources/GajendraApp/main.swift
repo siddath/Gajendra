@@ -134,6 +134,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var cardWindow: GajendraOverlayPanel?
     private var statusItem: NSStatusItem?
     private var workspaceActivationObserver: NSObjectProtocol?
+    private var lastExternalApplication: NSRunningApplication?
     private var screenParametersObserver: NSObjectProtocol?
     private var cardPresentation = GajendraCardPresentationState()
     private var launchAtLoginItem: NSMenuItem?
@@ -232,6 +233,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        // A regular Dock app can be activated on its desktop Space before this callback.
+        // Return to the user's last tool, then reveal our nonactivating, all-Spaces card there.
+        // Keep explicit Organizer/setup interactions in their own app window.
+        if organizerWindow?.isKeyWindow != true, sourceOnboardingWindow?.isKeyWindow != true,
+           let previous = lastExternalApplication, !previous.isTerminated {
+            // Finish handling Launch Services' reopen event before returning activation;
+            // restoring it inside the event can be overwritten by the pending Dock activation.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.cardPresentation.isPresented, !previous.isTerminated else { return }
+                previous.activate(options: .activateIgnoringOtherApps)
+                if let panel = self.cardWindow, panel.isVisible {
+                    self.orderCardFront(panel)
+                }
+            }
+        }
         recordUIReopenProbe()
         presentCardFromPillOrReopen(prewarmed: true)
         return true
@@ -1326,11 +1342,13 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func configureOverlayCollectionBehavior(_ panel: NSPanel) {
-        var behavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        // Full-screen eligibility applies on every supported OS, independently of the newer
+        // Stage Manager/all-apps role. Both the launcher and prewarmed card need this policy.
+        var behavior: NSWindow.CollectionBehavior = [
+            .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
+        ]
         if #available(macOS 15.0, *) {
             behavior.insert(.canJoinAllApplications)
-        } else {
-            behavior.insert(.fullScreenAuxiliary)
         }
         panel.collectionBehavior = behavior
     }
@@ -1363,13 +1381,21 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func observeDesktopChanges() {
+        if let current = NSWorkspace.shared.frontmostApplication,
+           current.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            lastExternalApplication = current
+        }
         workspaceActivationObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
             Task { @MainActor in
                 guard let self else { return }
+                if let activated = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                   activated.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+                    self.lastExternalApplication = activated
+                }
                 guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey) else { return }
                 self.pillWindow?.orderFrontRegardless()
                 if self.cardWindow?.isVisible == true { self.cardWindow?.orderFrontRegardless() }

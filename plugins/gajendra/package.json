@@ -6,6 +6,7 @@
   "description": "Gajendra: one clear focus across your AI tools.",
   "scripts": {
     "build": "npm run build:ui && npm run build:server",
+    "benchmark:sources": "vite-node scripts/benchmark-sources.ts",
     "build:ui": "cross-env GAJENDRA_ENTRY=gajendra.html vite build && node scripts/normalize-build.mjs dist/gajendra.html",
     "build:server": "esbuild src/server/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/server.mjs --banner:js='import { createRequire as __createRequire } from \"module\"; const require = __createRequire(import.meta.url);' && node scripts/normalize-build.mjs dist/server.mjs",
     "check": "npm run typecheck && npm run test && npm run build",

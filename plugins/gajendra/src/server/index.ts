@@ -65,11 +65,11 @@ export function createGajendraServer(service: DeckService = new GajendraService(
 
   registerAppTool(server, "gajendra_open", {
     title: "Gajendra",
-    description: "One clear focus across your AI tools.",
+    description: "Read Gajendra priorities and available task metadata. Resolve the exact canonical thread ID here before changing focus or review state; never guess an ID from a title.",
     inputSchema: {},
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
-      ui: { resourceUri: RESOURCE_URI, visibility: ["app"] },
+      ui: { resourceUri: RESOURCE_URI, visibility: ["app", "model"] },
       "openai/outputTemplate": RESOURCE_URI,
       "openai/widgetAccessible": true,
       "openai/ui": { entrypoints: [{ type: "global" }] },
@@ -78,20 +78,20 @@ export function createGajendraServer(service: DeckService = new GajendraService(
 
   registerAppTool(server, "gajendra_set_level", {
     title: "Set thread priority",
-    description: "Add, move, or remove one agent thread in Gajendra.",
+    description: "When the user asks, add, move, or remove one exact agent thread in Gajendra Focus or Important. Read gajendra_open first; use its canonical ID and revision. Do not infer priority from conversation content.",
     inputSchema: { threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-    _meta: { ui: { visibility: ["app"] } },
+    _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, level, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
     { type: "set-level", threadId, level }, expectedRevision, idempotencyKey,
   ))));
 
   registerAppTool(server, "gajendra_set_current", {
     title: "Set current focus",
-    description: "Make one thread from any configured source the single NOW item.",
+    description: "When the user asks to focus now on an exact task, make it the single Gajendra NOW item and include it in Focus. Read gajendra_open first; resolve this task from reliable host identity or ask if ambiguous. Use the snapshot revision.",
     inputSchema: { threadId: z.string().min(1), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-    _meta: { ui: { visibility: ["app"] } },
+    _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
     { type: "set-current", threadId }, expectedRevision, idempotencyKey,
   ))));
@@ -154,7 +154,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
       ...mutationOptionsSchema,
     },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
-    _meta: { ui: { visibility: ["app"] } },
+    _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, reviewUpdatedAt, reviewIdentity, acknowledged, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
     { type: "set-review-acknowledged", threadId, reviewUpdatedAt, reviewIdentity, acknowledged }, expectedRevision, idempotencyKey,
   ))));

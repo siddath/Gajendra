@@ -58,7 +58,9 @@ enum GajendraUITest {
         do {
             let metrics = try run()
             let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
-            if scope == "running-dock" {
+            if scope == "full-screen" {
+                print(#"{"status":"passed","scope":"full-screen","launcherHitOverFullScreen":true,"cardVisibleOnSameSpace":true,"fullScreenHostRemainsVisible":true,"dockReopenOnSameSpace":true}"#)
+            } else if scope == "running-dock" {
                 print(
                     #"{"status":"passed","scope":"running-dock","compactRunningDockControlClick":true,"compactRunningDockDoubleClick":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"runningToReadyTransition":false}"#
                 )
@@ -104,6 +106,15 @@ enum GajendraUITest {
         let pill = try waitForPill(pid: rawPID)
         _ = try waitForPillHelp(pid: rawPID, containing: "Click to show or hide priorities")
         Thread.sleep(forTimeInterval: 0.3)
+
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "full-screen" {
+            try verifyFullScreenOverlay(pid: rawPID, appURL: appURL)
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
+                warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
+                runningToReadyTransition: false
+            )
+        }
 
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "running-dock" {
             try verifyRunningDockControlsOnly(pid: rawPID)
@@ -1291,7 +1302,7 @@ enum GajendraUITest {
             label: controlLabel,
             value: "Expanded",
             scrollToVisible: true,
-            requiresSemanticHit: false
+            requiresSemanticHit: true
         )
         try tapWithoutSettling(try elementFrame(expandedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Collapsed")
@@ -1302,7 +1313,7 @@ enum GajendraUITest {
             label: controlLabel,
             value: "Collapsed",
             scrollToVisible: true,
-            requiresSemanticHit: false
+            requiresSemanticHit: true
         )
         try tapWithoutSettling(try elementFrame(collapsedControl).center)
         _ = try waitForElement(pid: pid, label: controlLabel, value: "Expanded")
@@ -1364,6 +1375,92 @@ enum GajendraUITest {
             throw GajendraUITestError.failed("the accessibility press action was unavailable for \(label)")
         }
         _ = try waitForElement(pid: pid, label: label, value: finalValue)
+    }
+
+    /// Own the full-screen host in this test process so no user's app or document is changed.
+    private static func verifyFullScreenOverlay(pid: pid_t, appURL: URL) throws {
+        let application = NSApplication.shared
+        application.setActivationPolicy(.regular)
+        application.finishLaunching()
+        let host = NSWindow(
+            contentRect: NSRect(x: 100, y: 100, width: 800, height: 600),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered, defer: false
+        )
+        host.title = "Gajendra synthetic full-screen host"
+        host.isReleasedWhenClosed = false
+        host.isRestorable = false
+        host.collectionBehavior = [.fullScreenPrimary]
+        host.contentView = NSTextField(labelWithString: "Synthetic full-screen overlay check")
+        defer {
+            if host.styleMask.contains(.fullScreen) {
+                host.toggleFullScreen(nil)
+                let deadline = Date().addingTimeInterval(5)
+                while host.styleMask.contains(.fullScreen), Date() < deadline {
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                }
+            }
+            host.close()
+        }
+        var enteredFullScreen = false
+        let observer = NotificationCenter.default.addObserver(
+            forName: NSWindow.didEnterFullScreenNotification, object: host, queue: .main
+        ) { _ in enteredFullScreen = true }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        host.makeKeyAndOrderFront(nil)
+        host.orderFrontRegardless()
+        application.activate(ignoringOtherApps: true)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        if let frame = windows(pid: getpid()).first(where: { $0.isOnScreen })?.bounds,
+           let hit = systemElementAtPosition(point: frame.center) {
+            var owner: pid_t = 0
+            AXUIElementGetPid(hit, &owner)
+            guard owner == getpid() else {
+                throw GajendraUITestError.failed("synthetic full-screen host activation target belongs to another app")
+            }
+            // Give this command-line AppKit host a real activation click before changing Spaces.
+            try tapWithoutSettling(frame.center)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        host.toggleFullScreen(nil)
+        let deadline = Date().addingTimeInterval(10)
+        while !(enteredFullScreen && host.isOnActiveSpace
+                && NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid()), Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+        // styleMask changes before the Space transition finishes; wait for AppKit's completion.
+        guard enteredFullScreen, host.isOnActiveSpace,
+              NSWorkspace.shared.frontmostApplication?.processIdentifier == getpid() else {
+            throw GajendraUITestError.failed(
+                "synthetic host did not enter full-screen readiness; entered=\(enteredFullScreen) activeSpace=\(host.isOnActiveSpace) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0) hostPID=\(getpid())"
+            )
+        }
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: true, label: "card over full-screen host")
+        guard host.isOnActiveSpace, host.styleMask.contains(.fullScreen),
+              host.isVisible else {
+            throw GajendraUITestError.failed(
+                "opening the card left the full-screen host; activeSpace=\(host.isOnActiveSpace) fullScreen=\(host.styleMask.contains(.fullScreen))"
+            )
+        }
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "full-screen card dismissal")
+        let reopen = Process()
+        reopen.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        reopen.arguments = ["-a", appURL.path]
+        try reopen.run()
+        reopen.waitUntilExit()
+        guard reopen.terminationStatus == 0 else {
+            throw GajendraUITestError.failed("full-screen Dock reopen trigger failed")
+        }
+        try waitForCard(pid: pid, visible: true, label: "Dock reopen over full-screen host")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        guard host.isOnActiveSpace, host.styleMask.contains(.fullScreen) else {
+            throw GajendraUITestError.failed("Dock reopen switched away from the full-screen Space")
+        }
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "full-screen Dock reopen dismissal")
+
     }
 
     private static func waitForPill(pid: pid_t) throws -> CGRect {

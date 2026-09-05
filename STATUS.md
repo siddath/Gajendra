@@ -4,7 +4,7 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-08-25
+**Reconciled:** 2026-09-05
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
@@ -14,6 +14,19 @@ It keeps Ready for Review independent of priority, adds a bounded exact-response
 preserves Running precedence, removes duplicate compact lane controls and priority-row Ready glyphs,
 and updates the matching source, privacy, tests, launch evidence, and public copy. Hosted and merge
 receipts remain distinct from the local receipts below.
+
+## September focus and performance update
+
+The [September audit](docs/PERFORMANCE-AUDIT-2026-09-05.md) records the conversational MCP actions,
+bounded discovery changes, full-screen reopen work, raw aggregate timings, and current validation
+boundaries. Claude metadata discovery improved 34–42% and Grok 37–40% across two controlled rounds;
+these are adapter measurements, not a faster-current-live-refresh claim. The older performance
+worktree remains intact, and its concurrent Codex runtime/review proposal was rejected because it
+changed candidate-selection and failure semantics.
+
+The production lockfile updates only `fast-uri` and `qs` to their fixed resolutions. The current
+source update's local and hosted verification is recorded in the audit; the historical release
+receipts below remain dated evidence and do not substitute for those checks.
 
 ## Current user-facing state
 
