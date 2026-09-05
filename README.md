@@ -77,7 +77,7 @@ priority actions; the source project still makes no signed/notarized binary clai
 
 - macOS **13.5 or later**
 - Xcode or the Xcode Command Line Tools
-- Node.js **20 or later** for the source build
+- Node.js **20.19+ or 22.12+** for the source build
 - At least one supported local AI tool whose threads you want to see
 
 ### Build and open the app

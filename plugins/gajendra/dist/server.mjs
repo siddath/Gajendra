@@ -11,11 +11,20 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+var __esm = (fn, res, err) => function __init() {
+  if (err) throw err[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err = [e], e;
+  }
 };
 var __commonJS = (cb, mod) => function __require2() {
-  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
 };
 var __export = (target, all) => {
   for (var name in all)
@@ -13983,8 +13992,8 @@ var init_compile = __esm({
     init_regexes();
     init_schemas();
     init_util();
-    INVALID2 = Symbol.for("zod.compile.invalid");
-    FALLBACK_FLAG = Symbol.for("zod.compile.fallback");
+    INVALID2 = /* @__PURE__ */ Symbol.for("zod.compile.invalid");
+    FALLBACK_FLAG = /* @__PURE__ */ Symbol.for("zod.compile.fallback");
     ZodCompileAsyncError = class extends Error {
       constructor(message = "z.compile does not support async refinements, transforms, or checks") {
         super(message);
@@ -16192,7 +16201,7 @@ var init_json_schema_processors = __esm({
       const seen = ctx.seen.get(schema);
       seen.ref = def.innerType;
     };
-    UNREPRESENTABLE_DEFAULT = Symbol();
+    UNREPRESENTABLE_DEFAULT = /* @__PURE__ */ Symbol();
     defaultProcessor = (schema, ctx, json2, params) => {
       const def = schema._zod.def;
       process2(def.innerType, ctx, params);
@@ -16884,7 +16893,7 @@ var init_visit = __esm({
   "../../node_modules/zod/v4/core/visit.js"() {
     init_schemas();
     init_util();
-    RESOLVING = Symbol("z.visit/resolving");
+    RESOLVING = /* @__PURE__ */ Symbol("z.visit/resolving");
   }
 });
 
@@ -30489,7 +30498,6 @@ ZodNaN.create = (params) => {
     ...processCreateParams(params)
   });
 };
-var BRAND = Symbol("zod_brand");
 var ZodBranded = class extends ZodType {
   _parse(input2) {
     const { ctx } = this._processInputParams(input2);
@@ -32434,7 +32442,7 @@ function isTerminal(status) {
 }
 
 // ../../node_modules/zod-to-json-schema/dist/esm/Options.js
-var ignoreOverride = Symbol("Let zodToJsonSchema decide on which parser to use");
+var ignoreOverride = /* @__PURE__ */ Symbol("Let zodToJsonSchema decide on which parser to use");
 var defaultOptions = {
   name: void 0,
   $refStrategy: "root",
@@ -35496,7 +35504,7 @@ var Server = class extends Protocol {
 };
 
 // ../../node_modules/@modelcontextprotocol/sdk/dist/esm/server/completable.js
-var COMPLETABLE_SYMBOL = Symbol.for("mcp.completable");
+var COMPLETABLE_SYMBOL = /* @__PURE__ */ Symbol.for("mcp.completable");
 function isCompletable(schema) {
   return !!schema && typeof schema === "object" && COMPLETABLE_SYMBOL in schema;
 }
@@ -37409,6 +37417,7 @@ var CodexAppServerRpcError = class extends Error {
     this.code = code;
     this.name = "CodexAppServerRpcError";
   }
+  code;
 };
 function isUnsupportedExperimentalError(error61) {
   if (!(error61 instanceof CodexAppServerRpcError)) return false;
@@ -37426,6 +37435,7 @@ var CodexAppServerClient = class {
     this.requestTimeoutMs = clampCodexRpcTimeout(requestTimeoutMs);
     this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
+  env;
   process = null;
   lifecycle = null;
   teardown = null;
@@ -38257,6 +38267,7 @@ var ThreadSourceRegistry = class {
     this.codex = codex;
     this.sourceCollectionConcurrency = resolveSourceCollectionConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
+  env;
   codex;
   sourceCollectionConcurrency;
   async collect(preferences) {
@@ -38328,6 +38339,7 @@ var CodexThreadSource = class {
   constructor(client) {
     this.client = client;
   }
+  client;
   id = "codex";
   name = "Codex";
   kind = "builtin";
@@ -38340,6 +38352,7 @@ var ClaudeThreadSource = class {
   constructor(env) {
     this.env = env;
   }
+  env;
   id = "claude";
   name = "Claude Code";
   kind = "builtin";
@@ -38361,6 +38374,7 @@ var CursorThreadSource = class {
   constructor(env) {
     this.env = env;
   }
+  env;
   id = "cursor";
   name = "Cursor";
   kind = "builtin";
@@ -38378,6 +38392,7 @@ var GrokThreadSource = class {
   constructor(env) {
     this.env = env;
   }
+  env;
   id = "grok";
   name = "Grok Build";
   kind = "builtin";
@@ -38402,6 +38417,10 @@ var CatalogThreadSource = class {
     this.deepLinkSchemes = deepLinkSchemes;
     this.enabledByDefault = enabled;
   }
+  id;
+  name;
+  catalogPath;
+  deepLinkSchemes;
   kind = "configured";
   enabledByDefault;
   async listThreads() {
@@ -38990,6 +39009,7 @@ var SourceUnavailableError = class extends Error {
     super(message);
     this.state = state;
   }
+  state;
 };
 var resumeCommandSchema = external_exports.object({
   executable: external_exports.string().min(1),
@@ -39098,6 +39118,8 @@ var GajendraService = class {
       MAX_GENERATION_RETRIES
     );
   }
+  store;
+  sources;
   generationDeadlineMs;
   maxGenerationRetries;
   now;

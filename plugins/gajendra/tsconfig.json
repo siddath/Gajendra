@@ -9,7 +9,7 @@
     "exactOptionalPropertyTypes": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["node", "vitest/globals", "vite/client"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts", "vite.config.ts", "playwright.config.ts"]
 }

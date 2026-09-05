@@ -44,7 +44,7 @@ their next write, causing handled Ready rows to reappear without changing priori
 
 ## Build versus binary compatibility
 
-Source builds require macOS 13.5+, Xcode/Swift, and Node >=20. A production-style bundle is expected
+Source builds require macOS 13.5+, Xcode/Swift, and Node 20.19+ or 22.12+. A production-style bundle is expected
 to carry Node v24.19.0 with a verified checksum and notices. Neither source compatibility, a local
 ad-hoc signature, nor the exact-installed automated interaction receipt proves a clean-Mac,
 Gatekeeper-accepted, Developer ID-signed, notarized, or distribution-ready binary. Those are
