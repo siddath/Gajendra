@@ -9,23 +9,25 @@
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
 
-## Widget update and settings polish in validation
+## Locally verified widget update and settings polish
 
-The [independent widget-sizing update](docs/WIDGET-SIZING-2026-09-06.md) is implemented and installed
-locally. Compact, Comfortable, and Expanded change task layout; a separate slider changes the outer
-widget size on release. Preferences persist independently, old dimensions migrate once, and the
-settings popover remains interactive outside the card bounds.
+The [independent widget-sizing update](docs/WIDGET-SIZING-2026-09-06.md) is implemented and installed.
+Compact, Comfortable, and Expanded change task layout; a separate slider changes the outer widget
+size on release. Preferences persist independently, old dimensions migrate once, and the settings
+popover remains interactive outside the card bounds. Theme, Appearance, and Lotus position share
+an equally spaced dropdown column. Settings opening and task layout changes have short transitions
+that respect macOS Reduce Motion.
 
-Implementation/test commit `13d8fa1` passed all 21 gauntlet gates, including the full native,
-full-screen, widget-performance, and 102 browser journeys. The exact installed app also passed the
-bottom-right sizing journey, signature/parity verification, and direct UI inspection; priorities
-were unchanged and a verified rollback is retained. The notes retain an earlier 224 ms timing
-failure alongside its passing unchanged-code recheck and final full-run receipt.
+Implementation/test freeze `bd43025` passed all 21 gauntlet gates, including full native,
+synthetic full-screen, strict widget performance, and 102 browser journeys. The tested app is
+installed with signature/parity verification, unchanged priority data, an installed bottom-right
+interaction recheck, direct UI inspection, and a retained rollback.
+The notes preserve an earlier 224 ms timing failure alongside its passing unchanged-code recheck
+and both complete gauntlet receipts.
 
-The owner has authorized publication and merge, with equally aligned settings dropdowns and
-Reduce Motion-aware settings/layout transitions. Those additions are being validated before
-publication; the initial receipt above does not substitute for the final candidate checks. Later
-material in this file describes already-merged behavior or explicitly dated receipts.
+The owner authorized publication and merge. Current-head hosted CI and merge remain pending at
+this local verification boundary; public `main` is still `fbb9e60`. Later material in this file
+describes already-merged behavior or explicitly dated receipts.
 
 **Ready acknowledgement source release:** [PR #27](https://github.com/siddath/Gajendra/pull/27).
 It keeps Ready for Review independent of priority, adds a bounded exact-response acknowledgement,

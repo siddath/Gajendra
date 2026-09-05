@@ -49,9 +49,9 @@ requested dropdown alignment and motion changes require a new final receipt. The
 UTC (September 6 locally): 115 source tests plus five complete repeats, 17 browser journeys plus
 85 repeated journeys, native self-test/build, full native interaction, full-screen reopen, widget
 performance, live MCP, artifact validation, and zero production vulnerabilities. The preview
-executable also compiled. See [the machine-readable report](../evidence/gauntlet/report.json).
+executable also compiled. The final settings-polish receipt below supersedes this initial report.
 
-| Final native journey | Prewarmed reveal | Cold open | Warm open |
+| Initial native journey | Prewarmed reveal | Cold open | Warm open |
 | --- | ---: | ---: | ---: |
 | Full interaction | 36 ms | 84 ms | 85 ms |
 | Widget/performance | 38 ms | 89 ms | 84 ms |
@@ -73,10 +73,47 @@ unchanged with mode 0600. The previous app remains available as
 `~/Applications/Gajendra-rollback-20260906-widget-sizing.app`; the redundant temporary replacement
 was removed only after a complete file/symlink manifest comparison.
 
-### Settings polish and publication
+### Final settings-polish receipt
 
-The owner explicitly authorized publication and merge of the sizing update plus aligned dropdowns
-and settings/layout animation on September 6. The new native UI assertion checks equal dropdown
-bounds and spacing, selection of Dark then Auto through the native menu, independent sizing,
-reopening, and unchanged synthetic priority data. Final candidate checks and hosted CI must pass
-before merge. Physical VoiceOver and signed/notarized distribution remain outside these receipts.
+Implementation/test freeze: `bd43025d94bf46264c9be8c3517e7266cf8503bf`. Subsequent changes are notes
+and evidence only. `npm run check` passed; its initial sandboxed invocation could not bind the
+loopback test port and was rerun with localhost access. The complete gauntlet passed **21/21 gates**
+from 2026-09-05 20:09:42 through 20:18:52 UTC (September 6 locally). This includes 115 source tests
+plus five complete repeats, 102 browser journeys, native self-test/build/full interaction,
+synthetic full-screen reopen, strict widget performance, live MCP, artifact validation, and zero
+production vulnerabilities. See [the final machine-readable report](../evidence/gauntlet/report.json).
+
+The native settings journey asserts equal dropdown bounds and vertical spacing, changes Appearance
+to Dark and back to Auto through the popup, switches all three layouts without resizing, moves the
+slider by pointer and accessibility actions, checks reopening, and preserves synthetic priorities.
+The preview executable also compiled. Direct native inspection confirmed menu opening and
+selection, and a final inspection of the installed app confirmed the aligned controls with the
+user's existing layout and size preferences preserved. SwiftUI's intrinsic-width
+menu wrappers did not provide a full-width hit area; standard NSPopUpButton controls now fill the
+column. The test locates menu items from their owning popup to stay within its bounded AX traversal.
+
+| Final native journey | Prewarmed reveal | Cold open | Warm open |
+| --- | ---: | ---: | ---: |
+| Full interaction | 36 ms | 83 ms | 84 ms |
+| Widget/performance | 64 ms | 84 ms | 82 ms |
+
+The 200 ms budget remains unchanged. The strict widget journey emitted no AttributeGraph cycles.
+The initial 224 ms outlier described above remains part of the audit history; this run establishes
+passing same-host measurements, not a universal latency guarantee. Added animation guards were
+reviewed for macOS Reduce Motion; physical accessibility testing remains a separate boundary.
+
+### Final installed result and publication
+
+The final app is installed at `~/Applications/Gajendra.app`. Strict ad-hoc signature validation and
+native/service/bundled-Node parity against the tested build passed. Native SHA-256:
+`d8aeec48a6134403603747d5cf8622986ca2f6c5a92ccc2bc0ea990438000f6b`.
+Installation preserved priority state byte-for-byte. The installed bottom-right sizing/menu journey
+passed on an unchanged-build recheck. Its first attempt timed out locating the Dark menu option;
+both receipts are retained privately, and the cause of that isolated lookup failure was not
+established. The full gauntlet and focused pre-install journey passed the same selection assertion.
+The immediately previous build is retained at
+`~/Applications/Gajendra-rollback-20260906-settings-polish.app`.
+
+The owner explicitly authorized the sizing update, aligned dropdowns, settings/layout animation,
+publication, and merge on September 6. Current-head hosted CI and merge remain pending at this
+local receipt boundary. These local checks do not establish signed/notarized distribution readiness.
