@@ -1,0 +1,49 @@
+{
+  "benchmark": "gajendra-source-discovery-v1",
+  "node": "v26.3.0",
+  "platform": "darwin-arm64",
+  "candidates": 1000,
+  "projects": 20,
+  "selectedPerSource": 200,
+  "runs": 7,
+  "claude": {
+    "samplesMs": [
+      13.83,
+      13.02,
+      12.51,
+      12.02,
+      13.07,
+      12.67,
+      11.56
+    ],
+    "medianMs": 12.67,
+    "p95Ms": 13.83,
+    "minMs": 11.56,
+    "maxMs": 13.83,
+    "measurement": {
+      "directoriesRead": 20,
+      "candidateFiles": 1000,
+      "metadataStats": 1000
+    }
+  },
+  "grok": {
+    "samplesMs": [
+      14.66,
+      16.31,
+      15.23,
+      12.74,
+      13.17,
+      13.11,
+      12.57
+    ],
+    "medianMs": 13.17,
+    "p95Ms": 16.31,
+    "minMs": 12.57,
+    "maxMs": 16.31,
+    "measurement": {
+      "directoriesRead": 20,
+      "candidateFiles": 1000,
+      "metadataStats": 1000
+    }
+  }
+}

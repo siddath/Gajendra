@@ -33,7 +33,15 @@ receipts below remain dated evidence and do not substitute for those checks.
 The [Running investigation](docs/RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md) records a bounded
 metadata fallback for active desktop tasks omitted by the provider list, exact stale-branch
 reconciliation, and verified local recovery archives. The old performance worktree and four
-superseded branches have been retired; active dependency proposals remain open.
+superseded branches have been retired.
+
+## Dependency maintenance
+
+The [dependency review](docs/DEPENDENCY-REVIEW-2026-09-05.md) records the Zod update in
+[PR #29](https://github.com/siddath/Gajendra/pull/29) and completed TypeScript/Vite/Vitest migration
+in [PR #23](https://github.com/siddath/Gajendra/pull/23), including explicit benchmark/process-test
+runner ownership, asset types, source-build Node requirements, rebuilt artifacts, and current
+validation evidence. Earlier dated launch receipts below do not substitute for these checks.
 
 ## Current user-facing state
 

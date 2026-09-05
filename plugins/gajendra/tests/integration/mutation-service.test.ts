@@ -14,7 +14,7 @@ import { GajendraStoreRepository } from "../../src/server/store.js";
 import { hashReviewAcknowledgement } from "../../src/server/review-acknowledgements.js";
 
 const temporaryDirectories: string[] = [];
-const viteNode = createRequire(import.meta.url).resolve("vite-node/vite-node.mjs");
+const tsxLoader = createRequire(import.meta.url).resolve("tsx");
 const processWorker = fileURLToPath(new URL("../fixtures/mutation-process-worker.ts", import.meta.url));
 const faultWorker = fileURLToPath(new URL("../fixtures/move-before-fault-worker.ts", import.meta.url));
 const packageRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -45,7 +45,7 @@ describe("Gajendra mutation service", () => {
   it("serializes 40 independent Node processes through the private data-directory lock", async () => {
     const directory = await temporaryDirectory();
     const results = await Promise.all(Array.from({ length: 40 }, async (_, index) => {
-      const { stdout } = await runFile(process.execPath, [viteNode, processWorker], {
+      const { stdout } = await runFile(process.execPath, ["--import", tsxLoader, processWorker], {
         cwd: packageRoot,
         env: {
           ...process.env,
@@ -196,7 +196,7 @@ describe("Gajendra mutation service", () => {
       idempotency: [],
       reviewAcknowledgements: [],
     });
-    await expect(runFile(process.execPath, [viteNode, faultWorker], {
+    await expect(runFile(process.execPath, ["--import", tsxLoader, faultWorker], {
       cwd: packageRoot,
       env: { ...process.env, GAJENDRA_DATA_DIR: directory },
       timeout: 10_000,
