@@ -226,6 +226,8 @@ struct GajendraWidgetLayoutControls: View {
     @ObservedObject var settings: GajendraVisualSettings
     var onManageSources: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -239,6 +241,7 @@ struct GajendraWidgetLayoutControls: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: settings.hoverCardSize)
                 Text("Adjust task spacing and detail.")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -263,15 +266,34 @@ struct GajendraWidgetLayoutControls: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Divider()
-            Picker("Theme", selection: $settings.theme) {
-                ForEach(GajendraVisualTheme.allCases) { Text($0.title).tag($0) }
+            Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 12) {
+                GridRow {
+                    Text("Theme")
+                    GajendraSettingsPicker(
+                        title: "Theme", selection: $settings.theme,
+                        options: GajendraVisualTheme.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
+                GridRow {
+                    Text("Appearance")
+                    GajendraSettingsPicker(
+                        title: "Appearance", selection: $settings.appearance,
+                        options: GajendraAppearance.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
+                GridRow {
+                    Text("Lotus position")
+                    GajendraSettingsPicker(
+                        title: "Lotus position", selection: $settings.pillAnchor,
+                        options: GajendraPillAnchor.allCases, optionTitle: { $0.title }
+                    )
+                    .frame(maxWidth: .infinity).frame(height: 24)
+                }
             }
-            Picker("Appearance", selection: $settings.appearance) {
-                ForEach(GajendraAppearance.allCases) { Text($0.title).tag($0) }
-            }
-            Picker("Lotus position", selection: $settings.pillAnchor) {
-                ForEach(GajendraPillAnchor.allCases) { Text($0.title).tag($0) }
-            }
+            .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
             HStack {
                 Button("Manage AI tools…") {
                     dismiss()
@@ -283,8 +305,67 @@ struct GajendraWidgetLayoutControls: View {
         }
         .padding(20)
         .frame(width: 340)
+        .opacity(isPresented || reduceMotion ? 1 : 0)
+        .offset(y: isPresented || reduceMotion ? 0 : 4)
         .background(GajendraSettingsWindowMarker())
-        .onDisappear { settings.isAdjustingWidgetSize = false }
+        .onAppear {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) {
+                isPresented = true
+            }
+        }
+        .onDisappear {
+            isPresented = false
+            settings.isAdjustingWidgetSize = false
+        }
+    }
+
+}
+
+/// SwiftUI's macOS menu picker keeps its intrinsic button width inside a flexible frame.
+/// A native popup fills the shared column, including its entire clickable area.
+private struct GajendraSettingsPicker<Value: Hashable>: NSViewRepresentable {
+    let title: String
+    @Binding var selection: Value
+    let options: [Value]
+    let optionTitle: (Value) -> String
+
+    final class PopupButton: NSPopUpButton {
+        override var intrinsicContentSize: NSSize {
+            NSSize(width: NSView.noIntrinsicMetric, height: super.intrinsicContentSize.height)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        var parent: GajendraSettingsPicker
+        init(_ parent: GajendraSettingsPicker) { self.parent = parent }
+
+        @objc func selectOption(_ sender: NSPopUpButton) {
+            guard parent.options.indices.contains(sender.indexOfSelectedItem) else { return }
+            parent.selection = parent.options[sender.indexOfSelectedItem]
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> PopupButton {
+        let button = PopupButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectOption(_:))
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return button
+    }
+
+    func updateNSView(_ button: PopupButton, context: Context) {
+        context.coordinator.parent = self
+        let titles = options.map(optionTitle)
+        if button.itemTitles != titles {
+            button.removeAllItems()
+            button.addItems(withTitles: titles)
+        }
+        if let index = options.firstIndex(of: selection) {
+            button.selectItem(at: index)
+        }
+        button.setAccessibilityLabel(title)
     }
 }
 

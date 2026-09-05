@@ -1,6 +1,6 @@
 # Release gauntlet
 
-The current local widget-sizing candidate has a **passing local gauntlet receipt**:
+The initial widget-sizing implementation has a **passing local gauntlet receipt**:
 [`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records all 21 gates passing on
 2026-09-05 (19:17–19:25 UTC; September 6 locally) for implementation/test commit
 `13d8fa14d100a3efc695c6e779a10bcdf9d550ca`. It covers 115 source tests plus five complete repeats,
@@ -9,8 +9,8 @@ interaction including independent layout/size controls, synthetic full-screen re
 performance, final artifacts, and zero production vulnerabilities.
 
 The [widget-sizing notes](WIDGET-SIZING-2026-09-06.md) record the earlier failed timing sample,
-unchanged-code recheck, final timings, installed verification, and publication boundary. Public
-publication is awaiting explicit owner approval; there is no current-head hosted CI or merge receipt.
+unchanged-code recheck, final timings, installed verification, and publication boundary. The owner has since authorized publication and requested dropdown alignment and motion polish;
+those additions require a fresh final gauntlet and current-head hosted CI before merge.
 The previous dependency gauntlet remains available in
 [the merged PR #23 receipt](https://github.com/siddath/Gajendra/blob/fbb9e608eaaec53a15054c537439528ceef94376/evidence/gauntlet/report.json).
 

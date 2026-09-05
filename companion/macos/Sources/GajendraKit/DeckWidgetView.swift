@@ -1295,6 +1295,7 @@ public struct GajendraHoverCardView: View {
             publishInteractionState()
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.errorMessage)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: visualSettings.hoverCardSize)
     }
 
     private func publishInteractionState() {

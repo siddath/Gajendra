@@ -293,6 +293,33 @@ enum GajendraUITest {
         try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Open Gajendra settings", value: nil)).center)
         _ = try waitForElement(pid: pid, label: "Widget size")
 
+        let dropdownFrames = try ["Theme", "Appearance", "Lotus position"].map { label in
+            try elementFrame(waitForStableHittableElement(pid: pid, label: label, value: nil))
+        }
+        guard dropdownFrames.allSatisfy({ abs($0.minX - dropdownFrames[0].minX) <= 1
+            && abs($0.width - dropdownFrames[0].width) <= 1 }),
+              abs((dropdownFrames[1].midY - dropdownFrames[0].midY)
+                  - (dropdownFrames[2].midY - dropdownFrames[1].midY)) <= 1 else {
+            throw GajendraUITestError.failed("settings dropdowns do not share a column and equal spacing: \(dropdownFrames)")
+        }
+        for appearance in ["Dark", "Auto"] {
+            let popup = try waitForStableHittableElement(pid: pid, label: "Appearance", value: nil)
+            try tap(try elementFrame(popup).center)
+            // Start at the popup: its native menu can exceed the app-root traversal depth.
+            let deadline = Date().addingTimeInterval(timeout)
+            var option: AXUIElement?
+            repeat {
+                option = firstElement(in: popup, depth: 0, label: appearance)
+                if option != nil { break }
+                Thread.sleep(forTimeInterval: 0.05)
+            } while Date() < deadline
+            guard let option else {
+                throw GajendraUITestError.failed("appearance popup did not expose \(appearance)")
+            }
+            try tap(try elementFrame(option).center)
+            _ = try waitForElement(pid: pid, label: "Appearance", value: appearance)
+        }
+
         func selectLayout(_ title: String) throws {
             fputs("Sizing: selecting \(title)\n", stderr)
             let control = try waitForStableHittableElement(pid: pid, label: title, value: nil)

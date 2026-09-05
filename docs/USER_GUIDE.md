@@ -66,6 +66,8 @@ toggle a source or rescan.
 - Open the app menu to show or hide the lotus, manage sources, change appearance, or quit.
 - Open **Settings** in the widget or Organizer. **Task layout** selects
   Compact, Comfortable, or Expanded spacing and detail without changing the widget dimensions.
+  Settings opens with a brief transition, and layout changes animate smoothly. Both respect macOS
+  **Reduce Motion**. Theme, Appearance, and Lotus position use an aligned dropdown column.
   **Widget size** is an independent Minimum–Maximum slider; 0% means the smallest usable widget,
   not a hidden widget. Release the slider to apply its size. Both choices are saved. The maximum
   fits the available display and launcher position. Existing installations retain their previous starting dimensions on migration.

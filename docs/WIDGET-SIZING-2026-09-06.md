@@ -5,6 +5,11 @@ control task spacing, text scale, and detail. The separate Minimum–Maximum sli
 outer floating widget, and neither control overwrites the other choice. The Organizer uses the same
 settings view. Appearance, theme, launcher position, and source management remain available there.
 
+Theme, Appearance, and Lotus position share an equally spaced, full-width dropdown column. Native
+menus retain the selected-option checkmarks and accessible labels/values. Settings content enters
+with a 180 ms fade and four-point movement; task layout changes use a 200 ms ease-in/out transition.
+macOS Reduce Motion disables both added transitions. Animation does not drive outer window sizing.
+
 ## Cause and implementation
 
 Previously the three presets selected both content scale and outer window dimensions. The AppKit
@@ -37,10 +42,10 @@ and byte-identical synthetic priority state. Visual-preference mutations use a u
 UserDefaults suite; CFFIXED_USER_HOME alone did not isolate cfprefsd writes on this host. This journey runs in the ordinary and
 performance UI suites, and can be isolated with `GAJENDRA_UI_TEST_SCOPE=widget-sizing npm run companion:ui-test`.
 
-### Final local receipt
+### Initial sizing receipt (before settings polish)
 
-Implementation/test commit: `13d8fa14d100a3efc695c6e779a10bcdf9d550ca`. Later edits are documentation
-and evidence only. The complete gauntlet passed all 21 gates from 2026-09-05 19:17:06 through 19:25:24
+Initial implementation/test commit: `13d8fa14d100a3efc695c6e779a10bcdf9d550ca`. The subsequently
+requested dropdown alignment and motion changes require a new final receipt. The complete gauntlet passed all 21 gates from 2026-09-05 19:17:06 through 19:25:24
 UTC (September 6 locally): 115 source tests plus five complete repeats, 17 browser journeys plus
 85 repeated journeys, native self-test/build, full native interaction, full-screen reopen, widget
 performance, live MCP, artifact validation, and zero production vulnerabilities. The preview
@@ -57,7 +62,7 @@ recheck passed at 63/88/85 ms with no AttributeGraph cycles, and the final compl
 The outlier's cause was not established by a controlled experiment. These observations are not a
 cross-machine or provider-refresh performance guarantee.
 
-### Installed result and publication boundary
+### Initial installed result
 
 The exact app was installed at `~/Applications/Gajendra.app`, with strict ad-hoc signature validation
 and executable/service/runtime parity against the tested build. Native executable SHA-256:
@@ -68,8 +73,10 @@ unchanged with mode 0600. The previous app remains available as
 `~/Applications/Gajendra-rollback-20260906-widget-sizing.app`; the redundant temporary replacement
 was removed only after a complete file/symlink manifest comparison.
 
-At this local closeout, public `main` remains `fbb9e608eaaec53a15054c537439528ceef94376` and no PR was
-created. Automatic approval review blocked public publication and requires owner approval for this
-exact update to `siddath/Gajendra`. Current-head hosted CI and merge are therefore pending; old CI
-receipts are not claimed for this update. These checks do not establish physical VoiceOver or
-signed/notarized distribution readiness.
+### Settings polish and publication
+
+The owner explicitly authorized publication and merge of the sizing update plus aligned dropdowns
+and settings/layout animation on September 6. The new native UI assertion checks equal dropdown
+bounds and spacing, selection of Dark then Auto through the native menu, independent sizing,
+reopening, and unchanged synthetic priority data. Final candidate checks and hosted CI must pass
+before merge. Physical VoiceOver and signed/notarized distribution remain outside these receipts.
