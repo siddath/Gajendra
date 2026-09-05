@@ -32937,7 +32937,9 @@ var CodexAppServerClient = class {
   async listThreads() {
     await this.ensureReady();
     const threads = await listBoundedCodexThreads(async (params) => this.request("thread/list", params));
-    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env);
+    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env, {
+      readThread: (params) => this.request("thread/read", params)
+    });
     if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
     const reviews = await enrichCodexReviewSignals(
       runtimeThreads,
@@ -33380,7 +33382,7 @@ function codexCompletedAt(value, nowMs) {
 }
 async function enrichCodexRuntimeStatuses(threads, env = process.env, options = {}) {
   if (!isCodexActivityEnrichmentEnabled(env)) return threads;
-  if (threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
+  if (!options.readThread && threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
   const deadlineMs = boundedPositive(
     options.deadlineMs ?? environmentInteger(env.GAJENDRA_CODEX_ENRICHMENT_DEADLINE_MS),
     DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS,
@@ -33414,8 +33416,13 @@ async function enrichCodexRuntimeStatuses(threads, env = process.env, options = 
   if (heldThreadIds.size === 0) return threads;
   const activeThreadIds = new Set(threads.filter((thread) => codexStatusType(thread.status) === "active").map((thread) => thread.id));
   const candidates = threads.filter((thread) => codexStatusType(thread.status) !== "active" && heldThreadIds.has(thread.id) && Boolean(thread.path));
+  const knownIds = new Set(threads.map((thread) => thread.id));
+  const missingIds = options.readThread ? [...heldThreadIds].filter((id) => !knownIds.has(id)).slice(0, Math.min(MAX_BACKGROUND_THREADS_PER_SOURCE, Math.max(0, MAX_CODEX_THREAD_ROWS - threads.length))) : [];
+  const recovered = new Array(missingIds.length);
+  if (candidates.length === 0 && missingIds.length === 0) return threads;
   let nextCandidate = 0;
   let timedOut = false;
+  let recoveringMissingTasks = false;
   const readTail = options.readTail ?? readContainedRolloutTail;
   const worker = async () => {
     for (; ; ) {
@@ -33423,15 +33430,25 @@ async function enrichCodexRuntimeStatuses(threads, env = process.env, options = 
         timedOut = true;
         return;
       }
-      const thread = candidates[nextCandidate++];
-      if (!thread?.path) return;
+      const index = nextCandidate++;
+      if (index >= (recoveringMissingTasks ? missingIds.length : candidates.length)) return;
       try {
+        const missingId = recoveringMissingTasks ? missingIds[index] : void 0;
+        const thread = missingId && options.readThread ? recoverableDesktopThread(await beforeDeadline(
+          options.readThread({ threadId: missingId, includeTurns: false }),
+          remainingDeadlineMs(deadline),
+          "Codex runtime enrichment exceeded its total deadline."
+        ), missingId) : candidates[index];
+        if (!thread?.path) continue;
         const tail = await beforeDeadline(
           readTail(thread.path, realSessionsDirectory),
           remainingDeadlineMs(deadline),
           "Codex runtime enrichment exceeded its total deadline."
         );
-        if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) activeThreadIds.add(thread.id);
+        if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) {
+          activeThreadIds.add(thread.id);
+          if (missingId) recovered[index] = thread;
+        }
       } catch (error51) {
         if (error51 instanceof DeadlineExceededError) {
           timedOut = true;
@@ -33442,7 +33459,21 @@ async function enrichCodexRuntimeStatuses(threads, env = process.env, options = 
   };
   await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
   if (timedOut || Date.now() >= deadline) return threads;
-  return threads.map((thread) => activeThreadIds.has(thread.id) ? { ...thread, status: { type: "active" } } : thread);
+  const runtimeThreads = threads.map((thread) => activeThreadIds.has(thread.id) ? { ...thread, status: { type: "active" } } : thread);
+  recoveringMissingTasks = true;
+  nextCandidate = 0;
+  timedOut = false;
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, missingIds.length) }, () => worker()));
+  if (timedOut || Date.now() >= deadline) return runtimeThreads;
+  return [...runtimeThreads, ...recovered.filter((thread) => thread !== void 0).map((thread) => ({ ...thread, status: { type: "active" } }))];
+}
+function recoverableDesktopThread(response, expectedId) {
+  if (!response || typeof response !== "object" || !("thread" in response)) return void 0;
+  const value = response.thread;
+  if (!value || typeof value !== "object") return void 0;
+  const thread = value;
+  if (thread.id !== expectedId || typeof thread.source !== "string" || !["cli", "vscode", "appServer"].includes(thread.source) || thread.ephemeral !== false || thread.parentThreadId != null || thread.canAcceptDirectInput === false || !Array.isArray(thread.turns) || thread.turns.length !== 0 || typeof thread.path !== "string") return void 0;
+  return codexBaseThread(thread);
 }
 function heldCodexThreadIds(output, lockDirectory) {
   const normalizedDirectory = `${path2.resolve(lockDirectory)}${path2.sep}`;

@@ -8,7 +8,8 @@ priority state, source opt-in, candidate limits, the four-worker review cap, and
 No remote provider or transcript mutation. Stop when further gains are provider-bound or unproven.
 
 Same Mac, macOS 26.6 arm64, bundled Node v24.19.0. Base `94a84d3` was refreshed against GitHub.
-The earlier `codex/gajendra-performance` worktree remains intact, including its uncommitted notes.
+The earlier `codex/gajendra-performance` worktree was preserved during this audit. It was later
+retired with complete recovery evidence in the [branch reconciliation](RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md).
 Its historic measurements are retained in [the August report](PERFORMANCE-BENCHMARK-2026-08-23.md).
 This report supersedes that report's proposed next-round procedure.
 

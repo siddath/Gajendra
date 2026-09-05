@@ -102,6 +102,13 @@ optional, best-effort, metadata-only enrichment:
 3. Read no more than the final 256 KiB from that opened handle.
 4. Examine only allow-listed lifecycle markers after the last `task_complete` marker.
 
+If an interactive root is omitted from `thread/list`, a held lock can additionally seed a bounded
+`thread/read` with `includeTurns: false`. Empty turns, exact identity, non-ephemeral root metadata,
+path confinement, and active lifecycle evidence are all required. At most 200 missing IDs share
+the remaining activity budget and worker cap, within the 2,000-row combined ceiling. Optional
+recovery failure preserves an already-complete ordinary runtime pass. See the
+[Running reconciliation](RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md).
+
 Raw rollout content, messages, response items, and coordination payloads are not returned or
 persisted. Set `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable the feature. If any condition
 cannot be safely established, Gajendra preserves the app-server status.

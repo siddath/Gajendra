@@ -28,6 +28,13 @@ The production lockfile updates only `fast-uri` and `qs` to their fixed resoluti
 source update's local and hosted verification is recorded in the audit; the historical release
 receipts below remain dated evidence and do not substitute for those checks.
 
+## Running and branch reconciliation
+
+The [Running investigation](docs/RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md) records a bounded
+metadata fallback for active desktop tasks omitted by the provider list, exact stale-branch
+reconciliation, and verified local recovery archives. The old performance worktree and four
+superseded branches have been retired; active dependency proposals remain open.
+
 ## Current user-facing state
 
 | Area | Current merged behavior | Boundary that remains open |

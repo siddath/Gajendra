@@ -98,7 +98,9 @@ On macOS, optional Codex app-server enrichment may inspect a held path under
 allow-listed lifecycle markers after the final `task_complete` marker can affect a status. No raw
 tail, response item, message, or coordination payload is exposed or persisted. Set
 `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable it. Any failed lock/path/open/probe/parse keeps
-the app-server status rather than inferring activity.
+the app-server status rather than inferring activity. Missing held interactive roots may be read
+through metadata-only `thread/read`, then subjected to the same lifecycle/path guards within the
+remaining activity budget. Optional recovery failure does not erase completed listed-task enrichment.
 
 ## Native and release boundary
 
