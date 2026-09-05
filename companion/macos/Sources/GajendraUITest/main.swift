@@ -290,12 +290,12 @@ enum GajendraUITest {
         }
         let originalState = try Data(contentsOf: stateURL)
         let original = try sizingFrame(pid: pid, label: "original size")
-        try tap(try elementFrame(waitForElement(pid: pid, label: "Open Gajendra settings")).center)
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Open Gajendra settings", value: nil)).center)
         _ = try waitForElement(pid: pid, label: "Widget size")
 
         func selectLayout(_ title: String) throws {
             fputs("Sizing: selecting \(title)\n", stderr)
-            let control = try waitForElement(pid: pid, label: title)
+            let control = try waitForStableHittableElement(pid: pid, label: title, value: nil)
             try tap(try elementFrame(control).center)
             let selected = try waitForElement(pid: pid, label: title)
             guard (attribute(selected, kAXValueAttribute) as? NSNumber)?.intValue == 1 else {
@@ -334,11 +334,12 @@ enum GajendraUITest {
                 throw GajendraUITestError.failed("\(title) changed outer widget dimensions")
             }
         }
-        guard let pointerSlider = matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
-            .first(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
+        guard matchingElements(in: AXUIElementCreateApplication(pid), depth: 0, label: "Widget size")
+            .contains(where: { attribute($0, kAXRoleAttribute) as? String == kAXSliderRole }) else {
             throw GajendraUITestError.failed("pointer slider missing")
         }
-        let sliderFrame = try elementFrame(pointerSlider)
+        let stableSlider = try waitForStableHittableElement(pid: pid, label: "Widget size", value: nil)
+        let sliderFrame = try elementFrame(stableSlider)
         try drag(from: CGPoint(x: sliderFrame.minX + 8, y: sliderFrame.midY),
                  to: CGPoint(x: sliderFrame.midX, y: sliderFrame.midY))
         guard try sizingFrame(pid: pid, label: "pointer slider growth").width > original.width else {
@@ -357,7 +358,7 @@ enum GajendraUITest {
         guard try sizingFrame(pid: pid, label: "expanded at chosen size").size == middle.size else {
             throw GajendraUITestError.failed("layout overwrote slider choice")
         }
-        try tap(try elementFrame(waitForElement(pid: pid, label: "Done")).center)
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Done", value: nil)).center)
         try tapCurrentPill(pid: pid)
         try waitForCard(pid: pid, visible: false, label: "sizing close")
         try tapCurrentPill(pid: pid)
@@ -365,11 +366,11 @@ enum GajendraUITest {
             throw GajendraUITestError.failed("reopen lost chosen widget size")
         }
         // Restore the fixture's starting layout and size for the remaining interaction journey.
-        try tap(try elementFrame(waitForElement(pid: pid, label: "Open Gajendra settings")).center)
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Open Gajendra settings", value: nil)).center)
         _ = try waitForElement(pid: pid, label: "Widget size")
         try selectLayout("Compact")
         _ = try setSize(0)
-        try tap(try elementFrame(waitForElement(pid: pid, label: "Done")).center)
+        try tap(try elementFrame(waitForStableHittableElement(pid: pid, label: "Done", value: nil)).center)
         guard try Data(contentsOf: stateURL) == originalState else {
             throw GajendraUITestError.failed("visual controls changed priority state")
         }
