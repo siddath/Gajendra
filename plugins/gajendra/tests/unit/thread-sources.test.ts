@@ -568,6 +568,36 @@ describe("thread source adapters", () => {
     expect(JSON.stringify(result)).not.toContain(directory);
   });
 
+  it("stops scheduling Grok stats at overflow and drains pending reads before rejecting", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-stat-overflow-"));
+    temporaryDirectories.push(directory);
+    await Promise.all(Array.from({ length: 40 }, async (_, index) => {
+      const session = path.join(directory, "workspace", `session-${index}`);
+      await mkdir(session, { recursive: true });
+      await writeFile(path.join(session, "summary.json"), "{}");
+    }));
+    const measurement: DiscoveryMeasurement = { directoriesRead: 0, candidateFiles: 0, metadataStats: 0 };
+    await expect(recentGrokSummaryFiles(directory, { candidateLimit: 3, measurement }))
+      .rejects.toThrow("too many session summaries");
+    // At most the overflowing read plus the seven already-running workers can finish.
+    expect(measurement.metadataStats).toBeLessThanOrEqual(11);
+    const settled = { ...measurement };
+    await delay(10);
+    expect(measurement).toEqual(settled);
+  });
+
+  it("ignores missing Grok summaries without consuming the valid-file candidate budget", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-stat-missing-"));
+    temporaryDirectories.push(directory);
+    await Promise.all(Array.from({ length: 12 }, async (_, index) => {
+      const session = path.join(directory, "workspace", `session-${index}`);
+      await mkdir(session, { recursive: true });
+      if (index === 11) await writeFile(path.join(session, "summary.json"), "{}");
+    }));
+    const files = await recentGrokSummaryFiles(directory, { candidateLimit: 1 });
+    expect(files).toEqual([path.join(directory, "workspace", "session-11", "summary.json")]);
+  });
+
   it("selects the true newest Claude and Grok metadata within a bounded measured candidate scan", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-source-scan-"));
     temporaryDirectories.push(directory);

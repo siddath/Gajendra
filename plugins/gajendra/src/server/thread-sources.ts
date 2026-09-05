@@ -41,6 +41,7 @@ export const MAX_DISCOVERY_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE * 10;
 /** Limits concurrent provider/catalog reads; each configured catalog can itself be up to 2 MiB. */
 export const DEFAULT_SOURCE_COLLECTION_CONCURRENCY = 4;
 export const MAX_SOURCE_COLLECTION_CONCURRENCY = 8;
+const DISCOVERY_STAT_CONCURRENCY = MAX_SOURCE_COLLECTION_CONCURRENCY;
 
 export type DiscoveryMeasurement = {
   directoriesRead: number;
@@ -362,7 +363,7 @@ export async function recentClaudeSessionFiles(projectsDirectory: string, option
     if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Claude Code has no local session directory yet.");
     throw error;
   }
-  const files: Array<{ path: string; modifiedAt: number }> = [];
+  const candidates: string[] = [];
   for (const project of projects) {
     if (!project.isDirectory()) continue;
     const directory = path.join(projectsDirectory, project.name);
@@ -370,15 +371,13 @@ export async function recentClaudeSessionFiles(projectsDirectory: string, option
     for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
       if (measurement) measurement.candidateFiles += 1;
-      if (files.length >= candidateLimit) {
+      if (candidates.length >= candidateLimit) {
         throw new Error("Claude Code has too many session files to inspect safely.");
       }
-      const filePath = path.join(directory, entry.name);
-      const fileStat = await stat(filePath);
-      if (measurement) measurement.metadataStats += 1;
-      files.push({ path: filePath, modifiedAt: fileStat.mtimeMs });
+      candidates.push(path.join(directory, entry.name));
     }
   }
+  const files = await statDiscoveryCandidates(candidates, measurement, false);
   return files.sort((left, right) => right.modifiedAt - left.modifiedAt).slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE).map((file) => file.path);
 }
 
@@ -393,34 +392,70 @@ export async function recentGrokSummaryFiles(sessionsDirectory: string, options:
     if (isMissing(error)) throw new SourceUnavailableError("not-configured", "Grok Build has no local session directory yet.");
     throw error;
   }
-  const summaries: Array<{ path: string; modifiedAt: number }> = [];
+  const candidates: string[] = [];
   for (const workspace of workspaces) {
     if (!workspace.isDirectory()) continue;
     const directory = path.join(sessionsDirectory, workspace.name);
     if (measurement) measurement.directoriesRead += 1;
     for (const entry of await boundedDirectoryEntries(directory, directoryBudget)) {
       if (!entry.isDirectory()) continue;
-      const summaryPath = path.join(directory, entry.name, "summary.json");
-      try {
-        const summaryStat = await stat(summaryPath);
-        if (!summaryStat.isFile()) continue;
-        if (measurement) {
-          measurement.candidateFiles += 1;
-          measurement.metadataStats += 1;
-        }
-        if (summaries.length >= candidateLimit) {
-          throw new Error("Grok Build has too many session summaries to inspect safely.");
-        }
-        summaries.push({ path: summaryPath, modifiedAt: summaryStat.mtimeMs });
-      } catch (error) {
-        if (!isMissing(error)) throw error;
-      }
+      candidates.push(path.join(directory, entry.name, "summary.json"));
     }
   }
+  const summaries = await statDiscoveryCandidates(candidates, measurement, true, candidateLimit);
   return summaries
     .sort((left, right) => right.modifiedAt - left.modifiedAt)
     .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE)
     .map((summary) => summary.path);
+}
+
+async function statDiscoveryCandidates(
+  candidates: string[],
+  measurement: DiscoveryMeasurement | undefined,
+  ignoreMissing: boolean,
+  candidateLimit = MAX_DISCOVERY_CANDIDATES,
+): Promise<Array<{ path: string; modifiedAt: number }>> {
+  const results: Array<{ path: string; modifiedAt: number } | undefined> = new Array(candidates.length);
+  let nextCandidate = 0;
+  let accepted = 0;
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      if (failed) return;
+      const index = nextCandidate++;
+      const candidate = candidates[index];
+      if (!candidate) return;
+      try {
+        const metadata = await stat(candidate);
+        if (!metadata.isFile()) {
+          if (ignoreMissing) continue;
+          throw new Error("Claude Code session metadata is not a regular file.");
+        }
+        if (measurement) {
+          measurement.metadataStats += 1;
+          if (ignoreMissing) measurement.candidateFiles += 1;
+        }
+        accepted += 1;
+        if (accepted > candidateLimit) {
+          throw new Error("Grok Build has too many session summaries to inspect safely.");
+        }
+        results[index] = { path: candidate, modifiedAt: metadata.mtimeMs };
+      } catch (error) {
+        if (!ignoreMissing || !isMissing(error)) {
+          failed = true;
+          throw error;
+        }
+      }
+    }
+  };
+  // Stop scheduling on the first error, and drain already-started reads before returning.
+  const outcomes = await Promise.allSettled(Array.from(
+    { length: Math.min(DISCOVERY_STAT_CONCURRENCY, candidates.length) },
+    () => worker(),
+  ));
+  const failure = outcomes.find((outcome) => outcome.status === "rejected");
+  if (failure?.status === "rejected") throw failure.reason;
+  return results.filter(isPresent);
 }
 
 export async function readClaudeThreadMetadata(filePath: string, executable: string): Promise<AgentThread | null> {
@@ -914,8 +949,8 @@ function isMissing(error: unknown): boolean {
   return Boolean(error && typeof error === "object" && "code" in error && error.code === "ENOENT");
 }
 
-function isPresent<T>(value: T | null): value is T {
-  return value !== null;
+function isPresent<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
 }
 
 class SourceUnavailableError extends Error {

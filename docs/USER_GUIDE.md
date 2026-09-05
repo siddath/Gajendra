@@ -205,3 +205,15 @@ source tool continues to own the session and every Open action.
 
 For the precise persisted fields and adapter limits, see [Security](../SECURITY.md),
 [Architecture](ARCHITECTURE.md), and [Thread sources](THREAD_SOURCES.md).
+
+## Ask your AI to set focus
+
+With the Gajendra plugin loaded in your AI host, say “Make this task my focus now”, “Add this task
+to Focus”, or “Mark this task important”. The assistant reads the current Gajendra snapshot,
+resolves the exact task, and applies your request. If the host does not identify the current task
+or the name is ambiguous, the assistant asks which task. NOW remains singular and belongs to Focus.
+The plugin does not listen to every conversation or infer priority from what you discuss.
+
+After a plugin update, reload the AI host so it discovers the model-visible actions. A host without
+Gajendra's MCP server cannot apply these changes. “Mark this response reviewed” clears that exact
+Ready response; a later response can appear again, and provider task status is unchanged.

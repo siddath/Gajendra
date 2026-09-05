@@ -87,6 +87,7 @@ npm run companion:test
 npm run companion:build
 npm run companion:ui-test
 npm run companion:ui-performance-test
+npm run companion:ui-fullscreen-test
 npm run companion:validate
 npm run companion:bundle-readiness
 npm run launch:assets
@@ -119,3 +120,12 @@ fixture. The app surfaces are actual SwiftUI output; no private provider thread 
 
 See [Host validation](HOST_VALIDATION.md), [release checklist](RELEASE_CHECKLIST.md), and
 [STATUS.md](../STATUS.md) for the pending proof sequence.
+
+## Full-screen reopen regression
+
+`npm run companion:ui-fullscreen-test` creates its own synthetic full-screen host window and
+waits for AppKit's transition-complete notification. It verifies the real launcher hit, details
+card visibility on that active Space, and the Dock/reopen path without changing a user document.
+Compact reopen returns to the last external app after Launch Services dispatches its activation,
+then presents the nonactivating overlay. Explicit Organizer and source-setup windows keep their
+ordinary activation behavior. The last external application reference is memory-only.

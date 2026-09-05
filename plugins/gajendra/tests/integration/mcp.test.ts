@@ -24,7 +24,7 @@ describe("Gajendra MCP contract", () => {
     const tools = await client.listTools();
     const open = tools.tools.find((tool) => tool.name === "gajendra_open");
 
-    expect(open?._meta?.ui).toEqual({ resourceUri: RESOURCE_URI, visibility: ["app"] });
+    expect(open?._meta?.ui).toEqual({ resourceUri: RESOURCE_URI, visibility: ["app", "model"] });
     expect(open?._meta?.["openai/ui"]).toEqual({ entrypoints: [{ type: "global" }] });
     expect(tools.tools.filter((tool) => tool._meta?.["openai/ui"])).toHaveLength(1);
     expect(tools.tools).toHaveLength(9);
@@ -36,10 +36,16 @@ describe("Gajendra MCP contract", () => {
     expect(firstContent && "text" in firstContent ? firstContent.text : "").toContain("One clear focus across your AI tools.");
   });
 
-  it("keeps tools app-only and returns a meaningful non-UI fallback", async () => {
+  it("exposes requested focus and review actions to the model while preserving the app", async () => {
     const { client } = await connect();
     const tools = await client.listTools();
     expect(tools.tools.every((tool) => (tool._meta?.ui as { visibility?: string[] })?.visibility?.includes("app"))).toBe(true);
+    expect(tools.tools.filter((tool) =>
+      (tool._meta?.ui as { visibility?: string[] })?.visibility?.includes("model"),
+    ).map((tool) => tool.name).sort()).toEqual([
+      "gajendra_open", "gajendra_set_current", "gajendra_set_level", "gajendra_set_review_acknowledged",
+    ]);
+
 
     const result = await client.callTool({ name: "gajendra_open", arguments: {} });
     expect(result.structuredContent).toMatchObject({ focusGuide: 5, source: "fixture" });

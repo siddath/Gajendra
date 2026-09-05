@@ -1,0 +1,269 @@
+{
+  "scope": "same-host local diagnostic; synthetic discovery; aggregate-only live timings",
+  "baseline": "94a84d3 plus local conversational-tool changes; old discovery code",
+  "runtime": "v24.19.0",
+  "discovery": {
+    "discovery-after-1": {
+      "benchmark": "gajendra-source-discovery-v1",
+      "node": "v24.19.0",
+      "platform": "darwin-arm64",
+      "candidates": 1000,
+      "projects": 20,
+      "selectedPerSource": 200,
+      "runs": 7,
+      "claude": {
+        "samplesMs": [
+          21,
+          15.55,
+          15.43,
+          15.79,
+          14.17,
+          12.94,
+          13.51
+        ],
+        "medianMs": 15.43,
+        "p95Ms": 21,
+        "minMs": 12.94,
+        "maxMs": 21,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      },
+      "grok": {
+        "samplesMs": [
+          13.64,
+          14.13,
+          12.96,
+          13.65,
+          13.11,
+          12.63,
+          12.79
+        ],
+        "medianMs": 13.11,
+        "p95Ms": 14.13,
+        "minMs": 12.63,
+        "maxMs": 14.13,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      }
+    },
+    "discovery-after-2": {
+      "benchmark": "gajendra-source-discovery-v1",
+      "node": "v24.19.0",
+      "platform": "darwin-arm64",
+      "candidates": 1000,
+      "projects": 20,
+      "selectedPerSource": 200,
+      "runs": 7,
+      "claude": {
+        "samplesMs": [
+          15.44,
+          13.26,
+          13.44,
+          13.16,
+          13.38,
+          12.33,
+          13.3
+        ],
+        "medianMs": 13.3,
+        "p95Ms": 15.44,
+        "minMs": 12.33,
+        "maxMs": 15.44,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      },
+      "grok": {
+        "samplesMs": [
+          13.02,
+          13.14,
+          13.12,
+          13.32,
+          13.03,
+          13.02,
+          13.62
+        ],
+        "medianMs": 13.12,
+        "p95Ms": 13.62,
+        "minMs": 13.02,
+        "maxMs": 13.62,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      }
+    },
+    "discovery-before-1": {
+      "benchmark": "gajendra-source-discovery-v1",
+      "node": "v24.19.0",
+      "platform": "darwin-arm64",
+      "candidates": 1000,
+      "projects": 20,
+      "selectedPerSource": 200,
+      "runs": 7,
+      "claude": {
+        "samplesMs": [
+          20.33,
+          20.42,
+          21.27,
+          30.56,
+          33.7,
+          35.22,
+          23.27
+        ],
+        "medianMs": 23.27,
+        "p95Ms": 35.22,
+        "minMs": 20.33,
+        "maxMs": 35.22,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      },
+      "grok": {
+        "samplesMs": [
+          23.9,
+          22.15,
+          23.83,
+          20.23,
+          20.73,
+          20.1,
+          19.48
+        ],
+        "medianMs": 20.73,
+        "p95Ms": 23.9,
+        "minMs": 19.48,
+        "maxMs": 23.9,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      }
+    },
+    "discovery-before-2": {
+      "benchmark": "gajendra-source-discovery-v1",
+      "node": "v24.19.0",
+      "platform": "darwin-arm64",
+      "candidates": 1000,
+      "projects": 20,
+      "selectedPerSource": 200,
+      "runs": 7,
+      "claude": {
+        "samplesMs": [
+          24.82,
+          23.85,
+          25.62,
+          22.81,
+          21.98,
+          21.01,
+          19.79
+        ],
+        "medianMs": 22.81,
+        "p95Ms": 25.62,
+        "minMs": 19.79,
+        "maxMs": 25.62,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      },
+      "grok": {
+        "samplesMs": [
+          22.95,
+          21.76,
+          23.93,
+          21.59,
+          21.48,
+          22.05,
+          21.27
+        ],
+        "medianMs": 21.76,
+        "p95Ms": 23.93,
+        "minMs": 21.27,
+        "maxMs": 23.93,
+        "measurement": {
+          "directoriesRead": 20,
+          "candidateFiles": 1000,
+          "metadataStats": 1000
+        }
+      }
+    }
+  },
+  "liveRefreshSamples": [
+    {
+      "warmup": true,
+      "totalMs": 12342.68,
+      "initializeMs": 116.32,
+      "listMs": 8234.5,
+      "reviewWallMs": 3733,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 5863.58,
+      "initializeMs": 83.81,
+      "listMs": 3657.65,
+      "reviewWallMs": 1929.63,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 5789.86,
+      "initializeMs": 131.63,
+      "listMs": 3312.34,
+      "reviewWallMs": 2164.1,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 6023.63,
+      "initializeMs": 41.03,
+      "listMs": 3153.94,
+      "reviewWallMs": 2631.1,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 5331.3,
+      "initializeMs": 37.95,
+      "listMs": 3247.3,
+      "reviewWallMs": 1854.84,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 6130.15,
+      "initializeMs": 52.02,
+      "listMs": 3303.56,
+      "reviewWallMs": 2576.12,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 5334.8,
+      "initializeMs": 37.85,
+      "listMs": 2991.16,
+      "reviewWallMs": 2107.81,
+      "snapshotError": false
+    },
+    {
+      "warmup": false,
+      "totalMs": 5887.36,
+      "initializeMs": 41.24,
+      "listMs": 3515.13,
+      "reviewWallMs": 2140.68,
+      "snapshotError": false
+    }
+  ]
+}

@@ -4,7 +4,7 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-08-25
+**Reconciled:** 2026-09-05
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
@@ -15,6 +15,19 @@ preserves Running precedence, removes duplicate compact lane controls and priori
 and updates the matching source, privacy, tests, launch evidence, and public copy. Hosted and merge
 receipts remain distinct from the local receipts below.
 
+## September focus and performance update
+
+[PR #31](https://github.com/siddath/Gajendra/pull/31) and the [September audit](docs/PERFORMANCE-AUDIT-2026-09-05.md) records the conversational MCP actions,
+bounded discovery changes, full-screen reopen work, raw aggregate timings, and current validation
+boundaries. Claude metadata discovery improved 34–42% and Grok 37–40% across two controlled rounds;
+these are adapter measurements, not a faster-current-live-refresh claim. The older performance
+worktree remains intact, and its concurrent Codex runtime/review proposal was rejected because it
+changed candidate-selection and failure semantics.
+
+The production lockfile updates only `fast-uri` and `qs` to their fixed resolutions. The current
+source update's local and hosted verification is recorded in the audit; the historical release
+receipts below remain dated evidence and do not substitute for those checks.
+
 ## Current user-facing state
 
 | Area | Current merged behavior | Boundary that remains open |
@@ -24,7 +37,7 @@ receipts remain distinct from the local receipts below.
 | Ready for Review | Provider-completed work appears independently of priority and opens the exact Task/Review destination. Opening does not clear it. A Ready-only green action reversibly acknowledges the exact response without changing NOW, Focus, Important, or Running; later or corrected evidence reappears. Expanded compact view shows five rows and the exact Organizer overflow. | Codex currently supplies built-in completion evidence; Claude Code, Cursor, and Grok are not guessed ready. A 1,024-thread receipt ceiling rejects overflow visibly instead of evicting handled work. |
 | Ready sync fix | One exact safe legacy `completedAt: null` summary is treated as missing evidence for that candidate only. It no longer suppresses valid completed siblings. The derived 70-second source-generation envelope no longer races the 30-second stale-lock marker; at 85 seconds the native watchdog initiates TERM/KILL, followed by process-group and pipe cleanup. It is not a strict response-by-85s SLO. Private items, errors on purported completed turns, malformed shapes, invalid/future timestamps, timeouts, and unsupported metadata still fail the built-in batch closed. | The provider does not expose a trustworthy human opened/unread field, so Gajendra does not claim one. |
 | Test isolation | Native transition proof mutates only a temporary synthetic catalog. Browser automation selects a bounded OS-assigned loopback port unless an explicit test port is supplied, so an interrupted preview on fixed port `4173` no longer creates that deterministic failure. | Automated real-window proof does not replace physical VoiceOver or clean-Mac testing; a narrow port-release-to-bind race remains possible. |
-| Launcher and performance | The circular launcher has no clipped rectangular blur, recovers the inactive first click, and prewarms the card. Three final widget samples measured median 47 ms prewarmed, 85 ms cold, and 86 ms warm against 58/86/85 ms at the exact pre-change revision; all paths stayed under the local 200 ms budget. | Same-host automation is not a cross-machine performance claim; the system AX tree did not expose the status item. |
+| Launcher and performance | The circular launcher has no clipped rectangular blur, recovers the inactive first click, and prewarms the card. Three August release widget samples measured median 47 ms prewarmed, 85 ms cold, and 86 ms warm against 58/86/85 ms at the exact pre-change revision; all paths stayed under the local 200 ms budget. | Same-host automation is not a cross-machine performance claim; the system AX tree did not expose the status item. |
 | Sources and privacy | Codex, Claude Code, Cursor, and Grok adapters are explicit and bounded. Gajendra persists namespaced IDs, its own priority metadata, and bounded hashed review acknowledgements—not titles, prompts, transcripts, credentials, review bodies, destinations, or provider databases. | Installed-provider and clean-account proof remain separate. |
 | Native app | macOS 13.5 source build, bundled Node v24.19.0/notices, service parity, strict ad-hoc codesign verification, and local bundle readiness pass. | Developer ID, notarization, stapling, Gatekeeper, clean-Mac, and binary distribution are not complete. |
 | Mobile | A documentation-only transport/security plan exists. | No listener, relay, mobile app, credential, signing, or store submission exists. |

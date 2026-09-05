@@ -636,10 +636,11 @@ describe("Gajendra mutation service", () => {
     const directory = await temporaryDirectory();
     const repository = new GajendraStoreRepository(directory);
     let collections = 0;
+    let clock = 0;
     const churningSources = {
       collect: async (preferences: Record<string, boolean>) => {
         collections += 1;
-        await delay(5);
+        clock += 5;
         await repository.transaction(async (current) => ({
           value: undefined,
           next: {
@@ -653,7 +654,9 @@ describe("Gajendra mutation service", () => {
       close: async () => undefined,
     };
     const service = new GajendraService(repository, churningSources, {
-      generationDeadlineMs: 100,
+      // This case proves retry exhaustion, not a 100ms disk/scheduler deadline.
+      // Use the production time envelope; deadline exhaustion has separate clock tests.
+      now: () => clock,
       maxGenerationRetries: 1,
     });
 
@@ -670,11 +673,8 @@ describe("Gajendra mutation service", () => {
 
     const collectionsBeforeSnapshot = collections;
     const snapshot = await service.snapshot();
-    // The absolute deadline may stop the snapshot before or after its one permitted retry.
-    // Prove the upper bound and authoritative fallback instead of requiring scheduler timing to
-    // produce exactly two more provider collections.
-    expect(collections).toBeGreaterThanOrEqual(collectionsBeforeSnapshot);
-    expect(collections).toBeLessThanOrEqual(collectionsBeforeSnapshot + 2);
+    // The injected service clock isolates the retry-cap contract from disk/scheduler load.
+    expect(collections).toBe(collectionsBeforeSnapshot + 2);
     expect(snapshot).toMatchObject({ error: expect.stringContaining("changed repeatedly"), focus: [], important: [], available: [] });
     expect(snapshot.revision).toBe((await repository.read()).revision);
   });
