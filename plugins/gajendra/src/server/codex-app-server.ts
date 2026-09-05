@@ -105,6 +105,8 @@ export type CodexActivityEnrichmentOptions = {
   listOpenFiles?: (lockDirectory: string, env: NodeJS.ProcessEnv) => Promise<string>;
   resolveSessionsDirectory?: (sessionsDirectory: string) => Promise<string>;
   readTail?: (filePath: string, sessionsDirectory: string) => Promise<{ text: string; truncated: boolean }>;
+  /** Metadata-only recovery for held desktop tasks omitted by thread/list. */
+  readThread?: (params: { threadId: string; includeTurns: false }) => Promise<unknown>;
 };
 
 export type CodexReviewEnrichmentOptions = {
@@ -186,7 +188,9 @@ export class CodexAppServerClient {
     const threads = await listBoundedCodexThreads(async (params) => (
       this.request("thread/list", params) as Promise<CodexThreadListPage>
     ));
-    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env);
+    const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env, {
+      readThread: (params) => this.request("thread/read", params),
+    });
     if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
 
     const reviews = await enrichCodexReviewSignals(
@@ -758,7 +762,7 @@ export async function enrichCodexRuntimeStatuses(
   options: CodexActivityEnrichmentOptions = {},
 ): Promise<CodexThread[]> {
   if (!isCodexActivityEnrichmentEnabled(env)) return threads;
-  if (threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
+  if (!options.readThread && threads.every((thread) => codexStatusType(thread.status) === "active")) return threads;
   const deadlineMs = boundedPositive(
     options.deadlineMs ?? environmentInteger(env.GAJENDRA_CODEX_ENRICHMENT_DEADLINE_MS),
     DEFAULT_CODEX_ENRICHMENT_DEADLINE_MS,
@@ -797,8 +801,16 @@ export async function enrichCodexRuntimeStatuses(
   const candidates = threads.filter((thread) => (
     codexStatusType(thread.status) !== "active" && heldThreadIds.has(thread.id) && Boolean(thread.path)
   ));
+  const knownIds = new Set(threads.map((thread) => thread.id));
+  // Recovery shares the existing activity deadline/workers and the global row ceiling. Never
+  // expand discovery to every source kind (which would include internal agent conversations).
+  const missingIds = options.readThread ? [...heldThreadIds].filter((id) => !knownIds.has(id))
+    .slice(0, Math.min(MAX_BACKGROUND_THREADS_PER_SOURCE, Math.max(0, MAX_CODEX_THREAD_ROWS - threads.length))) : [];
+  const recovered: Array<CodexThread | undefined> = new Array(missingIds.length);
+  if (candidates.length === 0 && missingIds.length === 0) return threads;
   let nextCandidate = 0;
   let timedOut = false;
+  let recoveringMissingTasks = false;
   const readTail = options.readTail ?? readContainedRolloutTail;
   const worker = async (): Promise<void> => {
     for (;;) {
@@ -806,15 +818,27 @@ export async function enrichCodexRuntimeStatuses(
         timedOut = true;
         return;
       }
-      const thread = candidates[nextCandidate++];
-      if (!thread?.path) return;
+      const index = nextCandidate++;
+      if (index >= (recoveringMissingTasks ? missingIds.length : candidates.length)) return;
       try {
+        const missingId = recoveringMissingTasks ? missingIds[index] : undefined;
+        const thread = missingId && options.readThread
+          ? recoverableDesktopThread(await beforeDeadline(
+            options.readThread({ threadId: missingId, includeTurns: false }),
+            remainingDeadlineMs(deadline),
+            "Codex runtime enrichment exceeded its total deadline.",
+          ), missingId)
+          : candidates[index];
+        if (!thread?.path) continue;
         const tail = await beforeDeadline(
           readTail(thread.path, realSessionsDirectory),
           remainingDeadlineMs(deadline),
           "Codex runtime enrichment exceeded its total deadline.",
         );
-        if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) activeThreadIds.add(thread.id);
+        if (rolloutTailShowsActiveTurn(tail.text, tail.truncated)) {
+          activeThreadIds.add(thread.id);
+          if (missingId) recovered[index] = thread;
+        }
       } catch (error) {
         if (error instanceof DeadlineExceededError) {
           timedOut = true;
@@ -829,9 +853,35 @@ export async function enrichCodexRuntimeStatuses(
   // A deadline is all-or-nothing: do not present a partly enriched status set as authoritative.
   if (timedOut || Date.now() >= deadline) return threads;
 
-  return threads.map((thread) => activeThreadIds.has(thread.id)
+  const runtimeThreads = threads.map((thread) => activeThreadIds.has(thread.id)
     ? { ...thread, status: { type: "active" } }
     : thread);
+  // Optional recovery gets only the remaining budget. Its failure must not erase a complete
+  // established runtime pass, or one slow omitted task could hide all known Running tasks.
+  recoveringMissingTasks = true;
+  nextCandidate = 0;
+  timedOut = false;
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, missingIds.length) }, () => worker()));
+  if (timedOut || Date.now() >= deadline) return runtimeThreads;
+  return [...runtimeThreads, ...recovered
+    .filter((thread): thread is CodexThread => thread !== undefined)
+    .map((thread) => ({ ...thread, status: { type: "active" } }))];
+}
+
+function recoverableDesktopThread(response: unknown, expectedId: string): CodexThread | undefined {
+  if (!response || typeof response !== "object" || !("thread" in response)) return undefined;
+  const value = response.thread;
+  if (!value || typeof value !== "object") return undefined;
+  const thread = value as CodexThread & {
+    source?: unknown; turns?: unknown; ephemeral?: unknown; parentThreadId?: unknown;
+    canAcceptDirectInput?: unknown;
+  };
+  // Only user-facing interactive roots with no hydrated turns qualify. A lock alone is never
+  // Running evidence; the caller still confines and checks the bounded lifecycle tail.
+  if (thread.id !== expectedId || typeof thread.source !== "string" || !["cli", "vscode", "appServer"].includes(thread.source)
+    || thread.ephemeral !== false || thread.parentThreadId != null || thread.canAcceptDirectInput === false
+    || !Array.isArray(thread.turns) || thread.turns.length !== 0 || typeof thread.path !== "string") return undefined;
+  return codexBaseThread(thread);
 }
 
 export function heldCodexThreadIds(output: string, lockDirectory: string): Set<string> {
@@ -859,7 +909,7 @@ export function rolloutTailShowsActiveTurn(tail: string, truncated = false): boo
     } catch {
       continue;
     }
-    if (event.type === "event_msg" && event.payload?.type === "task_complete") return false;
+    if (event.type === "event_msg" && (event.payload?.type === "task_complete" || event.payload?.type === "turn_aborted")) return false;
     if (event.type === "session_meta") return false;
     if (event.type === "turn_context") return true;
     if (event.type === "event_msg" && isAllowedActivityMarker(event.payload?.type)) return true;
@@ -873,7 +923,7 @@ export function isCodexActivityEnrichmentEnabled(env: NodeJS.ProcessEnv = proces
 }
 
 function isAllowedActivityMarker(value: unknown): boolean {
-  return value === "token_count" || value === "turn_started" || value === "turn_in_progress";
+  return value === "token_count" || value === "task_started" || value === "turn_started" || value === "turn_in_progress";
 }
 
 function codexStatusType(status: CodexThread["status"]): string {

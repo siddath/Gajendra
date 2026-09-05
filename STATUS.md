@@ -21,12 +21,19 @@ receipts remain distinct from the local receipts below.
 bounded discovery changes, full-screen reopen work, raw aggregate timings, and current validation
 boundaries. Claude metadata discovery improved 34–42% and Grok 37–40% across two controlled rounds;
 these are adapter measurements, not a faster-current-live-refresh claim. The older performance
-worktree remains intact, and its concurrent Codex runtime/review proposal was rejected because it
+worktree was subsequently retired with verified recovery material, and its concurrent Codex runtime/review proposal was rejected because it
 changed candidate-selection and failure semantics.
 
 The production lockfile updates only `fast-uri` and `qs` to their fixed resolutions. The current
 source update's local and hosted verification is recorded in the audit; the historical release
 receipts below remain dated evidence and do not substitute for those checks.
+
+## Running and branch reconciliation
+
+The [Running investigation](docs/RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md) records a bounded
+metadata fallback for active desktop tasks omitted by the provider list, exact stale-branch
+reconciliation, and verified local recovery archives. The old performance worktree and four
+superseded branches have been retired; active dependency proposals remain open.
 
 ## Current user-facing state
 
