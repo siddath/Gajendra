@@ -144,6 +144,7 @@ public enum GajendraHoverCardSizing {
 
 @MainActor
 public final class GajendraVisualSettings: ObservableObject {
+    public static let settingsWindowIdentifier = NSUserInterfaceItemIdentifier("gajendra-settings-popover")
     public static let themeKey = "gajendra.visual.theme"
     public static let appearanceKey = "gajendra.visual.appearance"
     public static let hoverCardSizeKey = "gajendra.visual.hover-card-size"
@@ -282,6 +283,20 @@ struct GajendraWidgetLayoutControls: View {
         }
         .padding(20)
         .frame(width: 340)
+        .background(GajendraSettingsWindowMarker())
         .onDisappear { settings.isAdjustingWidgetSize = false }
     }
+}
+
+/// NSPopover windows do not consistently expose their owner through NSWindow.parent.
+private struct GajendraSettingsWindowMarker: NSViewRepresentable {
+    final class MarkerView: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.identifier = GajendraVisualSettings.settingsWindowIdentifier
+        }
+    }
+
+    func makeNSView(context: Context) -> MarkerView { MarkerView() }
+    func updateNSView(_ view: MarkerView, context: Context) {}
 }

@@ -12,8 +12,9 @@ resize subscriber also read the model synchronously from an `@Published` notific
 before the stored value changes. That allowed a resize to use the previous selection. Window sizing
 now observes only the numeric widget preference, on the next main-queue delivery, without stacking
 resize animations. During a pointer drag, the displayed value changes immediately and the widget
-resizes on release, keeping the slider stationary under the pointer. Settings-popover child windows
-are treated as part of the widget for outside-click dismissal.
+resizes on release, keeping the slider stationary under the pointer. The settings window is
+explicitly identified as part of the widget for outside-click dismissal; a parent-window check alone
+was insufficient during the full native journey.
 
 The slider retains the existing preset dimensions as migration points: 0 = 560 × 570,
 25 = 660 × 610, and 50 = 760 × 680 points on the reference display. Its new maximum is 960 × 850.

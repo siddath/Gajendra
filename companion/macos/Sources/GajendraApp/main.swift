@@ -713,6 +713,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             if window === cardWindow { return true }
             ancestor = window.parent
         }
+        if event.window?.identifier == GajendraVisualSettings.settingsWindowIdentifier { return true }
         if event.window === cardWindow || event.window === pillWindow { return true }
         if event.window?.level == .popUpMenu { return true }
         return pointTargetsPresentedSurface(NSEvent.mouseLocation)
@@ -720,6 +721,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func pointTargetsPresentedSurface(_ point: CGPoint) -> Bool {
         pillWindow?.frame.contains(point) == true || cardWindow?.frame.contains(point) == true
+            || NSApplication.shared.windows.contains {
+                $0.identifier == GajendraVisualSettings.settingsWindowIdentifier
+                    && $0.isVisible && $0.frame.contains(point)
+            }
     }
 
     private func dismissCardIfOutside() {
