@@ -8,7 +8,8 @@ priority state, source opt-in, candidate limits, the four-worker review cap, and
 No remote provider or transcript mutation. Stop when further gains are provider-bound or unproven.
 
 Same Mac, macOS 26.6 arm64, bundled Node v24.19.0. Base `94a84d3` was refreshed against GitHub.
-The earlier `codex/gajendra-performance` worktree remains intact, including its uncommitted notes.
+The earlier `codex/gajendra-performance` worktree was preserved during this audit. It was later
+retired with complete recovery evidence in the [branch reconciliation](RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md).
 Its historic measurements are retained in [the August report](PERFORMANCE-BENCHMARK-2026-08-23.md).
 This report supersedes that report's proposed next-round procedure.
 
@@ -104,7 +105,7 @@ are outside this change. No direct dependency ranges were changed.
 
 Implementation boundary: `e63a948`; [PR #31](https://github.com/siddath/Gajendra/pull/31).
 Subsequent changes record evidence and documentation only. The September 5 local
-[gauntlet receipt](../evidence/gauntlet/report.json) contains **21 passing gates**:
+[gauntlet receipt](https://github.com/siddath/Gajendra/blob/72742c6778e7db4d957f7af9aef90f9591021fd2/evidence/gauntlet/report.json) contains **21 passing gates**:
 
 - 112/112 source tests, plus five complete repeated passes; source checks, build, and plugin validation.
 - 17/17 browser journeys and 85/85 repeated journeys, including keyboard, accessibility, and reflow.

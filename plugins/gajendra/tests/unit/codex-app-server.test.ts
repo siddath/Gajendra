@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CodexAppServerClient,
@@ -67,6 +67,17 @@ describe("Codex desktop runtime status", () => {
     expect(rolloutTailShowsActiveTurn(hostile)).toBe(false);
     expect(rolloutTailShowsActiveTurn(JSON.stringify({ type: "event_msg", payload: { type: "turn_in_progress", content: "ignored" } }))).toBe(true);
     expect(JSON.stringify({ active: rolloutTailShowsActiveTurn(hostile) })).not.toContain("private");
+  });
+
+  it("stops Running on an aborted turn and resumes only when later lifecycle evidence arrives", () => {
+    const events = [
+      JSON.stringify({ type: "turn_context" }),
+      JSON.stringify({ type: "event_msg", payload: { type: "token_count" } }),
+      JSON.stringify({ type: "event_msg", payload: { type: "turn_aborted" } }),
+    ];
+    expect(rolloutTailShowsActiveTurn(events.join("\n"))).toBe(false);
+    events.push(JSON.stringify({ type: "event_msg", payload: { type: "task_started" } }));
+    expect(rolloutTailShowsActiveTurn(events.join("\n"))).toBe(true);
   });
 
   it("allows local activity enrichment to be explicitly disabled", () => {
@@ -662,6 +673,90 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     }
   }, 15_000);
 
+  it("recovers omitted interactive roots only from metadata and held active lifecycle evidence", async () => {
+    const directory = "/private/synthetic-codex";
+    const sessions = path.join(directory, "sessions");
+    const ids = Array.from({ length: 9 }, (_, i) => syntheticThreadId(800 + i));
+    const base = [{ id: ids[0]!, status: "active" }];
+    const calls: unknown[] = [];
+    const tails: string[] = [];
+    const result = await enrichCodexRuntimeStatuses(base, { CODEX_HOME: directory }, {
+      listOpenFiles: async () => lockOutput(path.join(directory, "thread-writer-locks"), ids),
+      resolveSessionsDirectory: async () => sessions,
+      readThread: async (params) => {
+        calls.push(params);
+        const index = ids.indexOf(params.threadId);
+        return { thread: {
+          id: index === 8 ? syntheticThreadId(999) : params.threadId,
+          name: "Safe task", path: path.join(sessions, `${params.threadId}.jsonl`),
+          source: index === 3 ? { subAgent: "review" } : "vscode",
+          parentThreadId: index === 4 ? ids[0] : null,
+          ephemeral: index === 5, canAcceptDirectInput: index !== 6,
+          turns: index === 7 ? [{ private: "never-retain-turns" }] : [],
+          privateField: "never-retain-extra", status: "notLoaded",
+        } };
+      },
+      readTail: async (file) => {
+        tails.push(file);
+        return { text: JSON.stringify({ type: "event_msg", payload: {
+          type: file.includes(ids[2]!) ? "task_complete" : "turn_in_progress",
+        } }), truncated: false };
+      },
+    });
+    expect(result.map((thread) => thread.id)).toEqual(ids.slice(0, 2));
+    expect(result[1]?.status).toEqual({ type: "active" });
+    expect(calls).toEqual(ids.slice(1).map((threadId) => ({ threadId, includeTurns: false })));
+    expect(tails).toHaveLength(2);
+    expect(JSON.stringify(result)).not.toContain("never-retain");
+  });
+
+  it("bounds omitted-task metadata reads and drops recovery on deadline or unsafe paths", async () => {
+    const directory = "/private/synthetic-codex";
+    const sessions = path.join(directory, "sessions");
+    const ids = Array.from({ length: 205 }, (_, i) => syntheticThreadId(1000 + i));
+    let calls = 0;
+    let inFlight = 0;
+    let peak = 0;
+    const discovery = {
+      listOpenFiles: async () => lockOutput(path.join(directory, "thread-writer-locks"), ids),
+      resolveSessionsDirectory: async () => sessions,
+    };
+    const result = await enrichCodexRuntimeStatuses([], { CODEX_HOME: directory }, {
+      ...discovery, maxConcurrency: 3,
+      readThread: async ({ threadId }) => {
+        calls += 1; inFlight += 1; peak = Math.max(peak, inFlight);
+        await delay(1); inFlight -= 1;
+        return { thread: { id: threadId, path: "/outside/sessions.jsonl", source: "vscode", ephemeral: false, turns: [] } };
+      },
+      readTail: async () => { throw new Error("unconfined path"); },
+    });
+    expect(result).toEqual([]);
+    expect(calls).toBe(200);
+    expect(peak).toBeLessThanOrEqual(3);
+    const base = [{ id: ids[0]!, status: "notLoaded", path: path.join(sessions, `${ids[0]}.jsonl`) }];
+    let stalledCalls = 0;
+    vi.useFakeTimers();
+    try {
+      const pending = enrichCodexRuntimeStatuses(base, { CODEX_HOME: directory }, {
+        ...discovery, maxConcurrency: 2, deadlineMs: 20,
+        readTail: async () => ({ text: JSON.stringify({ type: "turn_context" }), truncated: false }),
+        readThread: async () => { stalledCalls += 1; return new Promise(() => undefined); },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stalledCalls).toBe(2);
+      await vi.advanceTimersByTimeAsync(20);
+      await expect(pending).resolves.toEqual([{ ...base[0], status: { type: "active" } }]);
+    } finally {
+      vi.useRealTimers();
+    }
+    let cappedCalls = 0;
+    const full = Array.from({ length: 2_000 }, (_, i) => ({ id: syntheticThreadId(3000 + i), status: "active" }));
+    await expect(enrichCodexRuntimeStatuses(full, { CODEX_HOME: directory }, {
+      ...discovery, readThread: async () => { cappedCalls += 1; return {}; },
+    })).resolves.toEqual(full);
+    expect(cappedCalls).toBe(0);
+  });
+
   it("uses a small bounded rollout worker pool and abandons a whole timed-out enrichment", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-codex-enrichment-"));
     try {
@@ -691,18 +786,25 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       expect(enriched.every((thread) => typeof thread.status === "object" && thread.status.type === "active")).toBe(true);
 
       let stalledCalls = 0;
-      const base = await enrichCodexRuntimeStatuses(threads, { CODEX_HOME: directory }, {
-        maxConcurrency: 2,
-        deadlineMs: 20,
-        listOpenFiles: async () => lockOutput(lockDirectory, ids),
-        resolveSessionsDirectory: async () => sessionsDirectory,
-        readTail: async () => {
-          stalledCalls += 1;
-          return new Promise(() => undefined);
-        },
-      });
-      expect(stalledCalls).toBe(2);
-      expect(base).toEqual(threads);
+      vi.useFakeTimers();
+      try {
+        const pending = enrichCodexRuntimeStatuses(threads, { CODEX_HOME: directory }, {
+          maxConcurrency: 2,
+          deadlineMs: 20,
+          listOpenFiles: async () => lockOutput(lockDirectory, ids),
+          resolveSessionsDirectory: async () => sessionsDirectory,
+          readTail: async () => {
+            stalledCalls += 1;
+            return new Promise(() => undefined);
+          },
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(stalledCalls).toBe(2);
+        await vi.advanceTimersByTimeAsync(20);
+        await expect(pending).resolves.toEqual(threads);
+      } finally {
+        vi.useRealTimers();
+      }
 
       const failed = await enrichCodexRuntimeStatuses(threads.slice(0, 2), { CODEX_HOME: directory }, {
         listOpenFiles: async () => lockOutput(lockDirectory, ids.slice(0, 2)),
