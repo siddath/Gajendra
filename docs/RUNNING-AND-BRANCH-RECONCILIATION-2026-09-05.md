@@ -99,3 +99,14 @@ renewed source, gauntlet, hosted, and installed checks recorded below.
   are attached to PR #32. Older green checks are not substituted for this final revision.
 - Final local plugin installation verified all nine deployed artifacts; its server, the installed
   app server, and the tested source build match by SHA-256.
+
+### Hosted deadline-fixture correction
+
+At `055ccc3`, the plugin CI job exhausted two tests' 20 ms wall-clock budgets before their
+expected workers started. Production correctly returned its bounded fallback. The tests now use
+controlled timers for those sections, assert that exactly two workers start before advancing the
+same 20 ms deadline, and assert the same fallback outcomes. Real timers are restored in `finally`.
+`npm run check` passes all 115 tests after this test-only correction. Runtime source and built/
+installed server SHA-256 remain unchanged (`1ef19d534ffd58e059f2a86d3f7f65af48fc180c06c55e5a7172656156f855bb`),
+so the full 21-gate native/browser/runtime receipt above still applies to those unchanged artifacts.
+Hosted checks must pass again on the final test/documentation revision before merge.

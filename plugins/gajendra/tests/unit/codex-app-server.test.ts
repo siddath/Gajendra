@@ -2,7 +2,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   CodexAppServerClient,
@@ -735,12 +735,20 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
     expect(peak).toBeLessThanOrEqual(3);
     const base = [{ id: ids[0]!, status: "notLoaded", path: path.join(sessions, `${ids[0]}.jsonl`) }];
     let stalledCalls = 0;
-    await expect(enrichCodexRuntimeStatuses(base, { CODEX_HOME: directory }, {
-      ...discovery, maxConcurrency: 2, deadlineMs: 20,
-      readTail: async () => ({ text: JSON.stringify({ type: "turn_context" }), truncated: false }),
-      readThread: async () => { stalledCalls += 1; return new Promise(() => undefined); },
-    })).resolves.toEqual([{ ...base[0], status: { type: "active" } }]);
-    expect(stalledCalls).toBe(2);
+    vi.useFakeTimers();
+    try {
+      const pending = enrichCodexRuntimeStatuses(base, { CODEX_HOME: directory }, {
+        ...discovery, maxConcurrency: 2, deadlineMs: 20,
+        readTail: async () => ({ text: JSON.stringify({ type: "turn_context" }), truncated: false }),
+        readThread: async () => { stalledCalls += 1; return new Promise(() => undefined); },
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(stalledCalls).toBe(2);
+      await vi.advanceTimersByTimeAsync(20);
+      await expect(pending).resolves.toEqual([{ ...base[0], status: { type: "active" } }]);
+    } finally {
+      vi.useRealTimers();
+    }
     let cappedCalls = 0;
     const full = Array.from({ length: 2_000 }, (_, i) => ({ id: syntheticThreadId(3000 + i), status: "active" }));
     await expect(enrichCodexRuntimeStatuses(full, { CODEX_HOME: directory }, {
@@ -778,18 +786,25 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
       expect(enriched.every((thread) => typeof thread.status === "object" && thread.status.type === "active")).toBe(true);
 
       let stalledCalls = 0;
-      const base = await enrichCodexRuntimeStatuses(threads, { CODEX_HOME: directory }, {
-        maxConcurrency: 2,
-        deadlineMs: 20,
-        listOpenFiles: async () => lockOutput(lockDirectory, ids),
-        resolveSessionsDirectory: async () => sessionsDirectory,
-        readTail: async () => {
-          stalledCalls += 1;
-          return new Promise(() => undefined);
-        },
-      });
-      expect(stalledCalls).toBe(2);
-      expect(base).toEqual(threads);
+      vi.useFakeTimers();
+      try {
+        const pending = enrichCodexRuntimeStatuses(threads, { CODEX_HOME: directory }, {
+          maxConcurrency: 2,
+          deadlineMs: 20,
+          listOpenFiles: async () => lockOutput(lockDirectory, ids),
+          resolveSessionsDirectory: async () => sessionsDirectory,
+          readTail: async () => {
+            stalledCalls += 1;
+            return new Promise(() => undefined);
+          },
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(stalledCalls).toBe(2);
+        await vi.advanceTimersByTimeAsync(20);
+        await expect(pending).resolves.toEqual(threads);
+      } finally {
+        vi.useRealTimers();
+      }
 
       const failed = await enrichCodexRuntimeStatuses(threads.slice(0, 2), { CODEX_HOME: directory }, {
         listOpenFiles: async () => lockOutput(lockDirectory, ids.slice(0, 2)),

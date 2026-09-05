@@ -9,6 +9,11 @@ browser UI, repeated reliability checks, final artifacts, and dependency audit. 
 includes 115/115 source tests, 17/17 primary browser journeys, five repeated source-test passes, and
 85/85 repeated browser journeys.
 
+The runtime gauntlet boundary is `055ccc3`. A subsequent test-only controlled-clock correction
+addresses hosted scheduler sensitivity; its renewed 115-test source check and final hosted results
+are documented in the [Running reconciliation](RUNNING-AND-BRANCH-RECONCILIATION-2026-09-05.md).
+The production source and runtime artifacts are unchanged by that correction.
+
 This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
 Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is
 the required rerun sequence if the candidate changes.
