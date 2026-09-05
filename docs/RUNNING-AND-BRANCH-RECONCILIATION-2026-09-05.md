@@ -12,7 +12,8 @@ new dependency proposals merely because their branches exist.
 
 The live Codex task API reported an active user-owned task that the installed Codex app-server's
 ordinary `thread/list` omitted. A held writer lock existed; `thread/read` with `includeTurns: false`
-returned its metadata, with no turns, and its bounded lifecycle tail confirmed activity. It was a
+returned its metadata, with no turns, and its bounded lifecycle tail contained activity markers. A later lifecycle check established
+that `turn_aborted` ended that turn; the existing parser incorrectly ignored that terminal marker. It was a
 non-ephemeral interactive root, not an internal subagent. Its exact identity was checked privately;
 no task titles, IDs, paths, prompts, or provider responses are published here.
 
@@ -36,8 +37,10 @@ remain unchanged. Recovered rows are active only: they do not enter the Ready-ca
 alter review acknowledgement semantics. If the provider continues omitting a task after it stops,
 this fallback does not invent history or Ready evidence for it.
 
-The live development probe recovered the omitted active task while correctly leaving independently
-completed tasks non-running. Synthetic regressions cover empty/all-active listings, metadata-only
+The initial live recovery probe found the omitted task, but its Running classification was invalid
+because the parser ignored an intervening `turn_aborted`. That probe is not claimed as active-task
+proof. The fix now treats `turn_aborted` as terminal and recognizes a subsequent explicit
+`task_started`; synthetic tests prove omitted active-task recovery and abort/restart transitions. Synthetic regressions cover empty/all-active listings, metadata-only
 requests, exact identity, internal/ephemeral/child/direct-input exclusion, content rejection,
 completed tails, worker/deadline/row limits, and preserving known Running evidence when optional
 recovery stalls. Path containment uses the existing tested no-follow bounded reader.
@@ -64,8 +67,8 @@ mode 0600; they are not committed or uploaded. The initial cleanup proposal was 
 review; the subsequent non-force cleanup passed after complete preservation and exact tree/patch
 reconciliation evidence were supplied.
 
-Remote feature refs already deleted after merge were pruned. Only the current fix branch and main
-remain locally. Open dependency PRs #23 (major development-toolchain updates) and #29 (Zod update)
+Remote feature refs already deleted after merge were pruned. At cleanup completion, only the current fix branch and main
+remained locally; the fix branch is eligible for removal after its merged tree is verified. Open dependency PRs #23 (major development-toolchain updates) and #29 (Zod update)
 are active proposals, not completed/stale feature branches; they are retained.
 
 ## Validation record
@@ -73,4 +76,26 @@ are active proposals, not completed/stale feature branches; they are retained.
 The first sandboxed source run hit an OS loopback-bind denial. The permitted source check passed
 114 tests. An initial gauntlet stopped on the unchanged native launcher move-mode precondition;
 that failed run is not passing evidence. Review then tightened optional-recovery timeout isolation.
-Final source, gauntlet, hosted, and installed receipts are recorded after that final code boundary.
+The initial implementation `e46e40e` passed 114 source tests, all 21 local gauntlet gates, and both
+hosted jobs. Live parity then exposed the ignored interruption marker, so those receipts do not
+prove the final correction. [PR #32](https://github.com/siddath/Gajendra/pull/32) remains gated on
+renewed source, gauntlet, hosted, and installed checks recorded below.
+
+
+### Final correction receipts
+
+- Final `npm run check`: 115/115 source tests, typecheck, build, script and plugin validation passed.
+- Native full journey: 32/81/82 ms prewarmed/cold/warm; dedicated widget: 56/86/89 ms. Both passed
+  under the existing 200 ms budget. Full-screen launcher/reopen passed; no UI assertion was weakened.
+- [Private-identity-free parity receipt](../evidence/performance/2026-09-05-running-parity.json):
+  the final source active IDs matched the host, which was stable before and after the snapshot.
+- The installed final app/server/runtime match the tested build; the card opens in the real interface.
+  Saved priority/review state is byte-identical to the pre-install backup. The verified original app
+  rollback is preserved; the known superseded interim generated bundle was removed.
+- Final [gauntlet](../evidence/gauntlet/report.json): all 21 gates passed, including five repeated
+  115-test source runs, 17 primary browser journeys, 85 repeated browser journeys, accessibility,
+  native/live/build checks, and zero production dependency vulnerabilities.
+- Hosted checks for the final correction must pass before merge; final PR and merged-main results
+  are attached to PR #32. Older green checks are not substituted for this final revision.
+- Final local plugin installation verified all nine deployed artifacts; its server, the installed
+  app server, and the tested source build match by SHA-256.

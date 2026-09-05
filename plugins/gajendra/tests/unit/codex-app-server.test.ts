@@ -69,6 +69,17 @@ describe("Codex desktop runtime status", () => {
     expect(JSON.stringify({ active: rolloutTailShowsActiveTurn(hostile) })).not.toContain("private");
   });
 
+  it("stops Running on an aborted turn and resumes only when later lifecycle evidence arrives", () => {
+    const events = [
+      JSON.stringify({ type: "turn_context" }),
+      JSON.stringify({ type: "event_msg", payload: { type: "token_count" } }),
+      JSON.stringify({ type: "event_msg", payload: { type: "turn_aborted" } }),
+    ];
+    expect(rolloutTailShowsActiveTurn(events.join("\n"))).toBe(false);
+    events.push(JSON.stringify({ type: "event_msg", payload: { type: "task_started" } }));
+    expect(rolloutTailShowsActiveTurn(events.join("\n"))).toBe(true);
+  });
+
   it("allows local activity enrichment to be explicitly disabled", () => {
     expect(isCodexActivityEnrichmentEnabled({})).toBe(true);
     expect(isCodexActivityEnrichmentEnabled({ GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: "off" })).toBe(false);

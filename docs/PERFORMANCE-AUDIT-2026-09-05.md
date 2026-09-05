@@ -105,7 +105,7 @@ are outside this change. No direct dependency ranges were changed.
 
 Implementation boundary: `e63a948`; [PR #31](https://github.com/siddath/Gajendra/pull/31).
 Subsequent changes record evidence and documentation only. The September 5 local
-[gauntlet receipt](../evidence/gauntlet/report.json) contains **21 passing gates**:
+[gauntlet receipt](https://github.com/siddath/Gajendra/blob/72742c6778e7db4d957f7af9aef90f9591021fd2/evidence/gauntlet/report.json) contains **21 passing gates**:
 
 - 112/112 source tests, plus five complete repeated passes; source checks, build, and plugin validation.
 - 17/17 browser journeys and 85/85 repeated journeys, including keyboard, accessibility, and reflow.

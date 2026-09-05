@@ -909,7 +909,7 @@ export function rolloutTailShowsActiveTurn(tail: string, truncated = false): boo
     } catch {
       continue;
     }
-    if (event.type === "event_msg" && event.payload?.type === "task_complete") return false;
+    if (event.type === "event_msg" && (event.payload?.type === "task_complete" || event.payload?.type === "turn_aborted")) return false;
     if (event.type === "session_meta") return false;
     if (event.type === "turn_context") return true;
     if (event.type === "event_msg" && isAllowedActivityMarker(event.payload?.type)) return true;
@@ -923,7 +923,7 @@ export function isCodexActivityEnrichmentEnabled(env: NodeJS.ProcessEnv = proces
 }
 
 function isAllowedActivityMarker(value: unknown): boolean {
-  return value === "token_count" || value === "turn_started" || value === "turn_in_progress";
+  return value === "token_count" || value === "task_started" || value === "turn_started" || value === "turn_in_progress";
 }
 
 function codexStatusType(status: CodexThread["status"]): string {

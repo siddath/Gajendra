@@ -95,7 +95,7 @@ ceiling rather than silently evicting another handled response.
 On macOS, optional Codex app-server enrichment may inspect a held path under
 `~/.codex/thread-writer-locks`. The matching rollout is realpath-confined beneath
 `~/.codex/sessions`, opened without following links, and bounded to its final 256 KiB. Only
-allow-listed lifecycle markers after the final `task_complete` marker can affect a status. No raw
+allow-listed lifecycle markers after the final `task_complete` or `turn_aborted` marker can affect a status. No raw
 tail, response item, message, or coordination payload is exposed or persisted. Set
 `GAJENDRA_CODEX_ACTIVITY_ENRICHMENT=off` to disable it. Any failed lock/path/open/probe/parse keeps
 the app-server status rather than inferring activity. Missing held interactive roots may be read
