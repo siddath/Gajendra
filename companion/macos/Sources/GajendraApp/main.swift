@@ -221,7 +221,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         observeDesktopChanges()
         model.cleanupResumeScripts()
         configureLaunchAtLogin()
-        model.refresh()
+        model.refresh(prepared: true)
         if !UserDefaults.standard.bool(forKey: pillHiddenKey) {
             showPill(on: preferredScreen())
         }
@@ -361,7 +361,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         popover.contentViewController?.view.window?.makeKey()
         surfaceRefreshLifecycle.revealPopover()
         startSurfaceRefresh()
-        model.refresh()
+        model.refresh(prepared: true)
     }
 
     private func showOrganizer() {
@@ -533,7 +533,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func toggleCardFromPill() {
         guard !pillEditController.isEditing else { return }
-        if cardPresentation.toggle() {
+        let isVisibleOnActiveSpace = cardWindow.map { $0.isVisible && $0.isOnActiveSpace } ?? false
+        if cardPresentation.toggle(isVisibleOnActiveSpace: isVisibleOnActiveSpace) {
             presentCardSurface()
         } else {
             removeCardDismissalMonitors()
@@ -549,7 +550,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             return
         }
         if !cardPresentation.isPresented {
-            _ = cardPresentation.toggle()
+            _ = cardPresentation.toggle(isVisibleOnActiveSpace: false)
         }
         presentCardSurface(animated: !prewarmed)
     }
@@ -635,7 +636,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             guard let self,
                   self.cardPresentation.isPresented,
                   self.cardWindow?.cardAnimationGeneration == generation else { return }
-            self.model.refresh()
+            self.model.refresh(prepared: true)
         }
     }
 
@@ -728,7 +729,9 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func dismissCardIfOutside() {
-        if !pointTargetsPresentedSurface(NSEvent.mouseLocation) { dismissPresentedCard() }
+        if !pointTargetsPresentedSurface(NSEvent.mouseLocation) {
+            dismissPresentedCard()
+        }
     }
 
     private func focusCardSearch() {
@@ -1171,6 +1174,8 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         stopSurfaceRefresh()
     }
 
+    private var lastProviderRefresh = Date.distantPast
+
     private func startSurfaceRefresh() {
         surfaceRefreshLifecycle.reconcile(
             cardSurfaceVisible: cardWindow?.isVisible == true,
@@ -1179,8 +1184,9 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         surfaceRefreshTimer?.invalidate()
         surfaceRefreshTimer = nil
         guard surfaceRefreshLifecycle.shouldPoll else { return }
+        lastProviderRefresh = Date()
         surfaceRefreshTimer = Timer.scheduledTimer(
-            withTimeInterval: GajendraSurfaceRefreshPolicy.interval,
+            withTimeInterval: 5,
             repeats: true
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -1206,7 +1212,12 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             modelIsMutating: model.isMutating,
             interactionState: cardInteractionSession.state
         ) else { return }
-        model.refresh()
+        if Date().timeIntervalSince(lastProviderRefresh) >= GajendraSurfaceRefreshPolicy.interval {
+            lastProviderRefresh = Date()
+            model.refresh(prepared: true)
+        } else {
+            model.syncRevision()
+        }
     }
 
     func popoverDidClose(_ notification: Notification) {

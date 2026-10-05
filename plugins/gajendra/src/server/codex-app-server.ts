@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, accessSync } from "node:fs";
 import { open, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
+import { CodexReviewCache, metadataHash, type CachedReview } from "./metadata-cache.js";
 
 import {
   isRunningThreadStatus,
@@ -13,6 +14,28 @@ import {
 } from "../shared/contracts.js";
 
 type JsonRpcResponse = { id: number; result?: unknown; error?: { code?: number; message?: string } };
+
+export function resolveCodexExecutable(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: string = process.platform,
+  isExecutable: (candidate: string) => boolean = (candidate) => {
+    try { accessSync(candidate, constants.X_OK); return true; } catch { return false; }
+  },
+): string {
+  const explicit = env.GAJENDRA_CODEX_BIN || env.AADI_CODEX_BIN || env.PRIORITY_DECK_CODEX_BIN;
+  if (explicit) return explicit;
+  if (platform === "darwin") {
+    const candidates = [
+      "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+      "/Applications/ChatGPT.app/Contents/Resources/codex",
+      "/opt/homebrew/bin/codex",
+      "/usr/local/bin/codex",
+    ];
+    const installed = candidates.find(isExecutable);
+    if (installed) return installed;
+  }
+  return "codex";
+}
 type OutputChildProcess = Pick<ChildProcess, "pid" | "kill"> & {
   stdout: Readable;
   stderr: Readable;
@@ -110,6 +133,8 @@ export type CodexActivityEnrichmentOptions = {
 };
 
 export type CodexReviewEnrichmentOptions = {
+  cache?: Map<string, CachedReview>;
+  cacheMaxAgeMs?: number;
   /** Bound the number of newest Codex candidates inspected during one visible source refresh. */
   maxCandidates?: number;
   /** Test seam; metadata-only turn summaries never exceed four concurrent requests. */
@@ -174,6 +199,8 @@ export class CodexAppServerClient {
   private ready: Promise<void> | null = null;
   private experimentalApiEnabled = false;
   private experimentalTurnsUnsupported = false;
+  private fastListingSupported = true;
+  private lastReconciledAt = Date.now();
 
   constructor(
     requestTimeoutMs = resolveRpcTimeout(),
@@ -183,20 +210,40 @@ export class CodexAppServerClient {
     this.stdoutLineLimit = resolveCodexAppServerStdoutLineLimit(env);
   }
 
-  async listThreads(): Promise<CodexThreadWithReview[]> {
+  async listThreads(options: { forceFreshReviews?: boolean } = {}): Promise<CodexThreadWithReview[]> {
     await this.ensureReady();
-    const threads = await listBoundedCodexThreads(async (params) => (
-      this.request("thread/list", params) as Promise<CodexThreadListPage>
-    ));
+    // The supported metadata-only API avoids scanning/repairing every rollout on every poll.
+    // Keep a bounded periodic reconciliation for metadata which a provider has not indexed yet.
+    const requestedInterval = Number(this.env.GAJENDRA_CODEX_RECONCILE_INTERVAL_MS ?? 300_000);
+    const interval = Number.isFinite(requestedInterval) && requestedInterval >= 0
+      ? Math.min(requestedInterval, 86_400_000) : 300_000;
+    const fast = this.env.GAJENDRA_CODEX_FAST_LIST !== "off" && this.fastListingSupported
+      && Date.now() - this.lastReconciledAt < interval;
+    const list = (metadataOnly: boolean) => listBoundedCodexThreads(params => this.request("thread/list", {
+      ...params, ...(metadataOnly ? { useStateDbOnly: true } : {}),
+    }) as Promise<CodexThreadListPage>);
+    let threads: CodexThread[];
+    try { threads = await list(fast); }
+    catch (error) {
+      if (!fast || !(error instanceof CodexAppServerRpcError) || error.code !== -32602) throw error;
+      this.fastListingSupported = false;
+      threads = await list(false);
+    }
+    if (!fast || !this.fastListingSupported) this.lastReconciledAt = Date.now();
     const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env, {
       readThread: (params) => this.request("thread/read", params),
     });
     if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
 
+    const reviewCache = new CodexReviewCache({ ...this.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable(this.env) });
+    const cacheEnabled = this.env.GAJENDRA_METADATA_CACHE !== "off";
+    const entries = cacheEnabled ? await reviewCache.load() : new Map<string, CachedReview>();
     const reviews = await enrichCodexReviewSignals(
       runtimeThreads,
       (params) => this.request("thread/turns/list", params),
+      { cache: entries, cacheMaxAgeMs: options.forceFreshReviews ? 0 : Number(this.env.GAJENDRA_REVIEW_CACHE_MAX_AGE_MS ?? 300_000) },
     );
+    if (cacheEnabled && reviews.availability === "available") await reviewCache.save(entries);
     if (reviews.availability === "unsupported") this.experimentalTurnsUnsupported = true;
     return reviews.threads;
   }
@@ -235,10 +282,7 @@ export class CodexAppServerClient {
     if (this.terminallyClosed || epoch !== this.closeEpoch) {
       throw new Error("Codex app-server client is closed.");
     }
-    const executable = this.env.GAJENDRA_CODEX_BIN
-      || this.env.AADI_CODEX_BIN
-      || this.env.PRIORITY_DECK_CODEX_BIN
-      || "codex";
+    const executable = resolveCodexExecutable(this.env);
     const child = spawn(executable, ["app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
       env: this.env,
@@ -259,7 +303,7 @@ export class CodexAppServerClient {
     child.once("close", () => this.handleAppServerClose(lifecycle));
     this.attachStdoutFraming(child);
 
-    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.3.1" };
+    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.4.0" };
     try {
       await this.request("initialize", {
         clientInfo,
@@ -604,9 +648,26 @@ export async function enrichCodexReviewSignals(
     .filter((thread) => typeof thread.id === "string" && thread.id.length > 0 && isEligibleCodexReviewThread(thread))
     .sort((left, right) => codexThreadRecency(right) - codexThreadRecency(left))
     .slice(0, maxCandidates);
-  if (candidates.length === 0) return { threads: baseThreads, availability: "available" };
+  if (candidates.length === 0) {
+    options.cache?.clear();
+    return { threads: baseThreads, availability: "available" };
+  }
 
   const signals = new Map<string, ReviewSignal>();
+  const nextCache = new Map<string, CachedReview>();
+  const cacheMaxAgeMs = Number.isFinite(options.cacheMaxAgeMs) && options.cacheMaxAgeMs! >= 0
+    ? Math.min(options.cacheMaxAgeMs!, 86_400_000) : 300_000;
+  const pendingCandidates = candidates.filter(thread => {
+    const key = metadataHash(thread.id);
+    const fingerprint = reviewFingerprint(thread);
+    const cached = options.cache?.get(key);
+    const age = cached ? now() - cached.checkedAt : Infinity;
+    if (!cached || codexThreadRecency(thread) <= 0 || cached.fingerprint !== fingerprint || age < 0 || age >= cacheMaxAgeMs
+      || (cached.completedAt !== null && codexCompletedAt(cached.completedAt, now()) === null)) return true;
+    nextCache.set(key, cached);
+    if (cached.completedAt !== null) signals.set(thread.id, codexReviewSignal(thread.id, cached.completedAt));
+    return false;
+  });
   let nextCandidate = 0;
   let availability: CodexReviewEnrichmentResult["availability"] = "available";
   const inspectCandidate = async (thread: CodexThread): Promise<void> => {
@@ -618,6 +679,10 @@ export async function enrichCodexReviewSignals(
       );
       const outcome = classifyCodexReviewTurnPage(thread, response, now());
       if (outcome.kind === "ready") signals.set(thread.id, outcome.signal);
+      if (outcome.kind !== "invalid") nextCache.set(metadataHash(thread.id), {
+        fingerprint: reviewFingerprint(thread), checkedAt: now(),
+        completedAt: outcome.kind === "ready" ? outcome.signal.updatedAt : null,
+      });
       // An unexpected response shape could otherwise leave an earlier valid candidate visible
       // as Ready. Abort the whole optional batch without retaining any turn-derived data.
       else if (outcome.kind === "invalid") availability = "transient";
@@ -630,7 +695,7 @@ export async function enrichCodexReviewSignals(
 
   // Probe the optional method once before filling the pool. This lets a method-not-found or
   // capability-rejecting app-server stop at one request rather than launching a needless burst.
-  const firstCandidate = candidates[nextCandidate++];
+  const firstCandidate = pendingCandidates[nextCandidate++];
   if (firstCandidate) await inspectCandidate(firstCandidate);
   if (availability !== "available" || now() >= deadline) {
     return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
@@ -642,16 +707,20 @@ export async function enrichCodexReviewSignals(
         if (availability === "available") availability = "transient";
         return;
       }
-      const thread = candidates[nextCandidate++];
+      const thread = pendingCandidates[nextCandidate++];
       if (!thread) return;
       await inspectCandidate(thread);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, pendingCandidates.length) }, () => worker()));
   if (availability !== "available" || now() >= deadline) {
     return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
   }
 
+  if (options.cache) {
+    options.cache.clear();
+    for (const [key, value] of nextCache) options.cache.set(key, value);
+  }
   return {
     threads: baseThreads.map((thread) => {
       const review = signals.get(thread.id);
@@ -684,6 +753,15 @@ function codexBaseThread(thread: CodexThread): CodexThread {
 function codexThreadRecency(thread: CodexThread): number {
   const value = thread.recencyAt ?? thread.updatedAt ?? 0;
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function reviewFingerprint(thread: CodexThread): string {
+  return metadataHash([thread.updatedAt, thread.recencyAt, codexStatusType(thread.status)]);
+}
+
+function codexReviewSignal(id: string, completedAt: number): ReviewSignal {
+  return { state: "ready", kind: "result", updatedAt: completedAt,
+    destination: { type: "thread", deepLink: `codex://threads/${encodeURIComponent(id)}` }, providerStatus: "completed" };
 }
 
 function isEligibleCodexReviewThread(thread: CodexThread): boolean {

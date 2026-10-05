@@ -1,14 +1,13 @@
-import { App } from "@modelcontextprotocol/ext-apps";
+import { App, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 
 import {
   allDeckThreads,
+  productDeckProjection,
   isDeckMutationResult,
   isPermittedDeepLink,
   isRunningThreadStatus,
   MUTATION_PROTOCOL_VERSION,
   normalizeDeckSelection,
-  reviewReadyDeckThreads,
-  runningDeckThreads,
   type DeckSnapshot,
   type DeckThread,
   type PriorityLevel,
@@ -16,6 +15,7 @@ import {
 } from "../shared/contracts.js";
 import { fixtureSnapshot } from "./fixtures.js";
 import { createDeckMotion, type DeckLayoutState, type RenderReason } from "./motion.js";
+import { ReviewAcknowledgements, preserveNewerReviewEvidence, type ReviewAcknowledgement } from "./review-acknowledgements.js";
 import "./styles.css";
 
 const queriedRoot = document.querySelector<HTMLDivElement>("#app");
@@ -41,9 +41,34 @@ const systemDarkMode = window.matchMedia("(prefers-color-scheme: dark)");
 let visualTheme: VisualTheme = readEnumPreference(themeStorageKey, ["native", "focus-deck"], "native");
 let appearancePreference: AppearancePreference = readEnumPreference(appearanceStorageKey, ["auto", "light", "dark"], "auto");
 let hostAppearance: ResolvedAppearance | null = null;
+let hostStyles: Parameters<typeof applyHostStyleVariables>[0] = {};
+const hostStyleMap = {
+  "--canvas": "--color-background-primary",
+  "--surface": "--color-background-secondary",
+  "--surface-raised": "--color-background-primary",
+  "--text": "--color-text-primary",
+  "--muted": "--color-text-secondary",
+  "--border": "--color-border-primary",
+} as const;
+let searchQuery = "";
+let historyExpanded = false;
+let historyFilter: "all" | "reviewed" | "finished" = "all";
+let continuationThreadId: string | null = null;
+let undoAction: { tool: string; args: Record<string, unknown>; label: string } | null = null;
+let syncTimer: ReturnType<typeof setInterval> | null = null;
+let checkingRevision = false;
+let lastProviderRefresh = Date.now();
+let refreshing = false;
+let syncFailed = false;
+const fixtureReviewed = new Map<string, NonNullable<DeckThread["review"]>>();
+const reviewAcknowledgements = new ReviewAcknowledgements();
+let reviewQueue: Promise<void> = Promise.resolve();
+let snapshotGeneration = 0;
+let fixtureReviewAttempt = 0;
 
 let snapshot: DeckSnapshot | null = null;
 let app: App | null = null;
+let connected = false;
 let busy = false;
 let runningExpanded = true;
 let reviewExpanded = true;
@@ -52,9 +77,13 @@ const fixtureNow = new Date("2026-08-11T15:00:00.000Z").valueOf();
 
 applyVisualPreferences();
 systemDarkMode.addEventListener("change", handleSystemAppearanceChange);
+root.addEventListener("keydown", handleSearchShortcut);
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void checkSharedRevision(); });
 
 window.addEventListener("pagehide", () => {
+  if (syncTimer) clearInterval(syncTimer);
   systemDarkMode.removeEventListener("change", handleSystemAppearanceChange);
+  root.removeEventListener("keydown", handleSearchShortcut);
   motion.destroy();
 }, { once: true });
 
@@ -67,30 +96,35 @@ async function start(): Promise<void> {
     return;
   }
 
-  app = hostTestHooks()?.createApp?.() ?? new App({ name: "Gajendra", version: "0.3.1" });
+  if (busy) return;
+  busy = true;
+  connected = false;
+  app = hostTestHooks()?.createApp?.() ?? new App({ name: "Gajendra", version: "0.4.0" });
+  const connectingApp = app;
   app.addEventListener("hostcontextchanged", (context) => {
-    const changedAppearance = normalizeAppearance(context.theme);
-    if (!changedAppearance) return;
-    hostAppearance = changedAppearance;
-    if (appearancePreference === "auto") applyVisualPreferences();
+    if (app === connectingApp) acceptHostAppearance(context);
   });
   app.ontoolresult = (result) => {
-    if (!busy) acceptSnapshot(result.structuredContent, "external");
+    if (app !== connectingApp || (busy && connected && snapshot !== null)) return;
+    try { acceptSnapshot(result.structuredContent, snapshot ? "external" : "initial"); }
+    catch (error) { renderRecoverableError(error, motion.captureLayout()); }
   };
   renderLoading();
-  busy = true;
   try {
     await app.connect();
-    hostAppearance = normalizeAppearance(app.getHostContext()?.theme);
-    applyVisualPreferences();
-    const result = await app.callServerTool({ name: "gajendra_open", arguments: {} });
-    acceptSnapshot(result.structuredContent, "initial");
+    connected = true;
+    acceptHostAppearance(app.getHostContext());
+    if (!syncTimer) syncTimer = setInterval(() => void checkSharedRevision(), 5000);
+    // Entrypoints deliver the initial result through the bridge. Do not throw it
+    // away and run another full provider scan before showing the user's queues.
+    // If a host fails to deliver it, the loading view offers an explicit retry.
   } catch (error) {
     renderConnectionError(error);
   } finally {
     busy = false;
     motion.setBusy(false);
   }
+  if (snapshot?.cachedAt) void refresh(true, true);
 }
 
 function shouldUseFixture(): boolean {
@@ -109,23 +143,57 @@ function hostTestHooks(): HostTestHooks | null {
 
 function acceptSnapshot(value: unknown, reason: RenderReason, layoutState: DeckLayoutState | null = motion.captureLayout()): void {
   if (isDeckMutationResult(value)) {
+    if (snapshot && value.snapshot.revision < snapshot.revision) return;
+    if (snapshot && value.snapshot.revision !== snapshot.revision) undoAction = null;
     snapshot = normalizeDeckSelection({
       ...value.snapshot,
       error: value.error?.message ?? value.snapshot.error,
     });
+    reviewAcknowledgements.observe(snapshot);
+    snapshotGeneration += 1;
     render(reason, layoutState);
     return;
   }
-  if (!value || typeof value !== "object" || !("focus" in value)) return;
+  if (!value || typeof value !== "object" || !("focus" in value)
+    || !Array.isArray(value.focus) || !("important" in value) || !Array.isArray(value.important)
+    || !("available" in value) || !Array.isArray(value.available)
+    || !("sources" in value) || !Array.isArray(value.sources)) {
+    throw new Error("Gajendra received no usable thread data. Try again to reconnect.");
+  }
+  if (snapshot && "revision" in value && typeof value.revision === "number" && value.revision < snapshot.revision) return;
+  if (snapshot && "revision" in value && value.revision !== snapshot.revision) undoAction = null;
   snapshot = normalizeDeckSelection(value as DeckSnapshot);
+  reviewAcknowledgements.observe(snapshot);
+  snapshotGeneration += 1;
   render(reason, layoutState);
 }
 
 function render(reason: RenderReason = "external", layoutState: DeckLayoutState | null = null): void {
   if (!snapshot) return renderLoading();
-  const running = runningDeckThreads(snapshot);
-  const reviewReady = reviewReadyDeckThreads(snapshot);
-  const recent = snapshot.available.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready");
+  const previousSearch = root.querySelector<HTMLInputElement>("#task-search");
+  const previousFocus = document.activeElement as HTMLElement | null;
+  const focusAction = previousFocus?.dataset.action;
+  const focusThreadId = previousFocus?.dataset.threadId;
+  const focusReviewToggle = previousFocus?.hasAttribute("data-review-toggle");
+  const searchWasFocused = previousSearch === document.activeElement;
+  const searchSelection = [previousSearch?.selectionStart ?? 0, previousSearch?.selectionEnd ?? 0] as const;
+  const focusedSource = (document.activeElement as HTMLElement | null)?.matches("button[data-action=source-toggle]")
+    ? (document.activeElement as HTMLElement).dataset.sourceId : undefined;
+  const settingsWereOpen = root.querySelector<HTMLDetailsElement>(".visual-settings")?.open ?? false;
+  const scrollTop = root.querySelector<HTMLElement>(".deck-scroll-surface")?.scrollTop ?? 0;
+  const openMenus = [...root.querySelectorAll<HTMLDetailsElement>(".row-menu[open]")].map((menu) => menu.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId).filter(Boolean);
+  const previousContinuation = root.querySelector<HTMLInputElement>("#continuation-search");
+  const continuationQuery = previousContinuation?.value ?? "";
+  const continuationWasFocused = previousContinuation === document.activeElement;
+  const product = snapshot.product ?? productDeckProjection(snapshot);
+  const running = product.running;
+  const reviewReady = reviewAcknowledgements.ready(snapshot);
+  const recent = product?.history ?? snapshot.available.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready");
+  const pendingHistory = allDeckThreads(snapshot).filter(thread => thread.review?.identity
+    && reviewAcknowledgements.operations.get(thread.review.identity)?.state === "pending"
+    && !recent.some(row => row.id === thread.id));
+  const ongoing = product?.continue ?? [...snapshot.focus, ...snapshot.important];
+  const ongoingIds = new Set(ongoing.map((thread) => thread.id));
   root.innerHTML = `
     <div class="deck-scroll-surface" aria-label="Scrollable Gajendra task overview">
       <header class="deck-header">
@@ -133,52 +201,89 @@ function render(reason: RenderReason = "external", layoutState: DeckLayoutState 
           <div class="brand-lockup">
             ${brandMark()}
             <div class="brand-copy">
-              <p class="eyebrow">Gajendra</p>
-              <h1>One clear focus across your AI tools.</h1>
-              <p class="lede">One NOW. One short queue. One click back to the exact thread.</p>
+              <h1>Gajendra</h1>
+              <p class="lede">Your work, within reach.</p>
             </div>
           </div>
           <button class="refresh-action" type="button" data-action="refresh" aria-label="Refresh Gajendra">
-            <span class="refresh-icon" aria-hidden="true">↻</span><span data-refresh-label>Refresh</span>
+            <span data-refresh-label>Refresh</span>
           </button>
         </div>
-        <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Gajendra is up to date</span>
+        <span class="visually-hidden" role="status" aria-live="polite" data-refresh-status>Ready</span>
       </header>
       ${snapshot.error ? errorPanel(snapshot.error) : ""}
-      ${sourcesPanel(snapshot.sources)}
+      ${reviewFeedback()}
+      ${syncFailed ? '<p class="source-notice" role="status">Sync interrupted. Showing the last saved view. Use Refresh to reconnect.</p>' : ""}
+      ${undoAction ? `<div class="action-receipt" role="status"><span>${escapeHtml(undoAction.label)}</span><button type="button" class="text-action" data-action="undo-work">Undo</button></div>` : ""}
+      ${snapshot.staleEntryCount > 0 ? `<p class="source-notice" role="status">${snapshot.staleEntryCount} saved ${snapshot.staleEntryCount === 1 ? "priority is" : "priorities are"} outside the available source results. Your saved choices have not been removed.</p>` : ""}
       ${currentPanel(snapshot.current)}
-      ${section("focus", "Focus", "The short queue you have deliberately chosen.", snapshot.focus)}
-      ${section("important", "Important", "Worth returning to after the focus queue.", snapshot.important)}
-      ${runningSection(running)}
       ${reviewSection(reviewReady)}
-      ${availableSection(snapshot, recent)}
+      ${product?.needsInput.length ? needsInputSection(product.needsInput) : ""}
+      ${runningSection(running)}
+      <section class="continue-section" aria-labelledby="continue-heading">
+        <h2 id="continue-heading">Your priorities</h2>
+        ${section("focus", "Focus", "", snapshot.focus.filter((thread) => ongoingIds.has(thread.id)))}
+        ${section("important", "Important", "", snapshot.important.filter((thread) => ongoingIds.has(thread.id)))}
+      </section>
+      ${continuationPicker()}
+      ${availableSection(snapshot, [...recent, ...pendingHistory])}
+      ${sourcesPanel(snapshot.sources)}
       <footer class="deck-footer">
-        <span>${snapshot.focus.length} focus · ${snapshot.important.length} important</span>
-        <span>Metadata only · ${snapshot.sources.filter((source) => source.state === "ready").length} sources ready</span>
+        <span>${snapshot.cachedAt ? `Saved view · ${escapeHtml(new Date(snapshot.cachedAt).toLocaleString())}` : syncFailed ? "Sync unavailable" : "Changes sync with the Mac app"}</span>
+        <span>Local to this Mac</span>
       </footer>
     </div>
     ${threadSearchFooter(snapshot, recent.length)}
   `;
   bindInteractions();
+  applySearch(false);
+  const settings = root.querySelector<HTMLDetailsElement>(".visual-settings");
+  if (settings) settings.open = settingsWereOpen;
+  root.querySelectorAll<HTMLDetailsElement>(".row-menu").forEach((menu) => {
+    if (openMenus.includes(menu.closest<HTMLElement>("[data-thread-id]")?.dataset.threadId)) menu.open = true;
+  });
+  const scrollSurface = root.querySelector<HTMLElement>(".deck-scroll-surface");
+  if (scrollSurface) scrollSurface.scrollTop = scrollTop;
+  if (continuationWasFocused) {
+    const input = root.querySelector<HTMLInputElement>("#continuation-search");
+    if (input) { input.value = continuationQuery; input.dispatchEvent(new Event("input")); input.focus({ preventScroll: true }); }
+  } else if (searchWasFocused) {
+    const search = root.querySelector<HTMLInputElement>("#task-search");
+    search?.focus({ preventScroll: true });
+    search?.setSelectionRange(...searchSelection);
+  } else if (focusedSource) {
+    root.querySelector<HTMLButtonElement>(`button[data-action=source-toggle][data-source-id="${CSS.escape(focusedSource)}"]`)?.focus({ preventScroll: true });
+  } else if (focusAction) {
+    root.querySelector<HTMLButtonElement>(`button[data-action="${CSS.escape(focusAction)}"]${focusThreadId ? `[data-thread-id="${CSS.escape(focusThreadId)}"]` : ""}`)?.focus({ preventScroll: true });
+  } else if (focusReviewToggle) {
+    root.querySelector<HTMLButtonElement>("button[data-review-toggle]")?.focus({ preventScroll: true });
+  }
   motion.setBusy(busy);
+  if (reviewAcknowledgements.pending) {
+    // Keep review, navigation, disclosure and Refresh usable while serializing store writes.
+    root.querySelectorAll<HTMLButtonElement>("button[data-collapse], button[data-action]").forEach(button => {
+      if (button.hasAttribute("data-collapse") || /^(undo-work|source-toggle|current|move-|level-|finish-work|reopen-work|confirm-link|unlink-next)/u.test(button.dataset.action ?? "")) button.disabled = true;
+    });
+    root.querySelectorAll<HTMLSelectElement>("select[data-context-thread-id]").forEach(select => { select.disabled = true; });
+  }
   motion.animateRender(layoutState, reason);
 }
 
 function currentPanel(current: DeckThread | null): string {
   if (!current) {
     return `<section class="now-card now-empty" aria-labelledby="now-heading">
-      <div><p class="now-label">NOW</p><h2 id="now-heading">Choose one task to focus on</h2></div>
-      <p>Promote a task to Focus, then mark it as Now.</p>
+      <div><h2 id="now-heading">Choose your next focus</h2></div>
+      <p>Pick a chat below and choose Make Now.</p>
     </section>`;
   }
   return `<section class="now-card" aria-labelledby="now-heading">
-    <div class="now-topline"><p class="now-label"><span aria-hidden="true">◎</span><strong>NOW</strong><small>Current focus</small></p></div>
+    <div class="now-topline"><p class="now-label"><strong>NOW</strong><small>${escapeHtml(current.sourceName)}</small></p></div>
     <div class="now-content">
-      <div><h2 id="now-heading">${escapeHtml(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
+      <div><h2 class="record-title" id="now-heading" title="${escapeAttribute(current.title)}">${recordTitle(current.title)}</h2><p class="thread-meta">${escapeHtml(current.project)} ${contextBadge(current)}</p></div>
       <div class="now-actions" aria-label="Current task actions">
         <a class="primary-action" ${openThreadAttributes(current)} aria-current="true">Open thread <span data-open-arrow aria-hidden="true">→</span></a>
         ${activitySignal(current)}
-        ${sourceBadge(current)}
+        ${workActions(current)}
       </div>
     </div>
   </section>`;
@@ -195,15 +300,26 @@ function activitySignal(thread: DeckThread): string {
   </div>`;
 }
 
+function headingIcon(kind: PriorityLevel | "running" | "review"): string {
+  const paths = kind === "running"
+    ? '<path data-hover-part="wave" d="M5 9v6"/><path data-hover-part="wave" d="M10 5v10"/><path data-hover-part="wave" d="M15 7v8"/>'
+    : kind === "review"
+      ? '<g class="heading-letter" data-hover-part="letter"><rect x="6" y="6" width="8" height="6" rx="1"/><path d="m6 7 4 3 4-3"/></g><path class="heading-tray" d="M3 10h4l2 3h2l2-3h4v6H3z"/>'
+      : kind === "focus"
+        ? '<path class="heading-fill" d="m10 2 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4-3.9-3.8 5.4-.8z"/>'
+        : '<path class="heading-fill" data-hover-part="bookmark" d="M6 3h8v14l-4-3-4 3z"/>';
+  return `<svg class="heading-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
 function section(level: PriorityLevel, title: string, description: string, threads: DeckThread[]): string {
   const isCollapsed = snapshot?.collapsed[level] ?? false;
   const warning = level === "focus" && snapshot?.focusOverGuide
-    ? `<p class="section-warning" role="status">You have more than the ${snapshot.focusGuide}-task focus guide. Keep only what can truly win.</p>`
+    ? `<p class="section-warning" role="status">You have more than the ${snapshot.focusGuide}-task focus guide. Choose what you want to continue.</p>`
     : "";
   return `<section class="deck-section" data-drop-level="${level}" aria-labelledby="${level}-heading">
-    <button class="section-toggle" type="button" data-collapse="${level}" aria-expanded="${String(!isCollapsed)}" aria-controls="${level}-list">
-      <span><span class="section-heading"><span class="section-symbol" aria-hidden="true">${level === "focus" ? "★" : "◆"}</span><span class="section-title" id="${level}-heading">${escapeHtml(title)}</span><span class="section-count">${threads.length}</span></span><span class="section-description">${escapeHtml(description)}</span></span>
-      <span class="chevron" aria-hidden="true">⌄</span>
+    <button class="section-toggle" type="button" data-heading-hover="${level}" data-collapse="${level}" aria-expanded="${String(!isCollapsed)}" aria-controls="${level}-list">
+      <span><span class="section-heading"><span class="section-title" id="${level}-heading">${headingIcon(level)}${escapeHtml(title)}</span><span class="section-count">${threads.length}</span></span>${description ? `<span class="section-description">${escapeHtml(description)}</span>` : ""}</span>
+      <span class="chevron" aria-hidden="true">${chevronIcon()}</span>
     </button>
     ${warning}
     <ol class="thread-list" id="${level}-list" data-drop-level="${level}" ${isCollapsed ? "hidden" : ""}>
@@ -217,69 +333,71 @@ function threadRow(thread: DeckThread, index: number, count: number): string {
     <div class="thread-main">
       <div class="thread-heading-line">
         ${thread.isCurrent ? '<span class="now-pill">NOW</span>' : ""}
-        <a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a>
+        <a class="record-title" title="${escapeAttribute(thread.title)}" ${openThreadAttributes(thread)}>${recordTitle(thread.title)}</a>
       </div>
-      <p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${contextBadge(thread)} ${sourceBadge(thread)}</p>
+      <p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${contextBadge(thread)} ${sourceBadge(thread)}</p>${chatHistory(thread)}
     </div>
     <div class="row-actions" aria-label="Actions for ${escapeAttribute(thread.title)}">
+      <details class="row-menu"><summary>Actions<span class="visually-hidden"> for ${escapeHtml(thread.title)}</span></summary><div class="row-menu-actions">
       ${contextSelector(thread)}
       ${thread.level === "focus" && !thread.isCurrent ? actionButton("Make Now", "current", thread.id) : ""}
       ${moveButtons(thread.id, index, count)}
       ${thread.isCurrent ? "" : thread.level === "focus" ? actionButton("Important", "level-important", thread.id) : actionButton("Focus", "level-focus", thread.id)}
       ${thread.isCurrent ? "" : actionButton("Remove", "level-none", thread.id)}
+      ${workActionButtons(thread)}
+      </div></details>
     </div>
   </li>`;
 }
 
 function runningSection(threads: DeckThread[]): string {
   return `<section class="running-section deck-section" aria-labelledby="running-heading">
-    <button class="running-heading running-toggle" type="button" data-running-toggle aria-expanded="${String(runningExpanded)}" aria-controls="running-list" ${threads.length ? "" : "disabled"}>
-      <span><span class="running-title"><span class="running-symbol" aria-hidden="true">◉</span><span id="running-heading">Running</span><span class="section-count">${threads.length}</span></span>
-      <span class="running-description">Active provider work across every priority lane.</span></span>
-      <span class="running-scope"><span>All priority lanes</span>${threads.length ? '<span class="running-chevron chevron" aria-hidden="true">⌄</span>' : ""}</span>
+    <button class="running-heading running-toggle" type="button" data-heading-hover="running" data-running-toggle aria-expanded="${String(runningExpanded)}" aria-controls="running-list" ${threads.length ? "" : "disabled"}>
+      <span><span class="running-title">${headingIcon("running")}<span id="running-heading">Running</span><span class="section-count">${threads.length}</span></span></span>
+      ${threads.length ? `<span class="running-chevron chevron" aria-hidden="true">${chevronIcon()}</span>` : ""}
     </button>
     <ul class="running-list thread-list" id="running-list" ${runningExpanded ? "" : "hidden"}>
-      ${threads.length ? threads.map(runningRow).join("") : '<li class="empty-row">No provider reports active work.</li>'}
+      ${threads.length ? threads.map(runningRow).join("") : `<li class="empty-row">${snapshot?.cachedAt ? "Checking live activity. Your saved work is available below." : "No provider reports active work."}</li>`}
     </ul>
   </section>`;
 }
 
 function runningRow(thread: DeckThread): string {
   return `<li class="available-row running-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="running-${escapeAttribute(thread.id)}">
-    <div><a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div><a class="record-title" title="${escapeAttribute(thread.title)}" ${openThreadAttributes(thread)}>${recordTitle(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
 }
 
 function reviewSection(threads: DeckThread[]): string {
   return `<section class="review-section deck-section" aria-labelledby="review-heading">
-    <button class="running-heading review-heading" type="button" data-review-toggle aria-expanded="${String(reviewExpanded)}" aria-controls="review-list" ${threads.length ? "" : "disabled"}>
-      <span><span class="running-title review-title">${reviewTrayIcon()}<span id="review-heading">Ready for Review</span><span class="section-count">${threads.length}</span></span>
-      <span class="running-description">Provider-confirmed work where human attention is useful.</span></span>
-      <span class="running-scope review-scope"><span>Needs your review</span>${threads.length ? '<span class="review-chevron chevron" aria-hidden="true">⌄</span>' : ""}</span>
+    <button class="running-heading review-heading" type="button" data-heading-hover="review" data-review-toggle aria-expanded="${String(reviewExpanded)}" aria-controls="review-list">
+      <span><span class="running-title review-title">${headingIcon("review")}<span id="review-heading">Ready for Review</span><span class="section-count">${threads.length}</span></span></span>
+      ${threads.length ? `<span class="review-chevron chevron" aria-hidden="true">${chevronIcon()}</span>` : ""}
     </button>
     <ul class="running-list review-list thread-list" id="review-list" ${reviewExpanded ? "" : "hidden"}>
-      ${threads.length ? threads.map(reviewRow).join("") : '<li class="empty-row">No provider reports work ready for review.</li>'}
+      ${threads.length ? threads.map(reviewRow).join("") : `<li class="empty-row">${snapshot?.cachedAt ? "Checking for results. Your saved work is available below." : "No results waiting for review."}</li>`}
     </ul>
   </section>`;
 }
 
 function reviewRow(thread: DeckThread): string {
-  const action = thread.review?.destination.type === "thread" ? "Task" : "Review";
   return `<li class="available-row review-row" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="review-${escapeAttribute(thread.id)}">
-    <div class="review-row-main"><a class="review-primary" ${openReviewAttributes(thread)}>${reviewTrayIcon()}<span><strong>${escapeHtml(thread.title)}</strong><small>${relativeDate(thread.review?.updatedAt ?? 0)}</small></span><span class="review-destination-label">${action}</span></a><p class="thread-meta">${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
-    <div class="available-actions">${threadActions(thread)}${reviewDoneButton(thread)}</div>
+    <div class="review-row-main"><a class="review-primary" title="${escapeAttribute(thread.title)}" ${openReviewAttributes(thread)}><span><strong class="record-title">${recordTitle(thread.title)}</strong><small>${relativeDate(thread.review?.updatedAt ?? 0)}</small></span></a><p class="thread-meta">${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+    <div class="available-actions">${reviewDoneButton(thread)}${threadActions(thread)}</div>
   </li>`;
 }
 
 function availableSection(deck: DeckSnapshot, recent: DeckThread[]): string {
   const recentIds = new Set(recent.map((thread) => thread.id));
-  const threads = allDeckThreads(deck);
+  const threads = allDeckThreads(deck).sort((left, right) => right.updatedAt - left.updatedAt);
   return `<section class="available-section" aria-labelledby="available-heading">
-    <div class="available-heading"><div><p class="eyebrow">Thread organizer</p><h2 id="available-heading">Find and organize any thread</h2></div><span data-search-count>${recent.length}</span></div>
-    <ul class="available-list" id="available-list">
+    <div class="available-heading"><h2 id="available-heading">History</h2><button type="button" class="text-action" data-action="toggle-history" aria-expanded="${historyExpanded || Boolean(searchQuery)}" aria-controls="available-list">${historyExpanded ? "Hide" : "Show"} <span data-search-count>${recent.length}</span> <span data-search-noun>${recent.length === 1 ? "chat" : "chats"}</span></button></div>
+    <div class="history-filters" role="group" aria-label="Filter History" ${historyExpanded && !searchQuery ? "" : "hidden"}>${(["all", "reviewed", "finished"] as const).map(filter => `<button type="button" class="text-action" data-action="history-${filter}" aria-pressed="${historyFilter === filter}">${filter === "all" ? "All" : filter === "reviewed" ? "Reviewed" : "Finished"}</button>`).join("")}</div>
+    <ul class="available-list" id="available-list" ${historyExpanded || searchQuery ? "" : "hidden"}>
       ${threads.map((thread) => availableRow(thread, recentIds.has(thread.id))).join("") || '<li class="empty-row">No threads are available.</li>'}
     </ul>
+    <p class="empty-row history-empty" hidden></p>
   </section>`;
 }
 
@@ -287,14 +405,14 @@ function threadSearchFooter(deck: DeckSnapshot, visibleCount: number): string {
   const total = allDeckThreads(deck).length;
   return `<section class="thread-search-footer" role="search" aria-label="All-thread search">
     <label class="visually-hidden" for="task-search">Search all ${total} threads</label>
-    <input id="task-search" type="search" placeholder="Search all ${total} threads" autocomplete="off" aria-describedby="thread-search-status" />
+    <input id="task-search" type="search" placeholder="Search all ${total} threads" value="${escapeAttribute(searchQuery)}" autocomplete="off" aria-describedby="thread-search-status" aria-keyshortcuts="Control+k Meta+k /" title="Search tasks (Command+K or Control+K)" />
     <span class="thread-search-status" id="thread-search-status" data-search-status aria-live="polite">${visibleCount} recent</span>
   </section>`;
 }
 
 function availableRow(thread: DeckThread, isRecent: boolean): string {
-  return `<li class="available-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(searchableThreadMetadata(thread))}" data-is-recent="${String(isRecent)}" ${isRecent ? "" : "hidden"}>
-    <div><a ${openThreadAttributes(thread)}>${escapeHtml(thread.title)}</a><p class="thread-meta">${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${sourceBadge(thread)} ${placementBadge(thread)}</p></div>
+  return `<li class="available-row history-row" draggable="true" data-thread-id="${escapeAttribute(thread.id)}" data-flip-id="search-${escapeAttribute(thread.id)}" data-search-value="${escapeAttribute(searchableThreadMetadata(thread))}" data-is-recent="${String(isRecent)}" data-reviewed="${thread.reviewAcknowledged === true}" data-finished="${thread.workState === "completed"}" ${isRecent ? "" : "hidden"}>
+    <div><a class="record-title" title="${escapeAttribute(thread.title)}" ${openThreadAttributes(thread)}>${recordTitle(thread.title)}</a><p class="history-status">${historyStatus(thread)}</p><p class="thread-meta">${sourceBadge(thread)} ${escapeHtml(thread.project)} · ${relativeDate(thread.updatedAt)} ${placementBadge(thread)}</p>${chatHistory(thread)}</div>
     <div class="available-actions">${threadActions(thread)}</div>
   </li>`;
 }
@@ -329,21 +447,79 @@ function placementBadge(thread: DeckThread): string {
 
 function reviewDoneButton(thread: DeckThread): string {
   if (!thread.review?.identity || isRunningThreadStatus(thread.status)) return "";
-  return `<button type="button" class="icon-action review-done" data-action="review-done" data-thread-id="${escapeAttribute(thread.id)}" data-review-updated-at="${thread.review.updatedAt}" data-review-identity="${escapeAttribute(thread.review.identity)}" aria-label="Mark ${escapeAttribute(thread.title)} reviewed" title="Mark reviewed">✓</button>`;
+  return `<button type="button" class="icon-action review-done" data-action="review-done" data-thread-id="${escapeAttribute(thread.id)}" data-review-updated-at="${thread.review.updatedAt}" data-review-identity="${escapeAttribute(thread.review.identity)}" aria-label="Mark ${escapeAttribute(thread.title)} reviewed" title="Mark reviewed"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg><span class="review-tooltip" role="tooltip">Mark reviewed</span></button>`;
+}
+
+function historyStatus(thread: DeckThread): string {
+  const pending = [...reviewAcknowledgements.operations.values()].some(operation => operation.thread.id === thread.id && operation.state === "pending");
+  const active = isRunningThreadStatus(thread.status) || thread.review?.state === "ready" || thread.attention === "needs-input";
+  const response = pending ? "Saving review…" : isRunningThreadStatus(thread.status) ? "Running" : thread.review?.state === "ready" ? "Ready for Review" : thread.reviewAcknowledged ? "Reviewed" : "";
+  const work = thread.workState === "completed" ? "Finished" : thread.continuationThreadId ? "Continued" : thread.level || active ? "Open" : "Open · inactive";
+  return `<span>${response ? `${response} · ` : ""}${work}</span>`;
+}
+
+function reviewFeedback(): string {
+  const operations = [...reviewAcknowledgements.operations.values()];
+  const saving = operations.some(operation => operation.state === "pending");
+  return `${saving ? '<p class="source-notice" role="status">Saving review…</p>' : ""}${operations.filter(operation => operation.state === "failed").map(operation => `<section class="error-panel review-error" role="alert"><span>Couldn’t confirm review was saved for ${escapeHtml(operation.thread.title)}. ${escapeHtml(operation.error ?? "Try again.")}${operation.superseded ? " A newer result or activity is shown below." : ""}</span>${operation.superseded ? "" : `<button type="button" data-action="review-retry" data-thread-id="${escapeAttribute(operation.thread.id)}" data-review-identity="${escapeAttribute(operation.identity)}">Retry</button>`}</section>`).join("")}`;
 }
 
 function reviewTrayIcon(): string {
   return '<svg class="review-symbol" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-2 14H6L4 5Z"/><path d="M7 13h3l2 2 2-2h3"/></svg>';
 }
 
+function chevronIcon(): string {
+  return '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>';
+}
+
+function workActionButtons(thread: DeckThread): string {
+  if ((thread.currentThreadId ?? thread.id) !== thread.id) {
+    const current = snapshot && allDeckThreads(snapshot).find(candidate => candidate.id === thread.currentThreadId);
+    return `${current ? `<a class="text-action" ${openThreadAttributes(current)}>Open current chat</a>` : ""}
+      ${thread.continuationThreadId === thread.currentThreadId ? actionButton("Unlink next chat", "unlink-next", thread.id) : ""}`;
+  }
+  return `${actionButton(thread.workState === "completed" ? "Reopen" : "Finish work", thread.workState === "completed" ? "work-reopen" : "work-finish", thread.id)}
+    ${thread.workState !== "completed" ? actionButton("Link next chat…", "link-next", thread.id) : ""}`;
+}
+
+function workActions(thread: DeckThread): string {
+  return `<details class="row-menu" data-thread-id="${escapeAttribute(thread.id)}"><summary>Actions<span class="visually-hidden"> for ${escapeHtml(thread.title)}</span></summary><div class="row-menu-actions">${workActionButtons(thread)}</div></details>`;
+}
+
+function chatHistory(thread: DeckThread): string {
+  if (!snapshot) return "";
+  const ids = thread.predecessorThreadIds ?? [];
+  if (!ids.length) return "";
+  const byId = new Map(allDeckThreads(snapshot).map((candidate) => [candidate.id, candidate]));
+  return `<details class="chat-history"><summary>${ids.length} earlier ${ids.length === 1 ? "chat" : "chats"}</summary><ul>${ids.map((id) => {
+    const earlier = byId.get(id);
+    return `<li>${earlier ? `<a ${openThreadAttributes(earlier)}>${escapeHtml(earlier.title)}</a>` : "Earlier chat is unavailable from its source"}</li>`;
+  }).join("")}</ul></details>`;
+}
+
+function needsInputSection(threads: DeckThread[]): string {
+  return `<section class="deck-section" aria-labelledby="input-heading"><h2 id="input-heading">Needs input</h2><ul class="thread-list">${threads.map(runningRow).join("")}</ul></section>`;
+}
+
+function continuationPicker(): string {
+  if (!snapshot || !continuationThreadId) return "";
+  const threads = allDeckThreads(snapshot);
+  const predecessor = threads.find((thread) => thread.id === continuationThreadId);
+  if (!predecessor) return "";
+  return `<section class="continuation-picker" aria-labelledby="link-heading"><h2 id="link-heading">Choose the next chat</h2><p>Continue ${escapeHtml(predecessor.title)} in an existing chat. Its priority moves with it.</p>
+    <label for="continuation-search">Find a chat</label><input type="search" id="continuation-search" placeholder="Search by title, project or provider" autocomplete="off" />
+    <ul>${threads.filter((thread) => thread.id !== predecessor.id && !thread.level && thread.workState !== "completed" && (thread.currentThreadId ?? thread.id) === thread.id && !(thread.predecessorThreadIds?.length) && !predecessor.predecessorThreadIds?.includes(thread.id)).map((thread) => `<li data-continuation-search="${escapeAttribute(searchableThreadMetadata(thread))}" hidden><button type="button" class="text-action" data-action="confirm-link" data-thread-id="${escapeAttribute(predecessor.id)}" data-next-thread-id="${escapeAttribute(thread.id)}">${escapeHtml(thread.title)}<small>${escapeHtml(thread.project)} · ${escapeHtml(thread.sourceName)}</small></button></li>`).join("")}</ul>
+    <p data-continuation-count>Type to find the exact chat.</p><button type="button" class="text-action" data-action="cancel-link">Cancel</button>
+  </section>`;
+}
+
 function threadActions(thread: DeckThread): string {
-  if (thread.isCurrent) return "";
-  return [
+  return `<details class="row-menu"><summary>Actions<span class="visually-hidden"> for ${escapeHtml(thread.title)}</span></summary><div class="row-menu-actions">${thread.isCurrent || thread.workState === "completed" || (thread.currentThreadId ?? thread.id) !== thread.id ? "" : [
     actionButton("Make Now", "current", thread.id),
     thread.level === "important" ? "" : actionButton("Important", "level-important", thread.id),
     thread.level === "focus" ? "" : actionButton("Focus", "level-focus", thread.id, true),
     thread.level ? actionButton("Remove", "level-none", thread.id) : "",
-  ].join("");
+  ].join("")}${workActionButtons(thread)}</div></details>`;
 }
 
 function actionButton(label: string, action: string, threadId: string, emphasized = false): string {
@@ -355,18 +531,74 @@ function moveButtons(threadId: string, index: number, count: number): string {
 }
 
 function emptyRow(level: PriorityLevel): string {
-  return `<li class="empty-row">No ${level} tasks yet. Add one from recent tasks below.</li>`;
+  return `<li class="empty-row">No ${level} work yet. Choose a chat from History or Search.</li>`;
 }
 
 function errorPanel(message: string): string {
-  return `<section class="error-panel" role="alert"><strong>Thread sources are unavailable.</strong><span>${escapeHtml(message)}</span><button type="button" data-action="retry">Try again</button></section>`;
+  return `<section class="error-panel" role="alert"><strong>Gajendra needs attention.</strong><span>${escapeHtml(message)}</span><button type="button" data-action="retry">Try again</button></section>`;
 }
 
 function sourcesPanel(sources: DeckSnapshot["sources"]): string {
   return `<section class="sources-strip" aria-label="Thread sources">
-    <div class="sources-label"><span>Sources</span><span>${sources.filter((source) => source.state === "ready").length}/${sources.length} ready</span></div>
-    <div class="source-chips">${sources.map((source) => `<button type="button" class="source-chip state-${source.state}" data-action="source-toggle" data-source-id="${escapeAttribute(source.id)}" data-source-enabled="${String(source.enabled)}" aria-label="${escapeAttribute(`${source.name}: ${source.state}. ${source.enabled ? "Disable" : "Enable"} source`)}" title="${escapeAttribute(source.detail ?? source.state)}"><span class="source-dot" aria-hidden="true"></span>${escapeHtml(source.name)}<span class="source-count">${source.threadCount}</span></button>`).join("")}</div>
+    <div class="sources-label"><span>${sources.filter((source) => source.state === "ready").length} sources ready</span><button class="text-action" type="button" data-action="manage-sources">Manage sources</button></div>
+    <div class="source-chips">${sources.map((source) => `<span class="source-chip state-${source.state}" data-source-id="${escapeAttribute(source.id)}" aria-label="${escapeAttribute(`${source.name}: ${source.state}`)}" title="${escapeAttribute(source.detail ?? source.state)}"><span class="source-dot" aria-hidden="true"></span>${escapeHtml(source.name)}<span class="source-count">${source.threadCount}</span></span>`).join("")}</div>
+    ${sources.filter((source) => source.enabled && source.state !== "ready").map((source) => `<p class="source-notice" role="status">${escapeHtml(source.name)}: ${escapeHtml(source.detail ?? "Unavailable. Refresh to try again.")}</p>`).join("")}
   </section>`;
+}
+
+function sourceSettings(): string {
+  if (!snapshot) return "";
+  return `<fieldset class="source-settings"><legend>Thread sources</legend>
+    ${snapshot.sources.map((source) => `<button type="button" role="switch" aria-checked="${String(source.enabled)}" aria-label="${escapeAttribute(source.name)} source" data-action="source-toggle" data-source-id="${escapeAttribute(source.id)}" data-source-enabled="${String(source.enabled)}"><span>${escapeHtml(source.name)}</span><span>${source.enabled ? "On" : "Off"}</span></button>`).join("")}
+  </fieldset>`;
+}
+
+function applySearch(animate: boolean): void {
+  const terms = searchQuery.trim().toLowerCase().split(/\s+/u).filter(Boolean);
+  const list = root.querySelector<HTMLElement>("#available-list");
+  if (list) list.hidden = !historyExpanded && !terms.length;
+  let visibleCount = 0;
+  root.querySelectorAll<HTMLElement>("#available-list .available-row").forEach((row) => {
+    const visible = terms.length
+      ? terms.every((term) => row.dataset.searchValue?.includes(term))
+      : row.dataset.isRecent === "true" && (historyFilter === "all" || (historyFilter === "reviewed" ? row.dataset.reviewed : row.dataset.finished) === "true");
+    if (visible) visibleCount += 1;
+    if (animate) motion.filterRow(row, visible);
+    else row.hidden = !visible;
+  });
+  root.querySelectorAll<HTMLElement>("[data-search-count]").forEach((count) => { count.textContent = String(visibleCount); });
+  const noun = root.querySelector<HTMLElement>("[data-search-noun]");
+  if (noun) noun.textContent = visibleCount === 1 ? "chat" : "chats";
+  const status = root.querySelector<HTMLElement>("[data-search-status]");
+  if (status) status.textContent = terms.length ? `${visibleCount} ${visibleCount === 1 ? "match" : "matches"}` : `${visibleCount} in history`;
+  const filters = root.querySelector<HTMLElement>(".history-filters");
+  if (filters) filters.hidden = !historyExpanded || Boolean(terms.length);
+  const empty = root.querySelector<HTMLElement>(".history-empty");
+  if (empty) {
+    empty.hidden = visibleCount > 0 || (!historyExpanded && !terms.length);
+    empty.textContent = terms.length ? "No matching chats." : historyFilter === "reviewed" ? "No reviewed responses in History." : historyFilter === "finished" ? "No finished work in History." : "No chats in History yet.";
+  }
+  if (animate && terms.length) root.querySelector<HTMLElement>(".available-section")?.scrollIntoView({ block: "start" });
+}
+
+function handleSearchShortcut(event: KeyboardEvent): void {
+  if (event.defaultPrevented || event.isComposing) return;
+  const search = root.querySelector<HTMLInputElement>("#task-search");
+  if (!search) return;
+  if (event.key === "Escape" && document.activeElement === search) {
+    event.preventDefault();
+    searchQuery = search.value = "";
+    applySearch(true);
+    return;
+  }
+  const editing = (event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable=true]");
+  const command = (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k";
+  const slash = event.key === "/" && !editing && !event.metaKey && !event.ctrlKey && !event.altKey;
+  if (command || slash) {
+    event.preventDefault();
+    search.focus();
+    search.select();
+  }
 }
 
 function sourceBadge(thread: DeckThread): string {
@@ -422,6 +654,17 @@ function visualPreferenceControls(): string {
 }
 
 function bindInteractions(): void {
+  root.querySelector<HTMLInputElement>("#continuation-search")?.addEventListener("input", (event) => {
+    const query = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase();
+    let count = 0;
+    root.querySelectorAll<HTMLElement>("[data-continuation-search]").forEach((row) => {
+      const matches = Boolean(query) && query.split(/\s+/u).every((term) => row.dataset.continuationSearch?.includes(term));
+      row.hidden = !matches || count >= 20;
+      if (matches) count += 1;
+    });
+    const status = root.querySelector<HTMLElement>("[data-continuation-count]");
+    if (status) status.textContent = !query ? "Type to find the exact chat." : count > 20 ? `${count} matches. Refine your search to see the right chat.` : `${count} matches`;
+  });
   const visualSettings = root.querySelector<HTMLDetailsElement>(".visual-settings");
   const visualSettingsButton = visualSettings?.querySelector<HTMLElement>("summary.brand-mark");
   const syncVisualSettingsDisclosure = (): void => {
@@ -462,23 +705,8 @@ function bindInteractions(): void {
     search?.focus();
   });
   search?.addEventListener("input", (event) => {
-    const terms = (event.currentTarget as HTMLInputElement).value.trim().toLowerCase().split(/\s+/u).filter(Boolean);
-    let visibleCount = 0;
-    root.querySelectorAll<HTMLElement>("#available-list .available-row").forEach((row) => {
-      const visible = terms.length
-        ? terms.every((term) => row.dataset.searchValue?.includes(term))
-        : row.dataset.isRecent === "true";
-      if (visible) visibleCount += 1;
-      motion.filterRow(row, visible);
-    });
-    root.querySelectorAll<HTMLElement>("[data-search-count]").forEach((count) => {
-      count.textContent = String(visibleCount);
-    });
-    const status = root.querySelector<HTMLElement>("[data-search-status]");
-    if (status) status.textContent = terms.length
-      ? `${visibleCount} ${visibleCount === 1 ? "match" : "matches"}`
-      : `${visibleCount} recent`;
-    if (terms.length) root.querySelector<HTMLElement>(".available-section")?.scrollIntoView({ block: "start" });
+    searchQuery = (event.currentTarget as HTMLInputElement).value;
+    applySearch(true);
   });
 
   root.querySelectorAll<HTMLSelectElement>("select[data-context-thread-id]").forEach((select) => {
@@ -492,18 +720,17 @@ function bindInteractions(): void {
     const capturedIntent = captureOpenIntent(anchor);
     anchor.addEventListener("click", async (event) => {
       event.preventDefault();
-      if (!resolveCapturedOpenTarget(anchor, capturedIntent)) return rejectOpenDestination();
-      await motion.acknowledgeOpen(anchor);
-      // The acknowledgement is asynchronous. Re-resolve immediately before the host/browser
-      // boundary so a refresh that removed readiness, changed destination, or removed the thread
-      // cannot turn a stale press into navigation.
+      // Resolve the captured intent at the action boundary. Cosmetic feedback must never delay
+      // navigation or keep it pending when Reduce Motion cancels an animation.
       const target = resolveCapturedOpenTarget(anchor, capturedIntent);
       if (!target) return rejectOpenDestination();
+      if (event.detail !== 0) motion.acknowledgeOpen(anchor);
       await openThreadLink(target.url, target.thread);
     });
   });
 
   root.querySelectorAll<HTMLElement>("button, a").forEach((element) => motion.bindPress(element));
+  root.querySelectorAll<HTMLButtonElement>("[data-heading-hover]").forEach((element) => motion.bindHeadingHover(element));
   bindDragAndDrop();
 
   root.querySelector<HTMLElement>(".now-card")?.addEventListener("dblclick", (event) => {
@@ -588,10 +815,11 @@ async function moveDroppedThread(threadId: string, level: PriorityLevel, beforeI
 
 async function handleCollapse(button: HTMLButtonElement): Promise<void> {
   if (busy) return;
+  const restoreFocus = document.activeElement === button;
   const level = button.dataset.collapse as PriorityLevel;
   const collapsed = button.getAttribute("aria-expanded") === "true";
   const list = root.querySelector<HTMLElement>(`#${level}-list`);
-  await motion.animateCollapse(button, list, collapsed);
+  motion.animateCollapse(button, list, collapsed);
   await mutate(
     "gajendra_set_collapsed",
     { level, collapsed },
@@ -600,11 +828,40 @@ async function handleCollapse(button: HTMLButtonElement): Promise<void> {
     },
     collapsed ? "collapse" : "expand",
   );
+  if (restoreFocus && (document.activeElement === document.body || document.activeElement === button)) {
+    root.querySelector<HTMLButtonElement>(`button[data-collapse="${level}"]`)?.focus({ preventScroll: true });
+  }
 }
 
 async function handleAction(button: HTMLButtonElement): Promise<void> {
   const action = button.dataset.action;
   const threadId = button.dataset.threadId;
+  if (action?.startsWith("history-")) {
+    const filter = action.slice(8);
+    if (filter === "all" || filter === "reviewed" || filter === "finished") historyFilter = filter;
+    render();
+    root.querySelector<HTMLButtonElement>(`button[data-action="${action}"]`)?.focus({ preventScroll: true });
+    return;
+  }
+  if (action === "toggle-history") {
+    historyExpanded = !historyExpanded;
+    render();
+    root.querySelector<HTMLButtonElement>('button[data-action="toggle-history"]')?.focus({ preventScroll: true });
+    return;
+  }
+  if (action === "cancel-link") {
+    continuationThreadId = null;
+    render();
+    return;
+  }
+  if (action === "undo-work" && undoAction) {
+    const undo = undoAction;
+    return mutate(undo.tool, undo.args, undefined, "mutation", () => {
+      if (undo.tool === "gajendra_set_review_acknowledged") reviewAcknowledgements.forget(String(undo.args.reviewIdentity));
+      undoAction = null;
+      render();
+    });
+  }
   if (action?.startsWith("theme-")) {
     setVisualTheme(action === "theme-focus-deck" ? "focus-deck" : "native");
     return;
@@ -615,12 +872,51 @@ async function handleAction(button: HTMLButtonElement): Promise<void> {
     return;
   }
   if (action === "retry" || action === "refresh") return refresh();
+  if (action === "manage-sources") {
+    const settings = root.querySelector<HTMLDetailsElement>(".visual-settings");
+    if (settings) {
+      settings.open = true;
+      settings.scrollIntoView({ block: "nearest" });
+      settings.querySelector<HTMLButtonElement>("[data-action=source-toggle]")?.focus();
+    }
+    return;
+  }
   if (action === "source-toggle") {
     const sourceId = button.dataset.sourceId;
     if (!sourceId) return;
-    return mutate("gajendra_set_source_enabled", { sourceId, enabled: button.dataset.sourceEnabled !== "true" });
+    await mutate("gajendra_set_source_enabled", { sourceId, enabled: button.dataset.sourceEnabled !== "true" });
+    root.querySelector<HTMLButtonElement>(`button[data-action=source-toggle][data-source-id="${CSS.escape(sourceId)}"]`)?.focus({ preventScroll: true });
+    return;
   }
   if (!threadId || !action) return;
+  if (action === "link-next") {
+    continuationThreadId = threadId;
+    render();
+    root.querySelector<HTMLInputElement>("#continuation-search")?.focus();
+    return;
+  }
+  if (action === "work-finish" || action === "work-reopen") {
+    const wasCurrent = snapshot?.current?.id === threadId;
+    const completed = action === "work-finish";
+    return mutate("gajendra_set_work_completed", { threadId, completed }, undefined, "mutation", () => {
+      undoAction = { tool: "gajendra_set_work_completed", args: { threadId, completed: !completed, ...(wasCurrent ? { currentThreadId: threadId } : {}) }, label: completed ? "Work finished. It remains in History." : "Work reopened." };
+      render();
+    });
+  }
+  if (action === "confirm-link" || action === "unlink-next") {
+    const nextId = action === "unlink-next" ? null : button.dataset.nextThreadId;
+    if (nextId === undefined) return;
+    return mutate("gajendra_link_continuation", { threadId, currentThreadId: nextId }, undefined, "mutation", () => {
+      continuationThreadId = null;
+      undoAction = null;
+      render();
+    });
+  }
+  if (action === "review-retry") {
+    const operation = reviewAcknowledgements.operations.get(button.dataset.reviewIdentity ?? "");
+    if (operation?.state === "failed" && !operation.superseded) queueReviewAcknowledgement(operation.thread, button);
+    return;
+  }
   if (action === "review-done") {
     const reviewUpdatedAt = Number(button.dataset.reviewUpdatedAt);
     const reviewIdentity = button.dataset.reviewIdentity;
@@ -628,21 +924,10 @@ async function handleAction(button: HTMLButtonElement): Promise<void> {
       || reviewUpdatedAt < 0
       || !reviewIdentity
       || !/^[a-f0-9]{64}$/iu.test(reviewIdentity)) return;
-    const readyButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
-    const focusIndex = Math.max(0, readyButtons.indexOf(button));
-    return mutate(
-      "gajendra_set_review_acknowledged",
-      { threadId, reviewUpdatedAt, reviewIdentity, acknowledged: true },
-      undefined,
-      "mutation",
-      () => {
-        const nextButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
-        (nextButtons[Math.min(focusIndex, nextButtons.length - 1)]
-          ?? root.querySelector<HTMLButtonElement>("button[data-review-toggle]"))?.focus();
-        const status = root.querySelector<HTMLElement>("[data-refresh-status]");
-        if (status) status.textContent = "Marked reviewed";
-      },
-    );
+    const thread = snapshot && reviewAcknowledgements.ready(snapshot).find(candidate => candidate.id === threadId
+      && candidate.review?.identity === reviewIdentity && candidate.review.updatedAt === reviewUpdatedAt);
+    if (thread) queueReviewAcknowledgement(thread, button);
+    return;
   }
   if (action === "current") return mutate("gajendra_set_current", { threadId });
   if (action === "move-up" || action === "move-down") {
@@ -655,6 +940,89 @@ async function handleAction(button: HTMLButtonElement): Promise<void> {
   }
 }
 
+function queueReviewAcknowledgement(thread: DeckThread, button: HTMLButtonElement): void {
+  if (busy) return;
+  const readyButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
+  const index = Math.max(0, readyButtons.findIndex(candidate => candidate.dataset.threadId === thread.id));
+  const operation = reviewAcknowledgements.begin(thread, mutationKey(), index);
+  if (!operation) return;
+  const shouldMoveFocus = document.activeElement === button;
+  snapshotGeneration += 1; // A refresh started before this intent cannot restore the removed row.
+  undoAction = null;
+  render("external");
+  if (shouldMoveFocus) {
+    const nextButtons = [...root.querySelectorAll<HTMLButtonElement>("button.review-done")];
+    (nextButtons[Math.min(index, nextButtons.length - 1)]
+      ?? root.querySelector<HTMLButtonElement>("button[data-review-toggle]"))?.focus({ preventScroll: true });
+  }
+  // Store writes stay sequential; every check still dismisses immediately, including keyboard use.
+  reviewQueue = reviewQueue.then(() => saveReviewAcknowledgement(operation));
+}
+
+async function saveReviewAcknowledgement(operation: ReviewAcknowledgement): Promise<void> {
+  const args = { threadId: operation.thread.id, reviewUpdatedAt: operation.updatedAt, reviewIdentity: operation.identity, acknowledged: true };
+  const generation = snapshotGeneration;
+  const requestSnapshot = snapshot;
+  try {
+    if (!app) {
+      await fixtureReviewFeedback(operation);
+      if (snapshot && operation.superseded && operation.thread.review) {
+        // The synthetic delayed receipt can finish after its newer provider generation arrives.
+        fixtureReviewed.set(operation.thread.id, operation.thread.review);
+        snapshot.revision += 1;
+      } else applyFixtureMutation("gajendra_set_review_acknowledged", args);
+      if (snapshot) snapshot.product = productDeckProjection(snapshot);
+    } else {
+      const result = await app.callServerTool({ name: "gajendra_set_review_acknowledged", arguments: {
+        ...args, protocolVersion: MUTATION_PROTOCOL_VERSION, expectedRevision: snapshot?.revision,
+        idempotencyKey: operation.idempotencyKey,
+      } });
+      const content = result.structuredContent;
+      if (!isDeckMutationResult(content)) throw new Error("The save could not be confirmed. Retry to confirm it safely.");
+      const next = snapshot && generation !== snapshotGeneration
+        ? preserveNewerReviewEvidence(content.snapshot, snapshot, operation, requestSnapshot ?? undefined) : content.snapshot;
+      acceptSnapshot(next, "external", null);
+      if (content.outcome !== "applied" && content.outcome !== "replayed") {
+        // A typed rejection is definitely uncommitted; the next attempt may use the fresh revision.
+        operation.idempotencyKey = mutationKey();
+        throw new Error(content.error?.message ?? "The save was not applied. Retry with the latest view.");
+      }
+    }
+    reviewAcknowledgements.complete(operation);
+    if (snapshot) reviewAcknowledgements.observe(snapshot);
+    snapshotGeneration += 1;
+    undoAction = { tool: "gajendra_set_review_acknowledged", args: { ...args, acknowledged: false }, label: "Review saved." };
+    render("external");
+    const status = root.querySelector<HTMLElement>("[data-refresh-status]");
+    if (status) status.textContent = "Review saved";
+  } catch (error) {
+    reviewAcknowledgements.fail(operation, error instanceof Error ? error.message : "Try again.");
+    render("external");
+  }
+}
+
+/** Explicit standalone synthetic-fixture controls for real-interface acceptance, never host writes. */
+async function fixtureReviewFeedback(operation: ReviewAcknowledgement): Promise<void> {
+  const parameters = new URLSearchParams(window.location.search);
+  if (app || !parameters.has("fixture")) return;
+  const firstAttempt = ++fixtureReviewAttempt === 1;
+  const delayed = parameters.get("review-delay") === "1";
+  if (firstAttempt && delayed && parameters.get("review-newer") === "1") {
+    setTimeout(() => {
+      if (!snapshot) return;
+      const target = allDeckThreads(snapshot).find(thread => thread.id === operation.thread.id);
+      if (!target?.review) return;
+      target.review = { ...target.review, identity: "e".repeat(64), updatedAt: target.review.updatedAt + 60 };
+      snapshot.product = productDeckProjection(snapshot);
+      reviewAcknowledgements.observe(snapshot);
+      snapshotGeneration += 1;
+      render("external");
+    }, 2000);
+  }
+  if (delayed) await new Promise(resolve => setTimeout(resolve, 8000));
+  if (firstAttempt && parameters.get("review-fail-once") === "1") throw new Error("Synthetic connection interruption. Retry to save this review.");
+}
+
 async function mutate(
   tool: string,
   args: Record<string, unknown>,
@@ -662,7 +1030,7 @@ async function mutate(
   reason: RenderReason = "mutation",
   onSuccess?: () => void,
 ): Promise<void> {
-  if (busy) return;
+  if (busy || reviewAcknowledgements.pending) return;
   const layoutState = motion.captureLayout();
   let succeeded = false;
   busy = true;
@@ -671,6 +1039,7 @@ async function mutate(
     if (!app) {
       fixtureMutation?.();
       applyFixtureMutation(tool, args);
+      if (snapshot) snapshot.product = productDeckProjection(snapshot);
       render(reason, layoutState);
       succeeded = true;
     } else {
@@ -685,6 +1054,7 @@ async function mutate(
       });
       acceptSnapshot(result.structuredContent, reason, layoutState);
       succeeded = isDeckMutationResult(result.structuredContent)
+        && result.structuredContent.revision === snapshot?.revision
         && (result.structuredContent.outcome === "applied" || result.structuredContent.outcome === "replayed");
     }
   } catch (error) {
@@ -715,11 +1085,68 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
     return;
   }
   if (!target) return;
+  if (tool === "gajendra_set_work_completed") {
+    target.workState = args.completed === true ? "completed" : "open";
+    if (args.completed && snapshot.current?.id === id) snapshot.current = null;
+    if (args.currentThreadId === id && !args.completed) snapshot.current = target;
+    snapshot = normalizeDeckSelection(snapshot);
+    snapshot.revision += 1;
+    return;
+  }
+  if (tool === "gajendra_link_continuation") {
+    const movePriority = (from: DeckThread, to: DeckThread) => {
+      const level = from.level;
+      const ordered = level === "focus" ? snapshot!.focus : snapshot!.important;
+      const index = ordered.findIndex(thread => thread.id === from.id);
+      snapshot!.focus = snapshot!.focus.filter(thread => thread.id !== from.id && thread.id !== to.id);
+      snapshot!.important = snapshot!.important.filter(thread => thread.id !== from.id && thread.id !== to.id);
+      snapshot!.available = snapshot!.available.filter(thread => thread.id !== from.id && thread.id !== to.id);
+      to.level = level;
+      to.context = from.context;
+      from.level = null;
+      from.context = null;
+      const destination = level === "focus" ? snapshot!.focus : level === "important" ? snapshot!.important : snapshot!.available;
+      destination.splice(Math.max(0, index), 0, to);
+      snapshot!.available.push(from);
+      if (snapshot!.current?.id === from.id) snapshot!.current = to;
+    };
+    if (args.currentThreadId === null) {
+      const next = all.find(thread => thread.id === target.continuationThreadId);
+      if (next) {
+        movePriority(next, target);
+        next.predecessorThreadIds = [];
+      }
+      target.continuationThreadId = null;
+      target.currentThreadId = target.id;
+    } else {
+      const next = all.find(thread => thread.id === args.currentThreadId);
+      if (!next || next.id === target.id || next.level || next.workState === "completed") return;
+      target.continuationThreadId = next.id;
+      target.currentThreadId = next.id;
+      next.currentThreadId = next.id;
+      next.predecessorThreadIds = [...(target.predecessorThreadIds ?? []), target.id];
+      movePriority(target, next);
+    }
+    snapshot = normalizeDeckSelection(snapshot);
+    snapshot.revision += 1;
+    return;
+  }
   if (tool === "gajendra_set_review_acknowledged") {
+    if (args.acknowledged === false) {
+      const review = fixtureReviewed.get(id);
+      if (review && review.identity === args.reviewIdentity && review.updatedAt === Number(args.reviewUpdatedAt)) {
+        if (!target.review) { target.review = review; delete target.reviewAcknowledged; }
+        fixtureReviewed.delete(id);
+      }
+      snapshot.revision += 1;
+      return;
+    }
     if (target.review?.updatedAt !== Number(args.reviewUpdatedAt)
       || target.review.identity !== args.reviewIdentity
       || args.acknowledged !== true) return;
+    fixtureReviewed.set(id, target.review);
     delete target.review;
+    target.reviewAcknowledged = true;
     snapshot.revision += 1;
     return;
   }
@@ -803,23 +1230,53 @@ function applyFixtureMutation(tool: string, args: Record<string, unknown>): void
   snapshot.revision += 1;
 }
 
-async function refresh(): Promise<void> {
-  if (busy) return;
+async function refresh(background = false, prepared = false): Promise<void> {
+  if (busy || refreshing) return;
+  if (app && !connected) return start();
   const layoutState = motion.captureLayout();
-  busy = true;
-  motion.setBusy(true, "Refreshing Gajendra");
+  const generation = snapshotGeneration;
+  refreshing = true;
+  if (!background) motion.setBusy(true, "Refreshing Gajendra");
   try {
     if (!app) {
       render("refresh", layoutState);
       return;
     }
-    const result = await app.callServerTool({ name: "gajendra_open", arguments: {} });
+    const result = await app.callServerTool({ name: "gajendra_open", arguments: { refresh: !prepared } });
+    if (generation !== snapshotGeneration) return;
     acceptSnapshot(result.structuredContent, "refresh", layoutState);
+    if (!prepared) lastProviderRefresh = Date.now();
+    syncFailed = false;
   } catch (error) {
     renderRecoverableError(error, layoutState);
   } finally {
-    busy = false;
-    motion.setBusy(false);
+    refreshing = false;
+    if (!background) motion.setBusy(false);
+  }
+}
+
+async function checkSharedRevision(): Promise<void> {
+  if (!app || !connected || busy || refreshing || checkingRevision || draggedThreadId || !snapshot || document.visibilityState === "hidden") return;
+  checkingRevision = true;
+  try {
+    const result = await app.callServerTool({ name: "gajendra_sync", arguments: {} });
+    const metadata = result.structuredContent;
+    if (!metadata || typeof metadata !== "object" || !("revision" in metadata) || !Number.isSafeInteger(metadata.revision)) throw new Error("Invalid sync response");
+    const activityRevision = "activityRevision" in metadata ? metadata.activityRevision : undefined;
+    if (activityRevision !== undefined && typeof activityRevision !== "string") throw new Error("Invalid activity revision");
+    const catalogRevision = "catalogRevision" in metadata ? metadata.catalogRevision : undefined;
+    if (catalogRevision !== undefined && !Number.isSafeInteger(catalogRevision)) throw new Error("Invalid catalog revision");
+    if (Date.now() - lastProviderRefresh >= 30_000) {
+      lastProviderRefresh = Date.now();
+      await refresh(true, true);
+    }
+    else if (metadata.revision !== snapshot.revision || activityRevision !== snapshot.activityRevision
+      || catalogRevision !== snapshot.catalogRevision) await refresh(true, true);
+    if (syncFailed) { syncFailed = false; render(); }
+  } catch {
+    if (!syncFailed) { syncFailed = true; render(); }
+  } finally {
+    checkingRevision = false;
   }
 }
 
@@ -885,25 +1342,20 @@ async function openThreadLink(url: string, thread: DeckThread): Promise<void> {
     return;
   }
   const candidate = app as (App & { openLink?(input: { url: string }): Promise<unknown> }) | null;
-  if (candidate?.openLink) {
-    try {
-      const result = (await candidate.openLink({ url })) as { isError?: boolean };
-      if (!result.isError) return;
-    } catch {
-      // Fall through to the native URI navigation attempt.
-    }
-  }
   try {
-    const navigate = hostTestHooks()?.navigate;
-    if (navigate) navigate(url);
-    else window.location.assign(url);
-  } catch (error) {
-    renderRecoverableError(error, motion.captureLayout());
+    if (!candidate?.openLink) throw new Error("Host navigation is unavailable.");
+    const result = await candidate.openLink({ url }) as { isError?: boolean } | undefined;
+    if (result?.isError) throw new Error("Host navigation failed.");
+  } catch {
+    // Navigating this sandboxed iframe can silently do nothing or replace the
+    // app. A host failure must remain visible and must not bypass its decision.
+    renderRecoverableError(new Error(`The host could not open this thread in ${thread.sourceName}. Open it from the Gajendra Mac app, or retry after reconnecting the plugin.`), motion.captureLayout());
   }
 }
 
 function renderLoading(): void {
-  root.innerHTML = `<section class="loading-state" role="status">${brandMark()}<h1>Loading Gajendra…</h1><p>Reading metadata from your enabled thread sources.</p></section>`;
+  root.innerHTML = `<section class="loading-state" role="status">${brandMark()}<h1>Opening your work</h1><p>Loading the saved view and checking your connected sources.</p><div class="loading-skeleton" aria-hidden="true"></div><div class="loading-skeleton" aria-hidden="true"></div><button type="button" data-action="retry-loading">Retry loading</button></section>`;
+  root.querySelector<HTMLButtonElement>("[data-action=retry-loading]")?.addEventListener("click", () => void refresh());
 }
 
 function renderConnectionError(error: unknown): void {
@@ -961,7 +1413,23 @@ function applyVisualPreferences(): void {
   document.documentElement.style.colorScheme = appearance;
   root.dataset.gajaTheme = visualTheme;
   root.dataset.theme = appearance;
+  const followHost = visualTheme === "native" && appearancePreference === "auto";
+  for (const [token, hostToken] of Object.entries(hostStyleMap)) {
+    const value = hostStyles[hostToken];
+    if (followHost && value) document.documentElement.style.setProperty(token, value);
+    else document.documentElement.style.removeProperty(token);
+  }
+  document.documentElement.style.fontFamily = followHost ? hostStyles["--font-sans"] ?? "" : "";
   updateVisualPreferenceControls();
+}
+
+function acceptHostAppearance(context: ReturnType<App["getHostContext"]>): void {
+  if (context?.theme) hostAppearance = normalizeAppearance(context.theme);
+  if (context?.styles?.variables) {
+    hostStyles = { ...hostStyles, ...context.styles.variables };
+    applyHostStyleVariables(context.styles.variables);
+  }
+  applyVisualPreferences();
 }
 
 function updateVisualPreferenceControls(): void {
@@ -1030,7 +1498,13 @@ function brandMark(): string {
     <div class="visual-settings-popover" id="gaja-visual-settings">
       <p class="settings-title">Appearance settings</p>
       ${visualPreferenceControls()}
+      ${sourceSettings()}
       <p class="settings-note">Card size and lotus position are available in the native Gajendra app.</p>
     </div>
   </details>`;
+}
+
+function recordTitle(title: string): string {
+  const text = escapeHtml(title);
+  return `<span class="record-title-rest">${text}</span><span class="record-title-emphasis" aria-hidden="true">${text}</span>`;
 }

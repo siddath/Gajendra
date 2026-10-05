@@ -18,6 +18,44 @@ enum GajendraSelfTest {
         try require(snapshot.current?.context == .design, "thread context did not decode")
         try require(snapshot.current?.allowedDeepLinkSchemes == ["codex"], "per-source deep-link allowlist did not decode")
         try require(snapshot.sources.count == 2, "thread sources did not decode")
+        try verifyWorkTaxonomy(snapshot)
+        try await verifyAuthorityAndSyncRecovery(snapshot)
+        var activityObject = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as! [String: Any]
+        activityObject["activityRevision"] = "synthetic-invalidation-epoch"
+        let activitySnapshot = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: activityObject))
+        let activityProbe = RefreshProbe(snapshot: activitySnapshot)
+        let syncingModel = DeckViewModel(client: activityProbe, initialSnapshot: snapshot)
+        syncingModel.syncRevision()
+        for _ in 0..<100 {
+            if syncingModel.snapshot?.activityRevision == "synthetic-invalidation-epoch" { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(syncingModel.snapshot?.activityRevision == "synthetic-invalidation-epoch",
+                    "an activity epoch must trigger refresh even without a priority revision change")
+        syncingModel.syncRevision()
+        try await Task.sleep(for: .milliseconds(50))
+        let refreshCount = await activityProbe.requestCount()
+        try require(refreshCount == 1, "unchanged sync epochs must not rescan providers")
+        try await verifyDailyActivityAndLaunchCache(snapshot)
+        var unavailableObject = try JSONSerialization.jsonObject(with: Data(fixture.utf8)) as! [String: Any]
+        unavailableObject["error"] = "private diagnostic must not be rendered"
+        unavailableObject["staleEntryCount"] = 8
+        let unavailableSnapshot = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: unavailableObject))
+        let unavailableModel = DeckViewModel(client: nil, initialSnapshot: unavailableSnapshot)
+        let unavailableMessage = unavailableModel.errorMessage
+        try require(unavailableMessage?.contains("Saved priorities are unchanged") == true, "source failure was silently rendered as an empty account")
+        try require(unavailableMessage?.contains("private diagnostic") == false, "provider diagnostics escaped into the native warning")
+        let failingRefresh = DeckViewModel(client: RefreshProbe(snapshot: unavailableSnapshot), initialSnapshot: snapshot)
+        failingRefresh.refresh()
+        for _ in 0..<100 {
+            if !failingRefresh.isLoading { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(failingRefresh.snapshot == snapshot && failingRefresh.errorMessage?.contains("last view") == true,
+                    "source failure must retain the last useful view with an explicit stale warning")
+        unavailableObject["error"] = NSNull()
+        let missingSnapshot = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: unavailableObject))
+        try require(missingSnapshot.sourceWarning?.contains("8 saved priorities") == true, "unavailable saved entries need an explicit non-destructive warning")
         try require(DeckThread.isRunningStatus("active"), "active provider status must be treated as running")
         try require(DeckThread.isRunningStatus("in-progress"), "normalized in-progress status must be treated as running")
         try require(!DeckThread.isRunningStatus("resumable"), "resumable metadata must not be inferred as running")
@@ -824,12 +862,24 @@ enum GajendraSelfTest {
         )
         var cardPresentation = GajendraCardPresentationState()
         try require(!cardPresentation.isPresented, "card must start hidden")
-        try require(cardPresentation.toggle(), "the first icon click must present the card")
+        try require(cardPresentation.toggle(isVisibleOnActiveSpace: false), "the first icon click must present the card")
         try require(cardPresentation.isPresented, "the card must stay presented without hover state")
-        try require(!cardPresentation.toggle(), "the second icon click must dismiss the card")
+        try require(!cardPresentation.toggle(isVisibleOnActiveSpace: true), "the second icon click must dismiss the visible card")
         try require(!cardPresentation.isPresented, "the card must remain hidden after click dismissal")
         try require(!cardPresentation.dismiss(), "dismissing an already-hidden card must be idempotent")
-        try require(cardPresentation.toggle(), "the card must reopen on a later click")
+        try require(cardPresentation.toggle(isVisibleOnActiveSpace: false), "the card must reopen on a later click")
+        try require(
+            cardPresentation.toggle(isVisibleOnActiveSpace: false),
+            "one click must reveal a card that still says presented but is hidden or on another Space"
+        )
+        try require(
+            !cardPresentation.toggle(isVisibleOnActiveSpace: true),
+            "the recovered visible card must still dismiss on the next click"
+        )
+        try require(
+            cardPresentation.toggle(isVisibleOnActiveSpace: true),
+            "a click during an unfinished dismissal must reopen the card"
+        )
         try require(cardPresentation.dismiss(), "outside click or Escape must dismiss a presented card")
         let priorityFrames = [
             CGRect(x: 20, y: 80, width: 240, height: 44),
@@ -912,6 +962,7 @@ enum GajendraSelfTest {
         try verifyReviewOpenRoutes(reviewSnapshot)
         try await verifyNativeViewProof(with: snapshot)
         try await verifyQueueHandlers(with: snapshot)
+        try await verifyOptimisticReviewAcknowledgement(with: snapshot)
         try await verifyCompactPriorityMoves(with: snapshot)
         try await verifyAdvancingQueueIntents(with: snapshot)
         try await verifyQueuedRefresh(with: snapshot)
@@ -1282,16 +1333,6 @@ enum GajendraSelfTest {
                     options: .regularExpression
                 ) == nil,
             "canonical thread identifiers must not be exported through accessibility identifiers"
-        )
-
-        let reviewDock = try section(
-            from: "private func reviewReadySummary(_ threads: [DeckThread])",
-            before: "private func toggleReviewDock()"
-        )
-        try require(
-            reviewDock.contains("let visibleThreads = Array(threads.prefix(5))")
-                && reviewDock.contains("moreButton(remaining: threads.count - 5, title: \"Ready for Review\")"),
-            "Ready for Review must cap its compact list at five while disclosing the exact overflow"
         )
 
         let queueRow = try section(
@@ -2169,10 +2210,10 @@ enum GajendraSelfTest {
             requestCountAfterUndo == requestCountBeforeUndo,
             "stale undo sent a mutation after external refresh"
         )
-        let externalError = await externalModel.mutationErrorMessage
+        let externalError = await externalModel.errorMessage
         try require(
-            externalError == "That change is no longer undoable because Gajendra changed elsewhere.",
-            "external refresh did not leave a typed fail-closed history error"
+            externalError == nil,
+            "successful external refresh must invalidate undo without presenting a connection or mutation error"
         )
     }
 
@@ -2596,6 +2637,148 @@ enum GajendraSelfTest {
         )
     }
 
+    @MainActor
+    private static func verifyOptimisticReviewAcknowledgement(with base: DeckSnapshot) async throws {
+        let original = try reviewTestSnapshot(base, revision: 50, identity: "a", reviewed: false)
+        let saved = try reviewTestSnapshot(base, revision: 51, identity: "a", reviewed: true)
+        let restored = try reviewTestSnapshot(base, revision: 52, identity: "a", reviewed: false)
+        let ready = original.current!
+        let probe = GatedReviewProbe()
+        let model = DeckViewModel(client: probe, initialSnapshot: original)
+        model.setReviewAcknowledged(ready, acknowledged: true)
+        try require(model.snapshot?.reviewReadyThreads.isEmpty == true && model.pendingReviewCount == 1,
+                    "review must disappear immediately before the slow durable request resolves")
+        try require(model.snapshot?.current?.id == ready.id && model.snapshot?.current?.context == .engineering
+                    && model.snapshot?.focus.map(\.id) == original.focus.map(\.id)
+                    && model.snapshot?.current?.workState == "open",
+                    "optimistic review must preserve NOW, priority order, context and open work")
+        try require(model.snapshot?.historyThreads.contains(where: { $0.id == ready.id && $0.reviewAcknowledged }) == true
+                    && model.isReviewPending(ready) && !model.canUndoReview,
+                    "pending review must appear in History without enabling Undo before save")
+        await probe.waitForMutation(1)
+        await probe.resolveMutation(DeckMutationResult(outcome: .applied, revision: saved.revision, snapshot: saved))
+        try await waitUntilIdle(model)
+        try require(model.pendingReviewCount == 0 && model.canUndoReview && model.reviewFeedback != nil,
+                    "successful durable acknowledgement must settle feedback and enable Undo")
+        model.undo()
+        await probe.waitForMutation(2)
+        let undoRequests = await probe.requests()
+        try require(undoRequests.last?.mutation == .setReviewAcknowledged(threadId: ready.id,
+                    reviewUpdatedAt: ready.review!.updatedAt, reviewIdentity: ready.review!.identity!, acknowledged: false),
+                    "Undo must target exactly the acknowledged response")
+        await probe.resolveMutation(DeckMutationResult(outcome: .applied, revision: restored.revision, snapshot: restored))
+        try await waitUntilIdle(model)
+        try require(model.snapshot?.reviewReadyThreads.map(\.id) == [ready.id], "Undo must restore Ready")
+
+        let failureProbe = GatedReviewProbe()
+        let failureModel = DeckViewModel(client: failureProbe, initialSnapshot: original)
+        failureModel.setReviewAcknowledged(ready, acknowledged: true)
+        await failureProbe.waitForMutation(1)
+        await failureProbe.failMutation()
+        try await waitUntilIdle(failureModel)
+        try require(failureModel.snapshot?.reviewReadyThreads.map(\.id) == [ready.id]
+                    && failureModel.pendingReviewCount == 0 && failureModel.canRetryReview
+                    && failureModel.mutationErrorMessage != nil && !failureModel.canUndoReview,
+                    "failed save must restore exact Ready row with retry and no false success")
+        failureModel.retryReviewAcknowledgement()
+        await failureProbe.waitForMutation(2)
+        let retryRequests = await failureProbe.requests()
+        try require(retryRequests.count == 2 && retryRequests[0].idempotencyKey == retryRequests[1].idempotencyKey,
+                    "uncertain-write Retry must retain the same idempotency key")
+        await failureProbe.resolveMutation(DeckMutationResult(outcome: .replayed, revision: saved.revision, snapshot: saved))
+        try await waitUntilIdle(failureModel)
+        try require(failureModel.snapshot?.reviewReadyThreads.isEmpty == true && !failureModel.canRetryReview,
+                    "replayed committed acknowledgement must settle the restored row")
+
+        // Start a refresh first so the clicked receipt queues behind genuinely newer provider evidence.
+        let newer = try reviewTestSnapshot(base, revision: 50, identity: "b", reviewed: false)
+        let queuedProbe = GatedReviewProbe()
+        let queuedModel = DeckViewModel(client: queuedProbe, initialSnapshot: original)
+        queuedModel.refresh()
+        await queuedProbe.waitForSnapshot()
+        queuedModel.setReviewAcknowledged(ready, acknowledged: true)
+        try require(queuedModel.snapshot?.reviewReadyThreads.isEmpty == true && queuedModel.pendingReviewCount == 1,
+                    "queued acknowledgement must respond before an in-flight refresh finishes")
+        await queuedProbe.resolveSnapshot(newer)
+        await queuedProbe.waitForMutation(1)
+        try require(queuedModel.snapshot?.reviewReadyThreads.first?.review?.identity == newer.current?.review?.identity,
+                    "pending old identity must never suppress a newly refreshed response")
+        await queuedProbe.resolveMutation(DeckMutationResult(outcome: .conflict, revision: original.revision,
+            snapshot: original, error: DeckMutationError(code: "stale-revision")))
+        try await waitUntilIdle(queuedModel)
+        try require(queuedModel.snapshot?.reviewReadyThreads.first?.review?.identity == newer.current?.review?.identity,
+                    "older conflict response must not roll back newer provider evidence at the same store revision")
+
+        // A later response cannot replace a newer saved-priority generation with an older snapshot.
+        let freshPriority = try reviewTestSnapshot(base, revision: 55, identity: "b", reviewed: false)
+        let staleProbe = GatedReviewProbe()
+        let staleModel = DeckViewModel(client: staleProbe, initialSnapshot: freshPriority)
+        staleModel.setReviewAcknowledged(freshPriority.current!, acknowledged: true)
+        await staleProbe.waitForMutation(1)
+        await staleProbe.resolveMutation(DeckMutationResult(outcome: .applied, revision: saved.revision, snapshot: saved))
+        try await waitUntilIdle(staleModel)
+        try require(staleModel.snapshot?.revision == freshPriority.revision
+                    && staleModel.snapshot?.current?.review?.identity == freshPriority.current?.review?.identity
+                    && staleModel.pendingReviewCount == 0 && staleModel.mutationErrorMessage != nil,
+                    "stale mutation response must preserve current priorities and restore pending review")
+    }
+
+    private static func reviewTestSnapshot(_ base: DeckSnapshot, revision: Int, identity: String, reviewed: Bool) throws -> DeckSnapshot {
+        let ready = DeckThread(id: "codex:optimistic-review", sourceId: "codex", sourceName: "Codex",
+            title: "Synthetic reviewed work", project: "Synthetic", updatedAt: identity == "a" ? 10 : 20,
+            status: "idle", level: .focus, isCurrent: true, context: .engineering,
+            deepLink: "codex://threads/optimistic-review", allowedDeepLinkSchemes: ["codex"],
+            review: reviewed ? nil : ReviewSignal(state: .ready, kind: .result, updatedAt: identity == "a" ? 10 : 20,
+                destination: ReviewDestination(type: .thread, deepLink: "codex://threads/optimistic-review"),
+                providerStatus: "COMPLETED", identity: String(repeating: identity, count: 64)), reviewAcknowledged: reviewed)
+        let other = DeckThread(id: "codex:optimistic-other", sourceId: "codex", sourceName: "Codex",
+            title: "Synthetic other", project: "Synthetic", updatedAt: 5, status: "idle", level: .focus,
+            isCurrent: false, deepLink: "codex://threads/optimistic-other")
+        let product = try JSONDecoder().decode(ProductSections.self, from: JSONEncoder().encode([
+            "readyForReview": reviewed ? [] : [ready], "needsInput": [], "running": [],
+            "continue": [ready, other], "history": reviewed ? [ready] : [],
+        ]))
+        return DeckSnapshot(revision: revision, generatedAt: base.generatedAt, product: product,
+            current: ready, focus: [ready, other], important: [], available: [], collapsed: base.collapsed,
+            focusGuide: base.focusGuide, focusOverGuide: false, staleEntryCount: 0,
+            source: base.source, sources: base.sources, error: nil)
+    }
+
+    private actor GatedReviewProbe: DeckServing {
+        private var receivedRequests: [DeckMutationRequest] = []
+        private var mutationGate: CheckedContinuation<DeckMutationResult, Error>?
+        private var snapshotGate: CheckedContinuation<DeckSnapshot, Never>?
+        private var mutationWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+        private var snapshotWaiters: [CheckedContinuation<Void, Never>] = []
+        func snapshot() async throws -> DeckSnapshot {
+            await withCheckedContinuation { continuation in
+                snapshotGate = continuation
+                snapshotWaiters.forEach { $0.resume() }; snapshotWaiters.removeAll()
+            }
+        }
+        func mutate(_ request: DeckMutationRequest) async throws -> DeckMutationResult {
+            receivedRequests.append(request)
+            return try await withCheckedThrowingContinuation { continuation in
+                mutationGate = continuation
+                let ready = mutationWaiters.filter { $0.0 <= receivedRequests.count }
+                mutationWaiters.removeAll { $0.0 <= receivedRequests.count }
+                ready.forEach { $0.1.resume() }
+            }
+        }
+        func waitForMutation(_ count: Int) async {
+            if receivedRequests.count >= count { return }
+            await withCheckedContinuation { mutationWaiters.append((count, $0)) }
+        }
+        func waitForSnapshot() async {
+            if snapshotGate != nil { return }
+            await withCheckedContinuation { snapshotWaiters.append($0) }
+        }
+        func resolveMutation(_ result: DeckMutationResult) { mutationGate?.resume(returning: result); mutationGate = nil }
+        func failMutation() { mutationGate?.resume(throwing: SelfTestError.failed("synthetic transport failure")); mutationGate = nil }
+        func resolveSnapshot(_ result: DeckSnapshot) { snapshotGate?.resume(returning: result); snapshotGate = nil }
+        func requests() -> [DeckMutationRequest] { receivedRequests }
+    }
+
     private static func waitUntilIdle(_ model: DeckViewModel) async throws {
         for _ in 0..<160 {
             if !(await model.isLoading) { return }
@@ -2641,6 +2824,192 @@ enum GajendraSelfTest {
         throw SelfTestError.failed("refresh requested during an active load was not queued exactly once")
     }
 
+    @MainActor
+    private static func verifyAuthorityAndSyncRecovery(_ original: DeckSnapshot) async throws {
+        var unavailable = try JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as! [String: Any]
+        unavailable["revision"] = original.revision + 1
+        unavailable["error"] = "provider details must remain private"
+        unavailable["current"] = NSNull()
+        var focus = unavailable["focus"] as! [[String: Any]]
+        let formerNow = original.current!.id
+        focus = focus.map { value in
+            var thread = value
+            thread["isCurrent"] = false
+            thread["status"] = "cached"
+            if thread["id"] as? String == formerNow { thread["workState"] = "completed" }
+            return thread
+        }
+        unavailable["focus"] = focus
+        let newer = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: unavailable))
+        let model = DeckViewModel(client: RefreshProbe(snapshot: newer), initialSnapshot: original)
+        model.refresh()
+        try await waitUntilIdle(model)
+        try require(model.snapshot?.revision == newer.revision && model.snapshot?.current == nil,
+                    "newer error snapshots must advance authority and preserve externally cleared NOW")
+        try require(model.snapshot?.continueThreads.contains(where: { $0.id == formerNow }) == false,
+                    "metadata failure must not resurrect work completed at a newer revision")
+        try require(model.errorMessage?.contains("Latest saved work") == true
+                    && model.errorMessage?.contains("provider details") == false,
+                    "newer error snapshots must show an actionable, sanitized warning")
+
+        unavailable["focus"] = []
+        unavailable["important"] = []
+        unavailable["available"] = []
+        let empty = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: unavailable))
+        let emptyModel = DeckViewModel(client: RefreshProbe(snapshot: empty), initialSnapshot: original)
+        emptyModel.refresh()
+        try await waitUntilIdle(emptyModel)
+        try require(emptyModel.snapshot?.revision == newer.revision && emptyModel.snapshot?.allThreads.isEmpty == true,
+                    "an empty error fallback must still advance the authoritative revision")
+
+        unavailable["revision"] = original.revision
+        let sameRevisionError = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: unavailable))
+        let probe = SyncRecoveryProbe(snapshot: sameRevisionError)
+        let recovering = DeckViewModel(client: probe, initialSnapshot: original)
+        recovering.syncRevision()
+        for _ in 0..<100 {
+            if recovering.errorChannels.sync != nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(recovering.errorMessage?.contains("Sync interrupted") == true && recovering.snapshot == original,
+                    "failed synchronization must be visible and keep the last view intact")
+        await probe.setFailsSync(false)
+        recovering.syncRevision()
+        for _ in 0..<100 {
+            if recovering.errorChannels.sync == nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(recovering.errorMessage == nil, "successful sync must clear its warning")
+        recovering.refresh()
+        try await waitUntilIdle(recovering)
+        let clientWarning = recovering.errorChannels.client
+        try require(recovering.snapshot == original && clientWarning?.contains("last view") == true,
+                    "same-revision source errors must retain the last useful view")
+        await probe.setFailsSync(true)
+        recovering.syncRevision()
+        for _ in 0..<100 {
+            if recovering.errorChannels.sync != nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(recovering.errorChannels.sync != nil, "sync warning must have its own error channel")
+        await probe.setFailsSync(false)
+        recovering.syncRevision()
+        for _ in 0..<100 {
+            if recovering.errorChannels.sync == nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(recovering.errorChannels.sync == nil && recovering.errorChannels.client == clientWarning,
+                    "sync recovery must not dismiss an independent provider-read error")
+    }
+
+    private actor SyncRecoveryProbe: DeckServing {
+        let result: DeckSnapshot
+        var failsSync = true
+        init(snapshot: DeckSnapshot) { result = snapshot }
+        func setFailsSync(_ value: Bool) { failsSync = value }
+        func syncState() async throws -> DeckSyncState? {
+            if failsSync { throw DeckClient.ClientError.invalidResponse }
+            return try JSONDecoder().decode(DeckSyncState.self, from: JSONEncoder().encode(result))
+        }
+        func snapshot() async throws -> DeckSnapshot { result }
+        func mutate(_ request: DeckMutationRequest) async throws -> DeckMutationResult {
+            throw DeckClient.ClientError.invalidResponse
+        }
+    }
+
+    private static func verifyWorkTaxonomy(_ snapshot: DeckSnapshot) throws {
+        var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(snapshot)) as! [String: Any]
+        var ready = (object["available"] as! [[String: Any]]).first ?? (object["focus"] as! [[String: Any]])[0]
+        ready["id"] = "codex:old-review"
+        ready["updatedAt"] = 1
+        ready["status"] = "idle"
+        ready["isCurrent"] = false
+        ready["review"] = ["state": "ready", "kind": "result", "updatedAt": 1, "providerStatus": "completed",
+                           "destination": ["type": "thread", "deepLink": "codex://threads/old-review"]]
+        var finished = ready
+        finished["id"] = "codex:finished"
+        finished["review"] = NSNull()
+        finished["workState"] = "completed"
+        finished["currentThreadId"] = "codex:successor"
+        finished["continuationThreadId"] = "codex:successor"
+        finished["predecessorThreadIds"] = ["codex:earlier"]
+        object["available"] = [ready, finished]
+        object["product"] = ["readyForReview": [ready], "needsInput": [], "running": [],
+                             "continue": object["focus"] as! [[String: Any]], "history": [finished]]
+        let decoded = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        try require(decoded.reviewReadyThreads.map(\.id) == ["codex:old-review"],
+                    "old unreviewed results must stay Ready independent of recency")
+        try require(decoded.needsInputThreads.isEmpty, "idle or review state must not invent Needs input")
+        try require(decoded.historyThreads.first?.workState == "completed", "explicit completion must survive decode")
+        try require(decoded.historyThreads.first?.continuationThreadId == "codex:successor",
+                    "direct continuation must remain distinct from inferred identity")
+        try require(decoded.continueThreads.allSatisfy { $0.workState != "completed" },
+                    "Continue must use the authoritative product projection")
+        let finish = DeckMutation.setWorkCompleted(threadId: "codex:finished", completed: false, currentThreadId: "codex:finished")
+        let payload = try JSONSerialization.jsonObject(with: JSONEncoder().encode(finish)) as! [String: Any]
+        try require(payload["type"] as? String == "set-work-completed" && payload["currentThreadId"] as? String == "codex:finished",
+                    "Undo completion must encode the prior explicit NOW")
+        let unlink = try JSONSerialization.jsonObject(with: JSONEncoder().encode(DeckMutation.linkContinuation(threadId: "codex:earlier", currentThreadId: nil))) as! [String: Any]
+        try require(unlink["currentThreadId"] is NSNull, "Unlink must explicitly encode a null destination")
+    }
+
+    @MainActor
+    private static func verifyDailyActivityAndLaunchCache(_ fixture: DeckSnapshot) async throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 19800)!
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let start = calendar.startOfDay(for: now).timeIntervalSince1970
+        let thread: (String, Double, String) -> DeckThread = { id, time, status in
+            DeckThread(id: "codex:\(id)", sourceId: "codex", sourceName: "Codex", title: id,
+                       project: "Fixture", updatedAt: time, status: status, level: nil,
+                       isCurrent: false, deepLink: "codex://threads/\(id)")
+        }
+        let current = DeckSnapshot(generatedAt: fixture.generatedAt, current: nil, focus: [], important: [],
+            available: [thread("previous", start - 1, "idle"), thread("continuation-3", start + 1, "idle"),
+                        thread("running", start + 2, "active")], collapsed: fixture.collapsed, focusGuide: 3,
+            focusOverGuide: false, staleEntryCount: 0, source: fixture.source, sources: fixture.sources, error: nil)
+        try require(current.activityThreads(today: true, now: now, calendar: calendar).map(\.id) == ["codex:continuation-3"],
+                    "an unpinned continuation must enter Today automatically, with running tasks in their own list")
+        try require(current.activityThreads(today: false, now: now, calendar: calendar).map(\.id) == ["codex:previous"],
+                    "local calendar boundaries must move older activity out of Today without removing it")
+        try require(current.allThreads.count == 3 && current.focus.isEmpty,
+                    "daily grouping must not change priority or mark work done")
+        let probe = LaunchCacheProbe(snapshot: current)
+        let model = DeckViewModel(client: probe)
+        model.refresh()
+        for _ in 0..<100 {
+            if model.snapshot?.cachedAt != nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(model.snapshot?.cachedAt != nil && model.isLoading,
+                    "cached metadata must render while live discovery is still pending")
+        await probe.releaseLiveSnapshot()
+        for _ in 0..<100 {
+            if !model.isLoading { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        try require(model.snapshot?.cachedAt == nil && !model.isLoading,
+                    "live snapshot must replace the saved view and clear its stale indication")
+    }
+
+    private actor LaunchCacheProbe: DeckServing {
+        let result: DeckSnapshot
+        var continuation: CheckedContinuation<DeckSnapshot, Never>?
+        init(snapshot: DeckSnapshot) { result = snapshot }
+        func cachedSnapshot() async throws -> DeckSnapshot? {
+            var object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as! [String: Any]
+            object["cachedAt"] = result.generatedAt
+            return try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        }
+        func snapshot() async throws -> DeckSnapshot {
+            await withCheckedContinuation { continuation = $0 }
+        }
+        func releaseLiveSnapshot() { continuation?.resume(returning: result); continuation = nil }
+        func mutate(_ request: DeckMutationRequest) async throws -> DeckMutationResult {
+            DeckMutationResult(outcome: .applied, revision: result.revision, snapshot: result)
+        }
+    }
+
     private actor RefreshProbe: DeckServing {
         private let result: DeckSnapshot
         private let mutationResultSnapshot: DeckSnapshot?
@@ -2665,6 +3034,10 @@ enum GajendraSelfTest {
             mutationError = error
             self.mutationRevisionOverride = mutationRevisionOverride
             self.mutationDelayMilliseconds = mutationDelayMilliseconds
+        }
+
+        func syncState() async throws -> DeckSyncState? {
+            try JSONDecoder().decode(DeckSyncState.self, from: JSONEncoder().encode(result))
         }
 
         func snapshot() async throws -> DeckSnapshot {

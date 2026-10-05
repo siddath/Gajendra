@@ -12,15 +12,15 @@ const transport = new StdioClientTransport({
   args: [serverPath, "--stdio"],
   env: { ...process.env, GAJENDRA_DATA_DIR: dataDirectory },
 });
-const client = new Client({ name: "gajendra-live-probe", version: "0.3.1" });
+const client = new Client({ name: "gajendra-live-probe", version: "0.4.0" });
 
 try {
   await client.connect(transport);
   const tools = await client.listTools();
   const open = tools.tools.find((tool) => tool.name === "gajendra_open");
   if (!open) throw new Error("gajendra_open is missing");
-  if (JSON.stringify(open._meta?.["openai/ui"]) !== JSON.stringify({ entrypoints: [{ type: "global" }] })) {
-    throw new Error("experimental global entry point metadata is missing");
+  if (JSON.stringify(open._meta?.["openai/ui"]) !== JSON.stringify({ entrypoints: [{ type: "global" }, { type: "thread" }] })) {
+    throw new Error("sidebar and conversation entry point metadata is missing");
   }
   const resource = await client.readResource({ uri: "ui://gajendra/app-v1.html" });
   if (resource.contents[0]?.mimeType !== "text/html;profile=mcp-app") {
@@ -31,12 +31,17 @@ try {
   if (!snapshot || snapshot.source !== "gajendra-registry" || snapshot.error) {
     throw new Error(`live snapshot failed: ${snapshot?.error ?? "missing structured content"}`);
   }
+  const codexSource = snapshot.sources?.find((source) => source.id === "codex");
+  if (codexSource?.state !== "ready") {
+    throw new Error("Codex source is not ready; other sources or saved data do not prove reachability.");
+  }
   console.log(
     JSON.stringify({
       toolCount: tools.tools.length,
       uiResource: resource.contents[0]?.mimeType,
       globalEntrypoint: true,
       codexAppServer: "reachable",
+      codexThreadCount: codexSource.threadCount,
       threadCount: Array.isArray(snapshot.available) ? snapshot.available.length : null,
       sourceCount: Array.isArray(snapshot.sources) ? snapshot.sources.length : null,
     }),

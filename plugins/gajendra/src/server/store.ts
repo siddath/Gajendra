@@ -9,6 +9,7 @@ import {
   EMPTY_STORE,
   type PriorityStore,
 } from "../shared/contracts.js";
+import { validCompletedIds, validContinuations } from "./workflow.js";
 import { normalizeStore } from "./domain.js";
 
 const DEFAULT_MAX_STORE_BYTES = 512 * 1024;
@@ -585,6 +586,9 @@ function hasKnownStoreShape(value: unknown, purpose: "primary" | "backup" | "leg
   if (!isCollapsedShape(candidate.collapsed)) return false;
   if (version >= 2 && !isSourcePreferencesShape(candidate.sourcePreferences)) return false;
   if (version === 3) {
+    if (candidate.completedThreadIds !== undefined && !validCompletedIds(candidate.completedThreadIds)) return false;
+    if (candidate.continuations !== undefined && !validContinuations(candidate.continuations)) return false;
+    if (candidate.nowSelection !== undefined && candidate.nowSelection !== "automatic" && candidate.nowSelection !== "cleared") return false;
     if (!isRevision(candidate.revision) || !Array.isArray(candidate.idempotency) || !candidate.idempotency.every(isStrictReceipt)) return false;
     if (candidate.reviewAcknowledgements !== undefined
       && (!Array.isArray(candidate.reviewAcknowledgements)

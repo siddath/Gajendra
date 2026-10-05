@@ -29,9 +29,15 @@ the missing piece is a trusted answer to four simple questions:
 
 Gajendra keeps those answers close without becoming another project-management system.
 
+The local **0.4.0 candidate** gives the Mac utility and Codex extension one shared view of Ready
+for Review, verified Needs input, Running, Your priorities, and History. Finish work and Reopen are explicit
+choices. An exact continuation moves priority to its selected successor and preserves the earlier
+chat in History. Age is only a history grouping; it never hides pending review or finishes work.
+See the [daily workflow trial](docs/DAILY-WIDGET.md) for acceptance and rollback boundaries.
+
 ## Product tour
 
-These are deterministic screenshots of the real SwiftUI views. Every title, project, ID, and status
+These are historical deterministic screenshots of the real SwiftUI views, not proof of the 0.4.0 layout. Every title, project, ID, and status
 comes from a public synthetic fixture shaped like common Codex and Claude workflows; no private
 thread content is used.
 
@@ -49,10 +55,13 @@ thread content is used.
 
 | Capability | What it is for |
 | --- | --- |
-| **NOW** | Keep exactly one current thread visible and open it immediately. Double-click anywhere on the NOW card or select **Open**; NOW always belongs to Focus. |
+| **NOW** | Keep one selected current thread visible and open it immediately. Double-click anywhere on the NOW card or select **Open**; NOW always belongs to open Focus work. Finish clears NOW without choosing a replacement. |
 | **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact priority rows rely on drag, context-menu, and accessibility actions instead of a duplicate left/right button; Running/Ready status rows retain their separate priority control. Organizer retains explicit queue controls. |
 | **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label; provider completion becomes Ready for Review on refresh only when valid Ready evidence is available. |
 | **Ready for Review** | See provider-completed work awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled. Select the green **Mark reviewed** action to remove only that exact response from Ready; Undo restores it, while a later response or corrected destination reappears. Running takes precedence, and an expanded compact preview shows at most five rows before routing the truthful remainder to Organizer. |
+| **Finish and Reopen** | Explicitly finish work while preserving its priority metadata and any pending response review. Reopen returns it to Continue; selecting NOW remains explicit. |
+| **Your priorities and History** | Your priorities holds open Focus and Important work. Select an exact existing successor chat in Organizer or the plugin to transfer priority, order, context, and NOW atomically. Earlier chats remain separate, searchable History with their original destinations. Titles never establish a continuation. |
+| **Needs input** | Show only an explicit validated source request. Generic waiting, idle, or age is insufficient. |
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
 | **Open and resume** | Return to the source-owned thread with source-specific destination validation. |
 | **Edit and recover** | Reorder, move, append, remove, make NOW, and use app-owned Undo/Redo after successful changes. |
@@ -111,7 +120,7 @@ refresh while its priority and exact destination stay unchanged. `npm run
 companion:ui-performance-test` separately enforces the measured launcher budget and checks the
 widget journey for SwiftUI dependency cycles.
 
-### Optional: add the Codex plugin
+### Use the Codex extension
 
 If you also want Gajendra's MCP tools inside Codex, with the Codex CLI available locally:
 
@@ -119,16 +128,38 @@ If you also want Gajendra's MCP tools inside Codex, with the Codex CLI available
 npm run install:local
 ```
 
-This installs the local plugin from the checked-out source. It is separate from opening the macOS
-companion.
+This installs the local plugin from the checked-out source. Reopen Codex after updating it to
+refresh the loaded MCP server. Open **Gajendra priorities** from the plugin's sidebar entry or
+from a conversation's panel menu. Calling `gajendra_open` also works in compatible inline MCP App
+hosts. The extension shares the Mac app's private priority store; opening it does not reset NOW.
+
+Both surfaces can first show a labeled neutral cached view, then refresh from providers. While
+visible, they check local revisions about every five seconds and request source refreshes about
+every thirty seconds. Provider latency still applies. Optional plugin lifecycle hooks can invalidate
+completion reuse sooner, but require explicit host review and trust; ordinary polling still works
+when hooks are skipped. This is a custom local plugin, not an OpenAI first-party feature.
+
+The October 5 performance candidate shares a private session backend between the Mac app and
+plugin. Prepared reads and local changes use its catalog; provider discovery runs separately.
+Codex listing uses its supported metadata-only API with periodic full reconciliation. In the local
+three-run comparison, median refresh fell from 15.05 seconds to 0.80 seconds and local writes from
+15.92 seconds to 0.11 seconds. These are backend timings, not popup latency guarantees. See the
+[performance receipt](worksheets/2026-10-05-backend-cache-performance.md) for scope and rollback.
+
+Sources must be available on the Mac where the MCP server runs. If a source cannot load, its
+diagnostic and the count of unavailable saved priorities remain visible. Archived provider tasks
+can be absent from active results while their saved Gajendra choices remain intact. Do not reset
+the store to fix a blank view. See the [extension recovery notes](docs/CODEX_EXTENSION.md).
 
 ## Local-first privacy
 
 - Provider products continue to own sessions, credentials, prompts, transcripts, and source files.
-- Gajendra persists only namespaced thread IDs, priority order, the bounded context enum, source
-  preferences, revision data, bounded idempotency receipts, and bounded SHA-256 review acknowledgement receipts.
-- It does **not** persist thread titles, prompts, transcript bodies, tokens, credentials, review
-  results, diffs, review timestamps/destinations, or arbitrary provider responses.
+- The authoritative store retains namespaced IDs, priority order, bounded context/source preferences,
+  explicit completion IDs, continuation relationships, NOW-selection state, revisions, and bounded
+  idempotency/review receipts. No provider text enters this store.
+- Separate private disposable caches may hold rendered titles/project labels and validated completion
+  metadata; they never hold prompts, transcripts, credentials, commands, review results, or raw responses.
+- Optional trusted lifecycle hooks write one invalidation token. They never finish work or steer Codex.
 - Every source is explicit and bounded. There is no arbitrary filesystem crawl or shell discovery.
 - Open actions revalidate source-specific URL schemes immediately before launch.
 
@@ -187,3 +218,16 @@ Android companion. See the [mobile plan](worksheets/GAJENDRA_MOBILE_APP_PLAN.md)
 Use [GitHub Discussions](https://github.com/siddath/Gajendra/discussions) for support and
 [private security reporting](https://github.com/siddath/Gajendra/security/advisories/new) for
 vulnerabilities.
+
+## 0.4.0 candidate update
+
+The native app and Codex plugin now share prepared metadata and durable work state, with explicit
+Finish/Reopen, exact continuation links, review Retry/Undo and restrained pointer feedback.
+See [release changes and known limits](docs/releases/0.4.0.md),
+[Codex plugin setup](docs/CODEX_EXTENSION.md), [privacy information](PRIVACY.md), and
+[directory submission readiness](docs/CODEX_PLUGIN_PUBLICATION.md).
+
+This is a community repository plugin. Official directory review and a notarized native download
+are separate remaining steps. When updating a locally built native app, quit it and replace the
+whole app bundle with a fresh copy; do not overwrite a running bundle's signed runtime in place.
+Retain your user-state backup separately from the app binaries.

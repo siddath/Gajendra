@@ -6,9 +6,24 @@ import Darwin
 import Glibc
 #endif
 
+public struct DeckSyncState: Decodable, Sendable {
+    public let revision: Int
+    public let activityRevision: String?
+    public var catalogRevision: Int? = nil
+}
+
 public protocol DeckServing {
+    func readSnapshot() async throws -> DeckSnapshot
+    func cachedSnapshot() async throws -> DeckSnapshot?
+    func syncState() async throws -> DeckSyncState?
     func snapshot() async throws -> DeckSnapshot
     func mutate(_ request: DeckMutationRequest) async throws -> DeckMutationResult
+}
+
+public extension DeckServing {
+    func readSnapshot() async throws -> DeckSnapshot { try await snapshot() }
+    func cachedSnapshot() async throws -> DeckSnapshot? { nil }
+    func syncState() async throws -> DeckSyncState? { nil }
 }
 
 public struct GajendraNodeResolution: Equatable, Sendable {
@@ -146,6 +161,18 @@ public struct DeckClient: Sendable, DeckServing {
         try await execute(arguments: ["--snapshot-json"], input: nil, decode: DeckSnapshot.self)
     }
 
+    public func readSnapshot() async throws -> DeckSnapshot {
+        try await execute(arguments: ["--read-json"], input: nil, decode: DeckSnapshot.self)
+    }
+
+    public func syncState() async throws -> DeckSyncState? {
+        try await execute(arguments: ["--sync-json"], input: nil, decode: DeckSyncState.self)
+    }
+
+    public func cachedSnapshot() async throws -> DeckSnapshot? {
+        try await execute(arguments: ["--cached-snapshot-json"], input: nil, decode: DeckSnapshot?.self)
+    }
+
     public func mutate(_ request: DeckMutationRequest) async throws -> DeckMutationResult {
         try await execute(
             arguments: ["--mutate-json"],
@@ -181,6 +208,7 @@ public struct DeckClient: Sendable, DeckServing {
            childEnvironment["AADI_CODEX_BIN"] == nil,
            childEnvironment["PRIORITY_DECK_CODEX_BIN"] == nil,
            let codex = firstExecutable([
+               "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
                "/Applications/ChatGPT.app/Contents/Resources/codex",
                "/opt/homebrew/bin/codex",
                "/usr/local/bin/codex",

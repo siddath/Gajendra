@@ -14,11 +14,16 @@ const brand = {
 
 assert(manifest.name === "gajendra", "plugin name must be gajendra");
 assert(/^\d+\.\d+\.\d+$/u.test(manifest.version), "plugin version must be semantic");
-assert(manifest.version === "0.3.1", "plugin release candidate must be version 0.3.1");
+assert(manifest.version === "0.4.0", "plugin release candidate must be version 0.4.0");
 assert(manifest.description === brand.descriptor, "plugin description must use the approved Gajendra descriptor");
 assert(manifest.interface?.displayName === brand.name, "plugin display name must use the Gajendra product identity");
-assert(manifest.interface?.shortDescription === brand.descriptor, "plugin short description must use the approved descriptor");
-assert(manifest.interface?.longDescription === brand.promise, "plugin long description must use the approved promise");
+assert(manifest.interface?.shortDescription === "One focus across AI tools", "plugin subtitle must use the directory-compatible short descriptor");
+assert(manifest.interface?.longDescription.startsWith(brand.promise), "plugin long description must start with the approved promise");
+assert(manifest.interface.shortDescription.length <= 30, "directory subtitle must fit 30 characters");
+assert(manifest.interface.websiteURL === manifest.repository, "listing website must point to the real repository");
+assert(manifest.interface.supportURL === `${manifest.repository}/issues`, "support must use the real issue tracker");
+assert(manifest.extensions?.["com.openai"]?.review.test_cases.positive.length >= 5, "review packet needs five positive cases");
+assert(manifest.extensions?.["com.openai"]?.review.test_cases.negative.length >= 3, "review packet needs three negative cases");
 assert(marketplace.interface?.displayName === brand.name, "marketplace display name must use the Gajendra product identity");
 assert(manifest.mcpServers === "./.mcp.json", "plugin must declare its bundled MCP server");
 assert(manifest.skills === "./skills/", "plugin must declare its bundled skill directory");
@@ -48,6 +53,8 @@ for (const relativePath of [
   "dist/server.mjs",
   "dist/gajendra.html",
   "skills/gajendra/SKILL.md",
+  "hooks/hooks.json",
+  "hooks/lifecycle-event.sh",
 ]) {
   await access(path.join(pluginRoot, relativePath));
 }
@@ -101,11 +108,9 @@ assert(webMain.includes('class="now-actions"'), "MCP App must align the NOW acti
 assert(webMain.includes('class="visual-settings"'), "MCP App must consolidate visual preferences under the header lotus");
 assert(webMain.includes('aria-label="Open Gajendra settings"'), "MCP App header lotus settings needs an explicit accessible action");
 assert(webMain.includes('class="brand-copy"'), "MCP App brand text and subtext must share one left-aligned stack beside the mark");
-assert(webMain.includes('class="running-scope"'), "MCP App Running disclosure must expose its all-lanes scope as a visible control");
 assert(webStyles.includes(".visual-settings-popover"), "MCP App must style the header-lotus settings disclosure near its control");
-assert(webStyles.includes(".running-scope"), "MCP App must make the all-lanes Running disclosure visibly clickable");
 assert(runtimeHtml.includes(`<title>${brand.name} — ${brand.descriptor}</title>`), "published MCP App title must use the approved Gajendra descriptor");
-assert(runtimeHtml.includes(brand.promise), "published MCP App must include the approved Gajendra promise");
+assert(runtimeHtml.includes("Ready for Review") && runtimeHtml.includes("Continue") && runtimeHtml.includes("History"), "MCP App must expose actionable work views");
 assert(runtimeServer.includes('title: "Gajendra"'), "published MCP server must expose the Gajendra app-server title");
 
 // This is intentionally limited to product-facing and bundled runtime artifacts. Compatibility

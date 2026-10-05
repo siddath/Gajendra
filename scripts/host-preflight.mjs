@@ -17,7 +17,8 @@ const cliFeatures = inspectCliFeatures();
 const state = inspectState(statePath);
 const artifacts = inspectArtifacts(plugin.cachePath);
 const mcpInventory = await inspectMcpInventory(
-  path.join(appPath, "Contents", "Resources", "codex"),
+  ["codex-cli/bin/codex", "codex"].map((relative) => path.join(appPath, "Contents", "Resources", relative)).find(existsSync)
+    ?? path.join(appPath, "Contents", "Resources", "codex"),
 );
 
 const hardChecks = {
@@ -190,6 +191,8 @@ function inspectArtifacts(cachePath) {
     "dist/server.mjs",
     "dist/gajendra.html",
     "skills/gajendra/SKILL.md",
+    "hooks/hooks.json",
+    "hooks/lifecycle-event.sh",
   ];
   const mismatches = [];
   let checked = 0;
@@ -316,7 +319,7 @@ async function inspectMcpInventory(appServerBinary) {
         clientInfo: {
           name: "gajendra-host-preflight",
           title: "Gajendra host preflight",
-          version: "0.3.1",
+          version: "0.3.2",
         },
         capabilities: {
           experimentalApi: true,

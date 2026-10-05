@@ -16,6 +16,7 @@ import {
   MAX_CODEX_APP_SERVER_MAX_LINE_BYTES,
   readCodexRolloutTail,
   resolveCodexAppServerStdoutLineLimit,
+  resolveCodexExecutable,
   rolloutTailShowsActiveTurn,
 } from "../../src/server/codex-app-server.js";
 import { EMPTY_STORE, type CodexThread } from "../../src/shared/contracts.js";
@@ -25,6 +26,15 @@ const syntheticThreadId = (index: number): string =>
   `00000000-0000-7000-8000-${String(index).padStart(12, "0")}`;
 
 describe("Codex desktop runtime status", () => {
+  it("uses the desktop bundled CLI without a shell PATH and preserves explicit overrides", () => {
+    const current = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex";
+    const legacy = "/Applications/ChatGPT.app/Contents/Resources/codex";
+    expect(resolveCodexExecutable({}, "darwin", (candidate) => candidate === current)).toBe(current);
+    expect(resolveCodexExecutable({}, "darwin", (candidate) => candidate === legacy)).toBe(legacy);
+    expect(resolveCodexExecutable({ GAJENDRA_CODEX_BIN: "/explicit/codex" }, "darwin", () => true)).toBe("/explicit/codex");
+    expect(resolveCodexExecutable({}, "linux", () => true)).toBe("codex");
+    expect(resolveCodexExecutable({}, "darwin", () => false)).toBe("codex");
+  });
   it("keeps only open thread writer locks from the configured directory", () => {
     const directory = "/Users/example/.codex/thread-writer-locks";
     const activeId = syntheticThreadId(1);
@@ -545,6 +555,7 @@ readline.createInterface({ input: process.stdin }).on("line", (line) => {
         const client = new CodexAppServerClient(2_000, {
           ...process.env,
           GAJENDRA_CODEX_BIN: fakeCodex,
+          GAJENDRA_DATA_DIR: path.join(directory, `${mode}-cache`),
           GAJENDRA_CODEX_ACTIVITY_ENRICHMENT: "off",
           GAJENDRA_TEST_REVIEW_LOG: logPath,
           GAJENDRA_TEST_REVIEW_THREAD_ID: id,

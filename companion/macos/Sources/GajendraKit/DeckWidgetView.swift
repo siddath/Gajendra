@@ -216,8 +216,10 @@ public struct GajendraCardPresentationState: Equatable, Sendable {
     public init() {}
 
     @discardableResult
-    public mutating func toggle() -> Bool {
-        isPresented.toggle()
+    public mutating func toggle(isVisibleOnActiveSpace: Bool) -> Bool {
+        // AppKit can leave an ordered panel on another Space. A launcher click must reveal
+        // that card, rather than dismissing a surface the user cannot see.
+        isPresented = !(isPresented && isVisibleOnActiveSpace)
         return isPresented
     }
 
@@ -471,24 +473,9 @@ public struct GajendraGlassSurface: View {
 
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        Group {
-            if #available(macOS 26.0, *) {
-                Color.clear
-                    .glassEffect(
-                        interactive ? .regular.interactive() : .regular,
-                        in: .rect(cornerRadius: cornerRadius)
-                    )
-                    .background(themeTint, in: shape)
-                    .overlay(shape.stroke(Color.primary.opacity(0.13), lineWidth: 0.5))
-            } else {
-                shape
-                    .fill(.thinMaterial)
-                    .overlay(
-                        shape.fill(themeTint)
-                    )
-                    .overlay(shape.stroke(Color.primary.opacity(0.14), lineWidth: 0.5))
-            }
-        }
+        shape
+            .fill(Color(nsColor: .windowBackgroundColor))
+            .overlay(shape.stroke(Color.primary.opacity(0.14), lineWidth: 0.5))
         .shadow(color: castsShadow ? Color.black.opacity(colorScheme == .dark ? 0.28 : 0.13) : .clear, radius: 18, y: 8)
     }
 
@@ -630,7 +617,7 @@ public struct GajendraPillView: View {
                 .background(Color(nsColor: .controlBackgroundColor), in: Circle())
                 .overlay(Circle().stroke(Color.secondary.opacity(0.45), lineWidth: 0.75))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.gajendraPress)
         .help("Hide Gajendra launcher")
         .accessibilityLabel("Hide Gajendra launcher")
     }
@@ -1133,14 +1120,6 @@ struct GajendraStatusCountBadge: View {
             .foregroundStyle(count > 0 ? tint : Color.secondary)
             .frame(minWidth: 20 * scale, minHeight: 18 * scale)
             .padding(.horizontal, 2 * scale)
-            .background(
-                tint.opacity(count > 0 ? (colorScheme == .dark ? 0.2 : 0.13) : 0.045),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(tint.opacity(count > 0 ? 0.58 : 0.16), lineWidth: 1)
-            )
             .accessibilityLabel("\(count)")
     }
 }
@@ -1154,10 +1133,11 @@ public struct GajendraHoverCardView: View {
     @State private var hoveredThreadId: String?
     @State private var isNowHovered = false
     @State private var isSearchHovered = false
-    @State private var isRunningHeaderHovered = false
     @State private var isRunningExpanded = true
-    @State private var isReviewHeaderHovered = false
     @State private var isReviewExpanded = true
+    @State private var showsEarlierActivity = false
+    @State private var historyFilter = "All"
+    @State private var historyVisibleCount = 5
     @State private var searchQuery: String
     @State private var searchFocused = false
     @State private var isQueueEditing: Bool
@@ -1365,12 +1345,19 @@ public struct GajendraHoverCardView: View {
                 .padding(.vertical, 10)
                 .allowsHitTesting(!isQueueEditing)
             if normalizedSearchQuery.isEmpty {
-                queueSummary
-                runningSummary(snapshot.runningThreads)
-                    .padding(.top, 8 * contentScale)
+                reviewSummary(snapshot.reviewReadyThreads)
+                    .id("gajendra-review")
                     .allowsHitTesting(!isQueueEditing)
-                reviewReadySummary(snapshot.reviewReadyThreads)
-                    .padding(.top, 8 * contentScale)
+                if !snapshot.needsInputThreads.isEmpty {
+                    attentionSection("Needs input", threads: snapshot.needsInputThreads)
+                }
+                runningSummary(snapshot.runningThreads)
+                    .id("gajendra-running")
+                    .padding(.top, 12 * contentScale)
+                    .allowsHitTesting(!isQueueEditing)
+                queueSummary.padding(.top, 16 * contentScale).id("gajendra-continue")
+                dailyActivity(snapshot)
+                    .padding(.top, 12 * contentScale)
                     .allowsHitTesting(!isQueueEditing)
             } else {
                 searchResults(snapshot.searchThreads(searchQuery))
@@ -1409,7 +1396,7 @@ public struct GajendraHoverCardView: View {
                             Image(systemName: "rectangle.3.group")
                                 .frame(width: 28, height: 28)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.gajendraPress)
                         .gajendraHoverSurface()
                         .help("Open organizer")
                         .accessibilityLabel("Open organizer")
@@ -1443,7 +1430,7 @@ public struct GajendraHoverCardView: View {
 
     private var visualSettingsMenu: some View {
         Button { showsLayoutControls = true } label: { settingsIcon }
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .popover(isPresented: $showsLayoutControls) {
                 GajendraWidgetLayoutControls(settings: visualSettings, onManageSources: onManageSources)
             }
@@ -1476,9 +1463,8 @@ public struct GajendraHoverCardView: View {
                     .foregroundStyle(Color.gajendraAccent(for: colorScheme))
 
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Text(current.title)
-                            .font(scaledFont(17, weight: .semibold))
-                            .lineLimit(visualSettings.hoverCardSize == .compact ? 2 : 3)
+                        GajendraRecordTitle(title: current.title, font: scaledFont(17, weight: .semibold), lineLimit: visualSettings.hoverCardSize == .compact ? 2 : 3)
+                            .environment(\.gajendraHovered, isNowHovered)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1507,7 +1493,7 @@ public struct GajendraHoverCardView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(alignment: .center, spacing: 7) {
+                VStack(alignment: .trailing, spacing: 7) {
                     Button { model.open(current) } label: {
                         Text("Open")
                             .font(scaledFont(11.5, weight: .semibold))
@@ -1529,10 +1515,6 @@ public struct GajendraHoverCardView: View {
                             )
                         }
                     }
-                    executionSignal(current)
-                    Button { model.open(current) } label: { sourceBadge(current) }
-                        .buttonStyle(.plain)
-                        .help("Open in \(current.sourceName)")
                 }
                 .fixedSize(horizontal: true, vertical: false)
             }
@@ -1593,13 +1575,13 @@ public struct GajendraHoverCardView: View {
                         title: "Focus",
                         systemImage: "star.fill",
                         level: .focus,
-                        threads: snapshot.focus.filter { !$0.isCurrent }
+                        threads: snapshot.continueThreads.filter { !$0.isCurrent && $0.level == .focus }
                     )
                     queueColumn(
                         title: "Important",
                         systemImage: "bookmark.fill",
                         level: .important,
-                        threads: snapshot.important
+                        threads: snapshot.continueThreads.filter { $0.level == .important }
                     )
                 }
             }
@@ -1611,29 +1593,29 @@ public struct GajendraHoverCardView: View {
         if isQueueEditing {
             queueEditModeBar
         } else {
-            HStack(spacing: 7 * contentScale) {
-                Image(systemName: "arrow.up.and.down.and.arrow.left.and.right")
+            ZStack {
+                Text("Your priorities")
+                    .font(scaledFont(14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 52 * contentScale)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityAddTraits(.isHeader)
+                HStack {
+                    Spacer(minLength: 8)
+                    Button("Edit") {
+                        setQueueEditing(true)
+                    }
                     .font(scaledFont(10.5, weight: .semibold))
-                Text(GajendraQueueInteractionTuning.holdToDragInstruction)
-                    .font(scaledFont(10.5, weight: .medium))
-                Spacer(minLength: 8)
-                Button("Edit") {
-                    setQueueEditing(true)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(queueInteractionBlocked)
+                    .accessibilityLabel("Edit priorities")
                 }
-                .font(scaledFont(10.5, weight: .semibold))
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(queueInteractionBlocked)
-                .accessibilityLabel("Edit priorities")
             }
-            .foregroundStyle(.secondary)
-            .padding(.leading, 10 * contentScale)
-            .padding(.trailing, 6 * contentScale)
-            .frame(maxWidth: .infinity, minHeight: 30 * contentScale)
-            .background(
-                Color.primary.opacity(0.025),
-                in: RoundedRectangle(cornerRadius: 9, style: .continuous)
-            )
+            .padding(.horizontal, 10 * contentScale)
+            .frame(maxWidth: .infinity)
+            .frame(height: 32 * contentScale)
+            .help(GajendraQueueInteractionTuning.holdToDragInstruction)
         }
     }
 
@@ -1684,18 +1666,26 @@ public struct GajendraHoverCardView: View {
         let visibleThreads = Array(threads.prefix(5))
         let column = VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
-                Image(systemName: systemImage)
-                    .font(scaledFont(11.5, weight: .semibold))
-                    .foregroundStyle(title == "Focus" ? Color.gajendraAccent(for: colorScheme) : Color.secondary)
+                GajendraHoverIcon(kind: level == .focus ? .focus : .important,
+                    tint: Color.gajendraAccent(for: colorScheme), size: 11.5 * contentScale)
                 Text(title)
                     .font(scaledFont(13.5, weight: .semibold))
+                    .foregroundStyle(.primary)
                 Text("\(threads.count)")
                     .font(scaledFont(10.5, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary.opacity(0.8))
                 Spacer(minLength: 4)
             }
-            .frame(height: 30 * contentScale)
+            .frame(height: 32 * contentScale)
             .padding(.horizontal, 10 * contentScale)
+            .background(
+                Color.primary.opacity(colorScheme == .dark ? 0.09 : 0.06),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
+            .gajendraHoverFeedback(tint: Color.gajendraAccent(for: colorScheme))
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            .padding(.bottom, 4 * contentScale)
 
             if threads.isEmpty {
                 Text("No tasks")
@@ -1720,13 +1710,13 @@ public struct GajendraHoverCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .background(queueSurfaceColor(title), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Color.clear)
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(
                     queueDragIsActive && targetedQueueLevel == level
                         ? Color.gajendraAccent(for: colorScheme).opacity(0.8)
-                        : Color.primary.opacity(0.08),
+                        : Color.clear,
                     lineWidth: queueDragIsActive && targetedQueueLevel == level ? 1.25 : 0.5
                 )
         )
@@ -1766,9 +1756,7 @@ public struct GajendraHoverCardView: View {
                 if thread.isRunning {
                     GajendraLiveActivityMark(scale: contentScale)
                 }
-                Text(thread.title)
-                    .font(scaledFont(12.5, weight: .medium))
-                    .lineLimit(1)
+                GajendraRecordTitle(title: thread.title, font: scaledFont(12.5, weight: .medium))
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 5)
                 providerBadge(thread, compact: true)
@@ -1896,11 +1884,7 @@ public struct GajendraHoverCardView: View {
                             .foregroundStyle(.white)
                             .frame(width: 20 * contentScale, height: 20 * contentScale)
                             .background(
-                                LinearGradient(
-                                    colors: [removeControlRed.opacity(0.96), removeControlRed.opacity(0.74)],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                ),
+                                removeControlRed,
                                 in: Circle()
                             )
                             .overlay(
@@ -1939,6 +1923,7 @@ public struct GajendraHoverCardView: View {
                 .fill(isHeld ? rowPressedColor.opacity(0.9) : Color.clear)
                 .allowsHitTesting(false)
         )
+        .gajendraHoverFeedback(drawsBackground: false)
         .onHover { hovered in
             hoveredThreadId = hovered ? thread.id : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
         }
@@ -2287,7 +2272,7 @@ public struct GajendraHoverCardView: View {
                 .contentShape(Rectangle())
             }
             .font(scaledFont(10.5, weight: .medium))
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .foregroundStyle(Color.gajendraAccent(for: colorScheme))
             .gajendraHoverSurface(cornerRadius: 6)
             .help("View all \(title) tasks in the organizer")
@@ -2354,7 +2339,7 @@ public struct GajendraHoverCardView: View {
             } label: {
                 priorityActionTrigger(thread, isEmphasized: isEmphasized)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .disabled(queueInteractionBlocked)
             .opacity(isEmphasized ? 1 : 0.58)
             .help(actionLabel)
@@ -2449,7 +2434,7 @@ public struct GajendraHoverCardView: View {
                 .stroke(
                     thread.isRunning
                         ? Color.green.opacity(0.3)
-                        : thread.isReadyForReview ? Color.orange.opacity(0.34) : Color.primary.opacity(0.08),
+                        : thread.isReadyForReview ? Color.orange.opacity(0.34) : Color.clear,
                     lineWidth: 0.75
                 )
         )
@@ -2463,27 +2448,23 @@ public struct GajendraHoverCardView: View {
             if threads.isEmpty {
                 HStack(spacing: 0) {
                     runningDisclosureHeader(count: 0)
-                    runningDisclosureControl(count: 0, expanded: false)
+                    runningDisclosureControl(count: 0, expanded: isRunningExpanded)
                         .padding(.trailing, 10 * contentScale)
                 }
+                .gajendraHoverFeedback(tint: runningControlColor)
                 Divider()
-                Text("No provider reports active work")
-                    .font(scaledFont(10.5, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10 * contentScale)
-                    .padding(.vertical, 8 * contentScale)
+                if isRunningExpanded {
+                    Text(model.snapshot?.cachedAt == nil ? "No provider reports active work" : "Live activity is being checked")
+                        .font(scaledFont(11, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10 * contentScale)
+                        .padding(.vertical, 10 * contentScale)
+                }
             } else {
                 HStack(spacing: 0) {
                     runningDisclosureHeader(count: threads.count)
                         .contentShape(Rectangle())
-                        .background(
-                            isRunningHeaderHovered
-                                ? Color.green.opacity(colorScheme == .dark ? 0.1 : 0.07)
-                                : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        )
-                        .onHover { isRunningHeaderHovered = $0 }
                         .onTapGesture(count: 2) {
                             toggleRunningDock()
                         }
@@ -2502,17 +2483,18 @@ public struct GajendraHoverCardView: View {
                     runningDisclosureControl(count: threads.count, expanded: isRunningExpanded)
                         .padding(.trailing, 10 * contentScale)
                 }
+                .gajendraHoverFeedback(tint: runningControlColor)
 
                 Divider()
                 if isRunningExpanded {
-                    ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
+                    ForEach(Array(threads.prefix(2).enumerated()), id: \.element.id) { index, thread in
                         HStack(spacing: 0) {
                             Button { model.open(thread) } label: {
                                 runningRow(thread)
                                     .contentShape(Rectangle())
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .buttonStyle(.plain)
+                            .buttonStyle(.gajendraPress)
                             .gajendraHoverSurface(cornerRadius: 6)
                             .help("Open \(thread.title) in \(thread.sourceName)")
                             .accessibilityLabel("\(thread.title), \(thread.sourceName), Running now")
@@ -2524,13 +2506,15 @@ public struct GajendraHoverCardView: View {
                             )
                             .padding(.trailing, 8 * contentScale)
                         }
+                        .gajendraHoverFeedback(tint: runningControlColor)
                         .onHover { hovered in
                             hoveredThreadId = hovered
                                 ? thread.id
                                 : (hoveredThreadId == thread.id ? nil : hoveredThreadId)
                         }
-                        if index < threads.count - 1 { Divider() }
+                        if index < min(threads.count, 2) - 1 { Divider() }
                     }
+                    if threads.count > 2 { moreButton(remaining: threads.count - 2, title: "Running") }
                 } else {
                     Text("\(threads.count) active threads across every priority lane")
                         .font(scaledFont(10.5, weight: .regular))
@@ -2543,11 +2527,7 @@ public struct GajendraHoverCardView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(queueSurfaceColor("Running"), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.green.opacity(0.2), lineWidth: 0.75)
-        )
+
         .accessibilityElement(children: .contain)
     }
 
@@ -2557,57 +2537,55 @@ public struct GajendraHoverCardView: View {
         }
     }
 
-    private func runningDisclosureHeader(count: Int) -> some View {
-        HStack(spacing: 7 * contentScale) {
-            Image(systemName: "waveform")
-                .font(scaledFont(10.5, weight: .semibold))
-                .foregroundStyle(Color.green)
-            Text("Running")
-                .font(scaledFont(11.5, weight: .semibold))
-            GajendraStatusCountBadge(count: count, tint: .green, scale: contentScale)
+    private func statusSectionTitle(_ title: String, icon: String, count: Int, tint: Color) -> some View {
+        HStack(spacing: 8 * contentScale) {
+            if icon == "waveform" || icon == "tray.full.fill" {
+                GajendraHoverIcon(kind: icon == "waveform" ? .running : .review,
+                    tint: tint, size: 12 * contentScale)
+            } else {
+                Image(systemName: icon)
+                    .font(scaledFont(12, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 18 * contentScale)
+                    .accessibilityHidden(true)
+            }
+            Text(title).font(scaledFont(13, weight: .semibold))
+            Text("\(count)")
+                .font(scaledFont(11, weight: .medium).monospacedDigit())
+                .foregroundStyle(.secondary)
             Spacer(minLength: 8)
         }
-        .padding(.horizontal, 10 * contentScale)
         .frame(maxWidth: .infinity, minHeight: 34 * contentScale, alignment: .leading)
     }
 
+    private func sectionChevron(expanded: Bool) -> some View {
+        Image(systemName: expanded ? "chevron.down" : "chevron.right")
+            .font(scaledFont(10.5, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 24 * contentScale, height: 34 * contentScale)
+            .accessibilityHidden(true)
+    }
+
+    private func runningDisclosureHeader(count: Int) -> some View {
+        statusSectionTitle("Running", icon: "waveform", count: count, tint: runningControlColor)
+            .padding(.horizontal, 10 * contentScale)
+    }
+
     private func runningDisclosureControl(count: Int, expanded: Bool) -> some View {
-        Button {
-            guard count > 0 else { return }
-            toggleRunningDock()
-        } label: {
-            HStack(spacing: 5 * contentScale) {
-                Text("All priority lanes")
-                    .lineLimit(1)
-                if count > 0 {
-                    Image(systemName: "chevron.down")
-                        .font(scaledFont(8.5, weight: .bold))
-                        .rotationEffect(.degrees(expanded ? 0 : -90))
-                        .accessibilityHidden(true)
-                }
-            }
-            .font(scaledFont(9.5, weight: .semibold))
-            .foregroundStyle(count > 0 ? runningControlColor : Color.secondary)
-            .padding(.horizontal, 8 * contentScale)
-            .padding(.vertical, 5 * contentScale)
-            .background(Color.green.opacity(count > 0 ? 0.09 : 0.035), in: Capsule())
-            .overlay(Capsule().stroke(Color.green.opacity(count > 0 ? 0.28 : 0.12), lineWidth: 0.75))
-            .contentShape(Capsule())
+        Button { toggleRunningDock() } label: {
+            sectionChevron(expanded: expanded).contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(count == 0)
+        .buttonStyle(.gajendraPress)
         .accessibilityLabel("All priority lanes, Running")
         .accessibilityValue(expanded ? "Expanded" : "Collapsed")
         .accessibilityHint("Click to \(expanded ? "collapse" : "expand") the running thread list")
-        .help("Click to \(expanded ? "shrink" : "expand") Running")
+        .help("\(expanded ? "Collapse" : "Expand") Running")
     }
 
     private func runningRow(_ thread: DeckThread) -> some View {
         HStack(spacing: 6) {
             GajendraLiveActivityMark(scale: contentScale, animated: true)
-            Text(thread.title)
-                .font(scaledFont(10.5, weight: .medium))
-                .lineLimit(1)
+            GajendraRecordTitle(title: thread.title, font: scaledFont(10.5, weight: .medium))
             Spacer(minLength: 6)
             providerBadge(thread, compact: true)
             if let placement = thread.placementLabel {
@@ -2623,109 +2601,147 @@ public struct GajendraHoverCardView: View {
         .frame(maxWidth: .infinity, minHeight: 32 * contentScale, alignment: .leading)
     }
 
-    private func reviewReadySummary(_ threads: [DeckThread]) -> some View {
-        // Ready is deliberately capped at five compact rows. Keep this bounded disclosure eager
-        // so its stable header remains in the SwiftUI/AX tree while the enclosing card scrolls.
+    private func reviewSummary(_ threads: [DeckThread]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if threads.isEmpty {
-                reviewDisclosureHeader(count: 0, expanded: false)
-                Divider()
-                Text("No provider reports work ready for review.")
-                    .font(scaledFont(10.5, weight: .regular))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 10 * contentScale)
-                    .padding(.vertical, 8 * contentScale)
-            } else {
-                reviewDisclosureHeader(count: threads.count, expanded: isReviewExpanded)
-                    .contentShape(Rectangle())
-                    .background(
-                        isReviewHeaderHovered ? Color.orange.opacity(colorScheme == .dark ? 0.12 : 0.08) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    )
-                    .onHover { isReviewHeaderHovered = $0 }
-                    .onTapGesture(count: 2) {
-                        toggleReviewDock()
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityAction {
-                        toggleReviewDock()
-                    }
-                    .accessibilityLabel(
-                        "Ready for Review, \(threads.count) \(threads.count == 1 ? "thread" : "threads")"
-                    )
-                    .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
-                    .accessibilityHint("Double-click to \(isReviewExpanded ? "collapse" : "expand") the review-ready thread list")
-                    .help("Double-click to \(isReviewExpanded ? "shrink" : "expand") Ready for Review")
-
-                Divider()
-                if isReviewExpanded {
-                    let visibleThreads = Array(threads.prefix(5))
-                    ForEach(Array(visibleThreads.enumerated()), id: \.element.id) { index, thread in
-                        reviewReadyRow(thread)
-                        if index < visibleThreads.count - 1 { Divider() }
-                    }
-                    if threads.count > 5 {
-                        Divider()
-                        moreButton(remaining: threads.count - 5, title: "Ready for Review")
-                    }
-                } else {
-                Text(
-                    threads.count == 1
-                        ? "1 thread needs your review"
-                        : "\(threads.count) threads need your review"
-                )
-                        .font(scaledFont(10.5, weight: .regular))
+            Button { isReviewExpanded.toggle() } label: {
+                HStack(spacing: 0) {
+                    statusSectionTitle("Ready for Review", icon: "tray.full.fill", count: threads.count,
+                        tint: model.snapshot?.cachedAt == nil ? reviewControlColor : .secondary)
+                    sectionChevron(expanded: isReviewExpanded)
+                }
+                .padding(.horizontal, 10 * contentScale)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.gajendraPress)
+            .gajendraHoverFeedback(tint: model.snapshot?.cachedAt == nil ? reviewControlColor : .secondary)
+            .accessibilityLabel("Ready for Review")
+            .accessibilityValue(isReviewExpanded ? "Expanded" : "Collapsed")
+            Divider()
+            if isReviewExpanded {
+                if threads.isEmpty {
+                    Text(model.pendingReviewCount > 0 ? "Saving your review…" : model.snapshot?.cachedAt == nil
+                        ? "You’re all caught up" : "Review status is being checked")
+                        .font(scaledFont(11, weight: .regular))
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 10 * contentScale)
-                        .padding(.vertical, 8 * contentScale)
+                        .padding(.vertical, 10 * contentScale)
                 }
+                ForEach(Array(threads.prefix(3))) { thread in
+                    reviewReadyRow(thread)
+                    Divider()
+                }
+                if threads.count > 3 { moreButton(remaining: threads.count - 3, title: "Ready for Review") }
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(queueSurfaceColor("Review"), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.orange.opacity(0.24), lineWidth: 0.75)
-        )
-        .accessibilityElement(children: .contain)
-    }
-
-    private func toggleReviewDock() {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) {
-            isReviewExpanded.toggle()
         }
     }
 
-    private func reviewDisclosureHeader(count: Int, expanded: Bool) -> some View {
-        HStack(spacing: 7 * contentScale) {
-            GajendraReviewStatusMark(scale: contentScale)
-            Text("Ready for Review")
-                .font(scaledFont(11.5, weight: .semibold))
-            GajendraStatusCountBadge(count: count, tint: .orange, scale: contentScale)
-            Spacer(minLength: 8)
-            HStack(spacing: 5 * contentScale) {
-                Text("Needs your review")
-                    .lineLimit(1)
-                if count > 0 {
-                    Image(systemName: "chevron.down")
-                        .font(scaledFont(8.5, weight: .bold))
-                        .rotationEffect(.degrees(expanded ? 0 : -90))
-                        .accessibilityHidden(true)
+    private func attentionSection(_ title: String, threads: [DeckThread]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(scaledFont(13, weight: .semibold))
+            ForEach(threads) { thread in activityRow(thread) }
+        }.padding(.top, 12)
+    }
+
+    private func dailyActivity(_ snapshot: DeckSnapshot) -> some View {
+        let history = snapshot.historyThreads.filter { thread in
+            historyFilter == "All" || (historyFilter == "Reviewed" && thread.reviewAcknowledged && !model.isReviewPending(thread))
+                || (historyFilter == "Finished" && thread.workState == "completed")
+        }
+        return VStack(alignment: .leading, spacing: 0) {
+            Button { showsEarlierActivity.toggle() } label: {
+                HStack(spacing: 0) {
+                    statusSectionTitle("History", icon: "clock", count: snapshot.historyThreads.count, tint: .secondary)
+                    sectionChevron(expanded: showsEarlierActivity)
+                }
+                .padding(.horizontal, 10 * contentScale)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.gajendraPress)
+            .accessibilityLabel("History")
+            .accessibilityValue(showsEarlierActivity ? "Expanded" : "Collapsed")
+            Divider()
+            if showsEarlierActivity {
+                Picker("History filter", selection: $historyFilter) {
+                    Text("All").tag("All")
+                    Text("Reviewed").tag("Reviewed")
+                    Text("Finished").tag("Finished")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel("Filter History")
+                .padding(.horizontal, 10 * contentScale)
+                .padding(.vertical, 8 * contentScale)
+                .onChange(of: historyFilter) { _ in historyVisibleCount = 5 }
+                if history.isEmpty {
+                    Text(historyFilter == "All" ? "Your earlier chats will appear here." : "No \(historyFilter.lowercased()) chats yet.")
+                        .font(scaledFont(11, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 10 * contentScale)
+                        .padding(.vertical, 10 * contentScale)
+                }
+                ForEach(Array(history.prefix(historyVisibleCount))) { thread in
+                    historyRow(thread)
+                    Divider()
+                }
+                if history.count > historyVisibleCount {
+                    Button("Show \(min(5, history.count - historyVisibleCount)) more") { historyVisibleCount += 5 }
+                        .buttonStyle(.gajendraPress)
+                        .font(scaledFont(11, weight: .medium))
+                        .padding(10 * contentScale)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
-            .font(scaledFont(9.5, weight: .semibold))
-            .foregroundStyle(count > 0 ? reviewControlColor : Color.secondary)
-            .padding(.horizontal, 8 * contentScale)
-            .padding(.vertical, 5 * contentScale)
-            .background(Color.orange.opacity(count > 0 ? 0.11 : 0.04), in: Capsule())
-            .overlay(Capsule().stroke(Color.orange.opacity(count > 0 ? 0.34 : 0.14), lineWidth: 0.75))
+        }
+    }
+
+    private func historyRow(_ thread: DeckThread) -> some View {
+        VStack(alignment: .leading, spacing: 3 * contentScale) {
+            Button { model.open(thread) } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8 * contentScale) {
+                    GajendraRecordTitle(title: thread.title, font: scaledFont(11.5, weight: .medium))
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 6)
+                    Text(model.isReviewPending(thread) ? "Saving review…" : thread.historyStatus)
+                        .font(scaledFont(9.5, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.gajendraPress)
+            .help("Open \(thread.title) in \(thread.sourceName)")
+            Text("\(thread.sourceName) · \(thread.project) · \(relativeUpdateText(thread.updatedAt))")
+                .font(scaledFont(9.5, weight: .regular))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if thread.currentThreadId != thread.id {
+                Button { model.openCanonicalThread(thread.currentThreadId) } label: {
+                    Label("Open current chat", systemImage: "arrow.turn.up.right")
+                }
+                .buttonStyle(.gajendraPress)
+                .font(scaledFont(10, weight: .medium))
+            }
         }
         .padding(.horizontal, 10 * contentScale)
-        .frame(maxWidth: .infinity, minHeight: 34 * contentScale, alignment: .leading)
+        .padding(.vertical, 8 * contentScale)
+        .gajendraHoverFeedback()
+    }
+
+    @ViewBuilder
+    private func activityRow(_ thread: DeckThread) -> some View {
+        if thread.isReadyForReview {
+            reviewReadyRow(thread)
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                searchResultRow(thread, showsTopDivider: false)
+                Text(relativeUpdateText(thread.updatedAt))
+                    .font(scaledFont(9, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10 * contentScale)
+                    .padding(.bottom, 6 * contentScale)
+            }
+        }
     }
 
     private func reviewReadyRow(_ thread: DeckThread) -> some View {
@@ -2734,9 +2750,7 @@ public struct GajendraHoverCardView: View {
                 HStack(spacing: 7 * contentScale) {
                     GajendraReviewStatusMark(scale: contentScale)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(thread.title)
-                            .font(scaledFont(10.5, weight: .medium))
-                            .lineLimit(1)
+                        GajendraRecordTitle(title: thread.title, font: scaledFont(10.5, weight: .medium))
                         Text(isPreview ? "Ready recently" : relativeReviewText(thread.review?.updatedAt ?? 0))
                             .font(scaledFont(9, weight: .regular))
                             .foregroundStyle(.secondary)
@@ -2749,15 +2763,11 @@ public struct GajendraHoverCardView: View {
                             .foregroundStyle(Color.gajendraAccent(for: colorScheme))
                             .fixedSize(horizontal: true, vertical: false)
                     }
-                    Text(thread.review?.destination.actionLabel ?? "Review")
-                        .font(scaledFont(8.5, weight: .semibold))
-                        .foregroundStyle(reviewControlColor)
-                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .frame(maxWidth: .infinity, minHeight: 36 * contentScale, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .gajendraHoverSurface(cornerRadius: 6)
             .help("Open \(thread.review?.destination.actionLabel.lowercased() ?? "review") for \(thread.title)")
             .accessibilityLabel("\(thread.title), Ready for Review, \(thread.review?.destination.actionLabel ?? "Review") destination")
@@ -2771,12 +2781,13 @@ public struct GajendraHoverCardView: View {
             reviewDoneButton(thread, surface: "review")
 
             Button { model.open(thread) } label: { providerBadge(thread, compact: true) }
-                .buttonStyle(.plain)
+                .buttonStyle(.gajendraPress)
                 .help("Open the owning task in \(thread.sourceName)")
                 .accessibilityLabel("Open owning task in \(thread.sourceName)")
         }
         .padding(.horizontal, 10 * contentScale)
         .frame(maxWidth: .infinity, minHeight: 38 * contentScale, alignment: .leading)
+        .gajendraHoverFeedback(tint: reviewControlColor)
         .onHover { hovered in
             hoveredThreadId = hovered
                 ? thread.id
@@ -2789,14 +2800,14 @@ public struct GajendraHoverCardView: View {
             model.setReviewAcknowledged(thread, acknowledged: true)
         } label: {
             Image(systemName: "checkmark.circle.fill")
-                .font(scaledFont(13, weight: .semibold))
-                .foregroundStyle(Color.green)
-                .frame(width: 28 * contentScale, height: 28 * contentScale)
-                .contentShape(Circle())
+                .font(scaledFont(17, weight: .medium))
+                .foregroundStyle(runningControlColor)
+                .frame(width: 32 * contentScale, height: 32 * contentScale)
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(isPreview || queueInteractionBlocked)
-        .opacity(isPreview ? 0.72 : 1)
+        .buttonStyle(.gajendraPress)
+        .disabled(isPreview || !model.canAcknowledgeReviews || model.isReviewPending(thread))
+        .gajendraHoverSurface(cornerRadius: 6)
         .help("Mark reviewed")
         .accessibilityIdentifier("gajendra-review-done-\(surface)")
         .accessibilityLabel("Mark \(thread.title) reviewed")
@@ -2844,7 +2855,7 @@ public struct GajendraHoverCardView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.gajendraPress)
                     .foregroundStyle(.secondary)
                     .help("Clear thread search")
                     .accessibilityLabel("Clear thread search")
@@ -2924,9 +2935,7 @@ public struct GajendraHoverCardView: View {
             Button { model.open(thread) } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text(thread.title)
-                            .font(scaledFont(11.5, weight: .medium))
-                            .lineLimit(1)
+                        GajendraRecordTitle(title: thread.title, font: scaledFont(11.5, weight: .medium))
                         if thread.isRunning {
                             Image(systemName: "waveform")
                                 .font(scaledFont(8.5, weight: .semibold))
@@ -2947,23 +2956,25 @@ public struct GajendraHoverCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .help("Open \(thread.title) in \(thread.sourceName)")
         }
         .padding(.horizontal, 10 * contentScale)
         .padding(.vertical, 5 * contentScale)
         .frame(maxWidth: .infinity, minHeight: 42 * contentScale)
+        .gajendraHoverFeedback()
         .overlay(alignment: .top) { if showsTopDivider { Divider() } }
         .contextMenu {
             if !isPreview {
                 searchActions(thread)
             }
         }
+
     }
 
     @ViewBuilder
     private func searchActions(_ thread: DeckThread) -> some View {
-        if !thread.isCurrent {
+        if !thread.isCurrent && thread.workState != "completed" && thread.currentThreadId == thread.id {
             Button("Make NOW") { model.makeNow(threadId: thread.id) }
             if thread.level != .focus {
                 Button("Move to Focus") { model.moveToLevel(threadId: thread.id, level: .focus) }
@@ -3003,10 +3014,22 @@ public struct GajendraHoverCardView: View {
     private var footer: some View {
         HStack(spacing: 8) {
             if let error = model.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
+                Label((model.snapshot?.cachedAt == nil ? "" : "Saved view · ") + error, systemImage: "exclamationmark.triangle.fill")
                     .font(scaledFont(10.5, weight: .regular))
                     .foregroundStyle(.orange)
-                    .lineLimit(1)
+                    .lineLimit(3)
+                    .help(error)
+            } else if model.pendingReviewCount > 0 {
+                Text(model.pendingReviewCount == 1 ? "Saving review…" : "Saving \(model.pendingReviewCount) reviews…")
+                    .font(scaledFont(10.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+            } else if let feedback = model.reviewFeedback {
+                Text(feedback).font(scaledFont(10.5, weight: .regular)).foregroundStyle(.secondary)
+            } else if let cachedAt = model.snapshot?.cachedAt {
+                Text("Saved view · \(cachedAtText(cachedAt))" + (model.isLoading ? " · Refreshing…" : " · Refresh to update"))
+                    .font(scaledFont(10.5, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
             } else {
                 Text(GajendraBrandCopy.promise)
                     .font(scaledFont(10.5, weight: .regular))
@@ -3014,12 +3037,25 @@ public struct GajendraHoverCardView: View {
                     .lineLimit(2)
             }
             Spacer()
-            if visualSettings.hoverCardSize != .compact {
+            if model.canRetryReview {
+                Button("Retry review") { model.retryReviewAcknowledgement() }
+            } else if model.mutationErrorMessage == nil && (model.clientErrorMessage != nil || model.snapshot?.sourceWarning != nil) {
+                Button("Reconnect", action: onManageSources)
+            } else if model.canUndoReview {
+                Button("Undo review") { model.undo() }
+            } else if model.errorMessage == nil && model.pendingReviewCount == 0 && visualSettings.hoverCardSize != .compact {
                 Text("Double-click to open NOW")
                     .font(scaledFont(10.5, weight: .regular))
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    private func cachedAtText(_ value: String) -> String {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = formatter.date(from: value) else { return "previous refresh" }
+        return RelativeDateTimeFormatter().localizedString(for: date, relativeTo: Date())
     }
 
     private var contentInset: CGFloat {
@@ -3057,11 +3093,9 @@ public struct GajendraHoverCardView: View {
             .font(scaledFont(compact ? 9.5 : 10.5, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
-            .foregroundStyle(providerColor(thread))
+            .foregroundStyle(.secondary)
             .padding(.horizontal, compact ? 6 : 8)
             .padding(.vertical, compact ? 2 : 3)
-            .background(providerColor(thread).opacity(colorScheme == .dark ? 0.2 : 0.1), in: Capsule())
-            .overlay(Capsule().stroke(providerColor(thread).opacity(0.38), lineWidth: 0.75))
     }
 
     private func contextBadge(_ context: ThreadContext, compact: Bool = false) -> some View {
@@ -3069,11 +3103,9 @@ public struct GajendraHoverCardView: View {
             .font(scaledFont(compact ? 9 : 10, weight: .semibold))
             .lineLimit(1)
             .fixedSize()
-            .foregroundStyle(contextColor(context))
+            .foregroundStyle(.secondary)
             .padding(.horizontal, compact ? 5 : 7)
             .padding(.vertical, compact ? 1.5 : 2.5)
-            .background(contextColor(context).opacity(colorScheme == .dark ? 0.18 : 0.1), in: Capsule())
-            .overlay(Capsule().stroke(contextColor(context).opacity(0.34), lineWidth: 0.75))
             .accessibilityLabel("Context: \(context.title)")
     }
 
@@ -3168,7 +3200,7 @@ public struct GajendraHoverCardView: View {
                         .frame(width: 28, height: 28)
                 }
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.gajendraPress)
             .gajendraHoverSurface()
             .disabled(model.isLoading)
             .help(model.isLoading ? "Refreshing" : "Refresh")
@@ -3255,7 +3287,7 @@ private struct GajendraThreadRowButtonBody: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(configuration.isPressed ? pressedColor : (isHovered ? hoverColor : Color.clear))
             )
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion && [.leftMouseDown, .leftMouseDragged, .leftMouseUp].contains(NSApp.currentEvent?.type) ? 0.985 : 1)
             .animation(
                 reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.82),
                 value: configuration.isPressed
@@ -3284,7 +3316,7 @@ private struct GajendraRemoveTaskButtonBody: View {
 
     var body: some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.78 : (isHovered ? 1.08 : 1))
+            .scaleEffect(reduceMotion ? 1 : (configuration.isPressed && [.leftMouseDown, .leftMouseDragged, .leftMouseUp].contains(NSApp.currentEvent?.type) ? 0.97 : (isHovered ? 1.03 : 1)))
             .brightness(configuration.isPressed ? 0.12 : 0)
             .shadow(
                 color: color.opacity(isHovered ? 0.42 : 0.24),

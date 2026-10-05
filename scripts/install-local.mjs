@@ -9,6 +9,12 @@ const codex = process.env.GAJENDRA_CODEX_BIN || "codex";
 const artifactPaths = [
   ".codex-plugin/plugin.json",
   ".mcp.json",
+  "LICENSE",
+  "THIRD_PARTY_NOTICES.md",
+  "third_party_licenses/modelcontextprotocol-ext-apps-LICENSE",
+  "third_party_licenses/modelcontextprotocol-sdk-LICENSE",
+  "third_party_licenses/gsap-LICENSE-NOTICE",
+  "third_party_licenses/zod-LICENSE",
   "assets/gajendra.svg",
   "assets/gajendra-app-icon.svg",
   "assets/gajendra-menubar.svg",
@@ -16,6 +22,8 @@ const artifactPaths = [
   "dist/server.mjs",
   "dist/gajendra.html",
   "skills/gajendra/SKILL.md",
+  "hooks/hooks.json",
+  "hooks/lifecycle-event.sh",
 ];
 
 ensureMarketplace();

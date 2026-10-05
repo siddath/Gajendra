@@ -38,6 +38,9 @@ type OutputChildProcess = Pick<ChildProcess, "pid" | "kill"> & {
   stderr: Readable;
 };
 export const MAX_DISCOVERY_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE * 10;
+// A session may have a JSONL file, a sibling sidecar directory, and its own project
+// directory. Directory enumeration is bounded separately from metadata candidates.
+export const DEFAULT_DISCOVERY_DIRECTORY_ENTRIES = MAX_DISCOVERY_CANDIDATES * 3;
 /** Limits concurrent provider/catalog reads; each configured catalog can itself be up to 2 MiB. */
 export const DEFAULT_SOURCE_COLLECTION_CONCURRENCY = 4;
 export const MAX_SOURCE_COLLECTION_CONCURRENCY = 8;
@@ -98,10 +101,10 @@ export class ThreadSourceRegistry {
     this.sourceCollectionConcurrency = resolveSourceCollectionConcurrency(this.env.GAJENDRA_SOURCE_COLLECTION_CONCURRENCY);
   }
 
-  async collect(preferences: Record<string, boolean>): Promise<SourceCollection> {
+  async collect(preferences: Record<string, boolean>, forceFreshReviews = false): Promise<SourceCollection> {
     const configured = await loadConfiguredSources(this.env);
     const adapters: SourceAdapter[] = [
-      new CodexThreadSource(this.codex),
+      new CodexThreadSource(this.codex, forceFreshReviews),
       new ClaudeThreadSource(this.env),
       new CursorThreadSource(this.env),
       new GrokThreadSource(this.env),
@@ -187,10 +190,10 @@ class CodexThreadSource implements SourceAdapter {
   readonly kind = "builtin" as const;
   readonly enabledByDefault = true;
 
-  constructor(private readonly client: CodexAppServerClient) {}
+  constructor(private readonly client: CodexAppServerClient, private readonly forceFreshReviews = false) {}
 
   async listThreads(): Promise<AgentThread[]> {
-    return (await this.client.listThreads()).map((thread) => codexThread(thread));
+    return (await this.client.listThreads({ forceFreshReviews: this.forceFreshReviews })).map((thread) => codexThread(thread));
   }
 }
 
@@ -317,6 +320,7 @@ class CatalogThreadSource implements SourceAdapter {
         allowedDeepLinkSchemes,
         ...(resumeCommand ? { resumeCommand } : {}),
         ...(review ? { review } : {}),
+        ...(thread.attention ? { attention: thread.attention } : {}),
       };
     });
   }
@@ -372,7 +376,7 @@ export async function recentClaudeSessionFiles(projectsDirectory: string, option
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
       if (measurement) measurement.candidateFiles += 1;
       if (candidates.length >= candidateLimit) {
-        throw new Error("Claude Code has too many session files to inspect safely.");
+        throw new SourceUnavailableError("error", "Claude Code has too many session files to inspect safely. Saved priorities are unchanged.");
       }
       candidates.push(path.join(directory, entry.name));
     }
@@ -640,6 +644,16 @@ async function loadConfiguredSources(env: NodeJS.ProcessEnv): Promise<{ adapters
   } catch (error) {
     return { adapters: [], issue: "Configured source configuration is invalid." };
   }
+}
+
+/** Relative catalog paths retain their existing caller-cwd semantics when sharing a backend. */
+export async function relativeCatalogWorkingDirectory(env: NodeJS.ProcessEnv): Promise<string | null> {
+  try {
+    const raw = await readBoundedSourcesConfig(resolveSourcesConfigPath(env), sourcesConfigByteLimit(env));
+    const config = sourcesConfigSchema.parse(JSON.parse(raw) as unknown);
+    return config.sources.some(source => source.catalog !== "~" && !source.catalog.startsWith("~/")
+      && !path.isAbsolute(source.catalog)) ? process.cwd() : null;
+  } catch { return null; }
 }
 
 async function readBoundedSourcesConfig(configPath: string, maxBytes: number): Promise<string> {
@@ -933,9 +947,10 @@ function deduplicate(threads: AgentThread[]): AgentThread[] {
 export function selectSourceThreads(threads: AgentThread[]): AgentThread[] {
   const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
   const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
-  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state === "ready");
+  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status)
+    && (thread.review?.state === "ready" || thread.attention === "needs-input"));
   const background = ordered
-    .filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready")
+    .filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready" && thread.attention !== "needs-input")
     .slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
   return [...running, ...reviewReady, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
@@ -954,7 +969,7 @@ function isPresent<T>(value: T | null | undefined): value is T {
 }
 
 class SourceUnavailableError extends Error {
-  constructor(readonly state: Extract<SourceState, "not-installed" | "not-configured">, message: string) {
+  constructor(readonly state: Extract<SourceState, "not-installed" | "not-configured" | "error">, message: string) {
     super(message);
   }
 }
@@ -999,6 +1014,7 @@ const catalogThreadSchema = z.object({
   deepLink: z.string().url().optional(),
   resumeCommand: resumeCommandSchema.optional(),
   review: reviewSignalSchema.optional(),
+  attention: z.literal("needs-input").optional(),
 }).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
   message: "A configured thread must declare deepLink or resumeCommand.",
 });
@@ -1045,14 +1061,14 @@ function positiveCandidateLimit(value: number | undefined): number {
 function positiveDirectoryEntryLimit(value: number | undefined): number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0
     ? value
-    : MAX_DISCOVERY_CANDIDATES;
+    : DEFAULT_DISCOVERY_DIRECTORY_ENTRIES;
 }
 
 async function boundedDirectoryEntries(directoryPath: string, budget: { remaining: number }) {
   const entries: Dirent[] = [];
   const directory = await opendir(directoryPath);
   for await (const entry of directory) {
-    if (budget.remaining <= 0) throw new Error("Thread source directory catalog exceeded the safe scan limit.");
+    if (budget.remaining <= 0) throw new SourceUnavailableError("error", "Thread source directory catalog exceeded the safe scan limit. Saved priorities are unchanged.");
     budget.remaining -= 1;
     entries.push(entry);
   }

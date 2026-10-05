@@ -1,6 +1,29 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 release candidate — 2026-10-06
+
+- Native and Codex plugin now share one local backend, prepared metadata reads and durable
+  revision-aware writes. A controlled three-sample local benchmark reduced median full refresh
+  from 15.05 s to 0.80 s and local writes from 15.92 s to 0.11 s. These are backend timings,
+  not UI latency guarantees; cold startup and periodic reconciliation can take longer.
+- Finish/Reopen and exact successor selection keep open work, completed work and continuation
+  history explicit across both clients. Opening or idle status never silently finishes work.
+- Ready for Review has immediate exact-response acknowledgement, durable Retry and Undo;
+  newer responses stay reviewable. History separates reviewed and finished work.
+- Added restrained title crossfades, row hover feedback, button press response and section icon
+  motion. Keyboard actions stay immediate and Reduce Motion removes spatial feedback.
+- Recovered fullscreen launcher state and aligned compact/organizer/plugin priority controls.
+- Improved Codex plugin listing metadata, install artifact checks, source-build instructions and
+  directory submission documentation. This repository package is not an approved directory listing.
+- Added bounded lifecycle invalidation, cache configuration isolation, offline saved views and
+  cross-process concurrency regression coverage.
+
+- Patched three runtime dependency advisories; the production audit reports zero findings.
+  The unpatched build-only braces advisory remains documented with its unused matching path.
+
+See [release details and known limits](docs/releases/0.4.0.md).
+
+## Earlier unreleased source changes
 
 - Kept Ready for Review independent of NOW, Focus, and Important; added a separate green,
   exact-response review acknowledgement with Undo, bounded SHA-256 receipts, Running precedence,

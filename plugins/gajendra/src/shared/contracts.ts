@@ -11,6 +11,9 @@ export const DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"] as const;
 /** One bounded recent-history ceiling shared by provider selection and optional metadata enrichments. */
 export const MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
 
+/** Reuse the existing bounded receipt capacity for local workflow records. */
+export const MAX_WORKFLOW_RECORDS = DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT;
+export type StoredContinuation = { predecessorThreadId: string; currentThreadId: string };
 export type PriorityLevel = "focus" | "important";
 export type ThreadContext = "design" | "engineering" | "life";
 export type SourceState = "ready" | "disabled" | "not-installed" | "not-configured" | "error";
@@ -96,6 +99,9 @@ export type PriorityStore = {
   sourcePreferences: Record<string, boolean>;
   idempotency: StoredMutationReceipt[];
   reviewAcknowledgements: StoredReviewAcknowledgement[];
+  completedThreadIds?: string[];
+  continuations?: StoredContinuation[];
+  nowSelection?: "automatic" | "cleared";
 };
 
 export type ResumeCommand = {
@@ -133,12 +139,27 @@ export type AgentThread = {
   allowedDeepLinkSchemes?: string[];
   resumeCommand?: ResumeCommand;
   review?: ReviewSignal;
+  attention?: "needs-input";
 };
 
 export type DeckThread = AgentThread & {
+  /** Exact live response matches a durable review receipt; this never means work is finished. */
+  reviewAcknowledged?: boolean;
   level: PriorityLevel | null;
   isCurrent: boolean;
   context: ThreadContext | null;
+  workState?: "open" | "completed";
+  currentThreadId?: string;
+  predecessorThreadIds?: string[];
+  continuationThreadId?: string | null;
+};
+
+export type ProductSnapshot = {
+  readyForReview: DeckThread[];
+  needsInput: DeckThread[];
+  running: DeckThread[];
+  continue: DeckThread[];
+  history: DeckThread[];
 };
 
 export type ThreadSourceStatus = {
@@ -152,7 +173,13 @@ export type ThreadSourceStatus = {
 };
 
 export type DeckSnapshot = {
+  /** Optional hook invalidation epoch captured before provider collection; never work completion. */
+  activityRevision?: string;
+  catalogRevision?: number;
+  product?: ProductSnapshot;
   generatedAt: string;
+  /** Present only for an explicitly stale launch projection; priorities are still read fresh. */
+  cachedAt?: string;
   revision: number;
   current: DeckThread | null;
   focus: DeckThread[];
@@ -179,6 +206,8 @@ export type CodexThread = {
 };
 
 export type DeckMutation =
+  | { type: "set-work-completed"; threadId: string; completed: boolean; currentThreadId?: string | null }
+  | { type: "link-continuation"; threadId: string; currentThreadId: string | null }
   | { type: "set-level"; threadId: string; level: PriorityLevel | null }
   | { type: "set-current"; threadId: string }
   | { type: "move"; threadId: string; direction: "up" | "down" }
@@ -230,6 +259,9 @@ export type MutationErrorCode =
   | "unknown-source"
   | "invalid-target"
   | "review-acknowledgement-limit"
+  | "workflow-limit"
+  | "invalid-continuation"
+  | "work-completed"
   | "store-recovery-required"
   | "store-busy";
 
@@ -294,3 +326,20 @@ export const EMPTY_STORE: PriorityStore = {
   idempotency: [],
   reviewAcknowledgements: [],
 };
+
+export function productDeckProjection(snapshot: DeckSnapshot): ProductSnapshot {
+  const threads = allDeckThreads(snapshot);
+  const byUpdated = (a: DeckThread, b: DeckThread) => b.updatedAt - a.updatedAt;
+  const running = threads.filter(thread => isRunningThreadStatus(thread.status)).sort(byUpdated);
+  // Only the explicit source contract status is accepted. Generic waiting/idle is never input evidence.
+  const needsInput = threads.filter(thread => thread.attention === "needs-input" && !isRunningThreadStatus(thread.status));
+  const readyForReview = threads.filter(thread => thread.review?.state === "ready"
+    && !isRunningThreadStatus(thread.status) && thread.attention !== "needs-input")
+    .sort((a, b) => (b.review?.updatedAt ?? 0) - (a.review?.updatedAt ?? 0));
+  const continueThreads = threads.filter(thread => thread.level !== null && thread.workState !== "completed"
+    && (thread.currentThreadId ?? thread.id) === thread.id);
+  const active = new Set([...running, ...needsInput, ...readyForReview, ...continueThreads].map(thread => thread.id));
+  const history = threads.filter(thread => thread.reviewAcknowledged || thread.workState === "completed" || (thread.currentThreadId ?? thread.id) !== thread.id
+    || !active.has(thread.id)).sort(byUpdated);
+  return { readyForReview, needsInput, running, continue: continueThreads, history };
+}

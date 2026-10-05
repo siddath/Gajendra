@@ -28,6 +28,25 @@ afterEach(async () => {
 });
 
 describe("thread source adapters", () => {
+  it("allows a session file plus sidecar directory per candidate without erasing Claude discovery", async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), "gajendra-claude-sidecars-"));
+    temporaryDirectories.push(directory);
+    const project = path.join(directory, "project");
+    await mkdir(project);
+    // Reproduces the former shared 2,000-entry limit with fewer than 2,000 sessions.
+    for (let index = 0; index < 1_010; index += 1) {
+      await writeFile(path.join(project, `session-${index}.jsonl`), "{}");
+      await mkdir(path.join(project, `session-${index}`));
+    }
+    const newest = path.join(project, "newest.jsonl");
+    await writeFile(newest, "{}");
+    await utimes(newest, 2_000_000_000, 2_000_000_000);
+    const files = await recentClaudeSessionFiles(directory);
+    expect(files).toHaveLength(200);
+    expect(files[0]).toBe(newest);
+    await expect(recentClaudeSessionFiles(directory, { directoryEntryLimit: 2_000 }))
+      .rejects.toThrow("Saved priorities are unchanged");
+  });
   it("bounds concurrent provider collection while retaining deterministic source order", async () => {
     let inFlight = 0;
     let peak = 0;
@@ -102,6 +121,15 @@ describe("thread source adapters", () => {
       id: "fixture:201",
       review: expect.objectContaining({ state: "ready" }),
     }));
+  });
+
+  it("retains explicit input requests outside the ordinary background window", () => {
+    const threads = Array.from({ length: 202 }, (_, index) => ({
+      ...threadForSource("fixture", String(index), 202 - index),
+      ...(index === 201 ? { attention: "needs-input" as const } : {}),
+    }));
+    expect(selectSourceThreads(threads)).toHaveLength(201);
+    expect(selectSourceThreads(threads)).toContainEqual(expect.objectContaining({ id: "fixture:201", attention: "needs-input" }));
   });
 
   it("normalizes Cursor's supported session list into resumable threads", () => {
@@ -318,6 +346,7 @@ describe("thread source adapters", () => {
       threads: [{
         id: "thread-123",
         title: "Synthetic adapter check",
+        attention: "needs-input",
         project: "/code/example",
         updatedAt: "2026-08-12T12:00:00Z",
         status: "idle",
@@ -342,6 +371,7 @@ describe("thread source adapters", () => {
       id: "my-agent:thread-123",
       sourceName: "My Agent",
       title: "Synthetic adapter check",
+      attention: "needs-input",
       deepLink: "my-agent://threads/thread-123",
       review: {
         state: "ready",
