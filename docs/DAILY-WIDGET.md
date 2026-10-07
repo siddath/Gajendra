@@ -26,7 +26,7 @@ Focus/Important work and the selected NOW. History retains finished work, predec
 other inactive chats; age is only secondary organization. Unprioritized chats remain searchable.
 
 Finish work is a durable user choice, separate from Mark reviewed. It preserves priority metadata,
-chat history, and any pending review. Finishing NOW clears it without promoting another chat.
+chat history, and any pending review evidence in History. Finished work leaves Ready for Review and Continue until Reopen, including when the assistant sends a closing reply. Finishing NOW clears it without promoting another chat.
 Reopen restores Continue eligibility; select NOW explicitly or use the exact inverse action.
 Choosing an existing successor by exact ID transfers priority/order/context/NOW atomically.
 Predecessors keep their own destinations. Similar titles never establish a relationship.

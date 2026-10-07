@@ -111,9 +111,15 @@ describe("explicit work lifecycle and exact chat continuity", () => {
     const finished = await f.service.mutate(request);
     expect(finished.outcome).toBe("applied"); expect(finished.snapshot.current).toBeNull();
     expect(finished.snapshot.product?.continue.map(t => t.id)).toEqual(["codex:next"]);
-    expect(finished.snapshot.product?.readyForReview.map(t => t.id)).toEqual(["codex:old"]);
+    expect(finished.snapshot.product?.readyForReview).toEqual([]);
+    expect(finished.snapshot.product?.history.find(t => t.id === "codex:old")?.review?.state).toBe("ready");
+    expect((await new GajendraStoreRepository(f.dir).read()).reviewAcknowledgements).toEqual([]);
     expect(finished.snapshot.product?.history.find(t => t.id === "codex:old")?.workState).toBe("completed");
+    // The assistant's closing reply is another completion; it must not resurrect finished work.
+    f.threads[0]!.review!.updatedAt = 2;
     const restarted = f.create(); const durable = await restarted.snapshot();
+    expect(durable.product?.readyForReview).toEqual([]);
+    expect(durable.product?.history.find(t => t.id === "codex:old")?.review?.updatedAt).toBe(2);
     expect(durable.current).toBeNull(); expect(durable.product?.continue.map(t => t.id)).toEqual(["codex:next"]);
     expect((await restarted.mutate({ expectedRevision: before.revision,
       mutation: { type: "set-work-completed", threadId: "codex:old", completed: false } })).outcome).toBe("conflict");
@@ -121,6 +127,7 @@ describe("explicit work lifecycle and exact chat continuity", () => {
     const reopened = await restarted.mutate({ expectedRevision: durable.revision,
       mutation: { type: "set-work-completed", threadId: "codex:old", completed: false, currentThreadId: "codex:old" } });
     expect(reopened.snapshot.current?.id).toBe("codex:old");
+    expect(reopened.snapshot.product?.readyForReview.map(t => t.id)).toEqual(["codex:old"]);
     expect(reopened.snapshot.product?.continue.map(t => t.id)).toEqual(["codex:old", "codex:next"]);
     const persisted = await readFile(path.join(f.dir, "gajendra.v2.json"), "utf8");
     expect(persisted).not.toContain("Synthetic"); expect(persisted).not.toContain("codex://");
@@ -146,7 +153,7 @@ describe("explicit work lifecycle and exact chat continuity", () => {
     expect((await f.mutate({ type: "link-continuation", threadId: "codex:old", currentThreadId: "claude:wrong-namespace" })).error?.code).toBe("invalid-continuation");
   });
 
-  it("keeps evidence independent of age/finish; waiting is not input; provider failure never resets workflow", async () => {
+  it("keeps evidence in History after Finish; waiting is not input; provider failure never resets workflow", async () => {
     const f = await fixture(); const snapshot = await f.service.snapshot();
     expect(snapshot.product?.readyForReview.map(t => t.id)).toEqual(["codex:old"]);
     expect(snapshot.product?.needsInput.map(t => t.id)).toEqual(["codex:input"]);
@@ -158,7 +165,8 @@ describe("explicit work lifecycle and exact chat continuity", () => {
     expect((await f.mutate({ type: "set-work-completed", threadId: "codex:old", completed: false })).error?.code).toBe("unknown-thread");
     f.setFailure(false); const restored = await f.create().snapshot();
     expect(restored.product?.history.find(t => t.id === "codex:old")?.workState).toBe("completed");
-    expect(restored.product?.readyForReview.map(t => t.id)).toEqual(["codex:old"]);
+    expect(restored.product?.readyForReview).toEqual([]);
+    expect(restored.product?.history.find(t => t.id === "codex:old")?.review?.state).toBe("ready");
   });
 
   it("syncs without provider discovery and projects current workflow into neutral cached metadata", async () => {

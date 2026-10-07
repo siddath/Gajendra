@@ -2928,17 +2928,23 @@ enum GajendraSelfTest {
                            "destination": ["type": "thread", "deepLink": "codex://threads/old-review"]]
         var finished = ready
         finished["id"] = "codex:finished"
-        finished["review"] = NSNull()
+        finished["review"] = ready["review"]
         finished["workState"] = "completed"
         finished["currentThreadId"] = "codex:successor"
         finished["continuationThreadId"] = "codex:successor"
         finished["predecessorThreadIds"] = ["codex:earlier"]
         object["available"] = [ready, finished]
-        object["product"] = ["readyForReview": [ready], "needsInput": [], "running": [],
+        object["product"] = ["readyForReview": [ready, finished], "needsInput": [], "running": [],
                              "continue": object["focus"] as! [[String: Any]], "history": [finished]]
         let decoded = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
         try require(decoded.reviewReadyThreads.map(\.id) == ["codex:old-review"],
                     "old unreviewed results must stay Ready independent of recency")
+        try require(decoded.historyThreads.first?.review?.isReady == true && decoded.historyThreads.first?.isReadyForReview == false,
+                    "Finish must keep response evidence in History without a Ready badge or acknowledgement")
+        object.removeValue(forKey: "product")
+        let fallback = try JSONDecoder().decode(DeckSnapshot.self, from: JSONSerialization.data(withJSONObject: object))
+        try require(!fallback.reviewReadyThreads.contains { $0.id == "codex:finished" },
+                    "native fallback must also exclude finished work from Ready")
         try require(decoded.needsInputThreads.isEmpty, "idle or review state must not invent Needs input")
         try require(decoded.historyThreads.first?.workState == "completed", "explicit completion must survive decode")
         try require(decoded.historyThreads.first?.continuationThreadId == "codex:successor",

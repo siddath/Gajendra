@@ -19,7 +19,7 @@
     {
       "id": "explicit-lifecycle",
       "intent": "Finish, reopen and continue work in an exact successor chat.",
-      "acceptance": "Finish clears NOW without auto-promotion, keeps pending review, Reopen leaves NOW unselected, exact continuation preserves predecessor history."
+      "acceptance": "Finish clears NOW without auto-promotion and leaves Ready, preserving pending response evidence in History even after a closing reply. Reopen restores review without selecting NOW. Exact continuation preserves predecessor history."
     },
     {
       "id": "private-restart",
@@ -30,6 +30,11 @@
       "id": "cross-client",
       "intent": "Use the native widget and Codex plugin interchangeably.",
       "acceptance": "The compiled native CLI and MCP tools see shared revisions, preserve concurrent winners, and agree on Finish/Reopen/continuation/history."
+    },
+    {
+      "id": "hook-shared-scope",
+      "intent": "Refresh the widget when Codex sends a trusted lifecycle event.",
+      "acceptance": "The compiled hook wrapper ignores hook-only PLUGIN_DATA, its token reaches the shared reader, no content is stored, and priorities/completion remain unchanged."
     }
   ]
 }

@@ -129,4 +129,32 @@ describe("optional lifecycle invalidation", () => {
     expect(await run("x".repeat(MAX_LIFECYCLE_INPUT_BYTES * 2))).toEqual({ stdout: "{}\n", stderr: "" });
     expect(await f.marker.read()).toBe(before);
   }, 20_000);
+
+  it("routes host-injected PLUGIN_DATA hooks to the same default scope as the native/MCP reader", async () => {
+    const f = await fixture();
+    const index = fileURLToPath(new URL("../../src/server/index.ts", import.meta.url));
+    const pluginData = path.join(f.dir, "host-plugin-data");
+    const shared = process.platform === "darwin"
+      ? path.join(f.dir, "Library/Application Support/Gajendra") : path.join(f.dir, ".config/gajendra");
+    const store = new GajendraStoreRepository(shared, []);
+    await store.write(structuredClone(EMPTY_STORE));
+    const before = await readFile(store.filePath, "utf8");
+    const env = { ...process.env, HOME: f.dir, XDG_CONFIG_HOME: undefined, PLUGIN_DATA: pluginData,
+      GAJENDRA_DATA_DIR: undefined, GAJENDRA_METADATA_CACHE: undefined };
+    const result = await new Promise<string>((resolve, reject) => {
+      const child = execFile(process.execPath, ["--import", "tsx", index, "--lifecycle-event"], { env, timeout: 5_000 },
+        (error, stdout) => error ? reject(error) : resolve(stdout));
+      child.stdin!.end(event("UserPromptSubmit", { prompt: "Thanks, I'm done with this thread" }));
+    });
+    expect(result).toBe("{}\n");
+    const service = new GajendraService(store, { collect: async () => { throw new Error("must not scan"); }, close: async () => {} });
+    expect((await service.sync()).activityRevision).toBe(await new LifecycleInvalidationCache(shared).read());
+    expect((await service.sync()).activityRevision).toBeTruthy();
+    expect(await stat(pluginData).catch(() => null)).toBeNull();
+    expect(await readFile(store.filePath, "utf8")).toBe(before);
+    // Explicit isolation wins even when the host provides its own plugin directory.
+    await ingestLifecycleEvent(event(), { ...env, GAJENDRA_DATA_DIR: f.dir });
+    expect(await f.marker.read()).toBeTruthy();
+    await service.close();
+  }, 20_000);
 });

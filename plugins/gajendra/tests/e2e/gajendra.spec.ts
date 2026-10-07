@@ -1007,6 +1007,22 @@ test("finishes and reopens work explicitly while Undo restores the selected NOW"
   await expect(page.locator("#focus-list .is-current")).toHaveCount(0);
 });
 
+test("Finish removes an unreviewed response from Ready and Reopen restores it", async ({ page }) => {
+  const id = "review-agent:focus-review";
+  const review = page.locator(`.review-row[data-thread-id="${id}"]`);
+  await expect(review).toHaveCount(1);
+  await chooseRowAction(page.locator(`#focus-list .thread-row[data-thread-id="${id}"]`), "Finish work");
+  await expect(review).toHaveCount(0);
+  await expect(page.locator(".review-row")).toHaveCount(2);
+  await openHistory(page);
+  const history = page.locator(`#available-list .available-row[data-thread-id="${id}"]`);
+  await expect(history.locator(".history-status")).toContainText("Finished");
+  await expect(history).toHaveAttribute("data-reviewed", "false");
+  await chooseRowAction(history, "Reopen");
+  await expect(review).toHaveCount(1);
+  await expect(page.locator(".review-row")).toHaveCount(3);
+});
+
 test("links the chosen exact continuation and keeps the earlier chat inspectable", async ({ page }) => {
   const predecessor = "codex:00000000-0000-7000-8000-000000000001";
   const successor = "codex:available-1";

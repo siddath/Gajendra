@@ -102,6 +102,14 @@ header to shrink or expand the rows; a single click on the header itself does no
 provider later supplies valid completion evidence, refresh moves the thread from Running to Ready
 for Review; that transition is completion evidence, not unread state.
 
+### Finish and reopen a chat
+
+Choose **Finish work**, or tell the connected Gajendra plugin “I'm done with this thread”.
+The exact chat leaves Ready for Review and Continue, including after the assistant's closing reply.
+It remains in History with its original destination, priorities, and unacknowledged response evidence.
+**Reopen** restores pending review and priority eligibility; it does not choose a new NOW.
+Gajendra does not archive or delete the provider conversation. “Thanks” alone does not finish work.
+
 ### Ready for Review
 
 Ready for Review is live provider evidence, not an unread badge. The current local Codex app-server
@@ -224,3 +232,11 @@ The plugin does not listen to every conversation or infer priority from what you
 After a plugin update, reload the AI host so it discovers the model-visible actions. A host without
 Gajendra's MCP server cannot apply these changes. “Mark this response reviewed” clears that exact
 Ready response; a later response can appear again, and provider task status is unchanged.
+
+### Hook refresh troubleshooting
+
+`npm run host:preflight` reports Gajendra's effective hook enablement/trust separately from MCP
+registration. Hooks only invalidate metadata; they never finish work or parse a goodbye as an instruction.
+Finish is an explicit MCP action. A trusted hook that writes only under Codex's plugin data directory
+while the widget reads the shared app directory indicates an older installation; rebuild/install both
+surfaces. Relaunch Codex to load changed skill/tool descriptions. Ordinary polling remains available.
