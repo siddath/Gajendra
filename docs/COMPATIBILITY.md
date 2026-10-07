@@ -67,6 +67,17 @@ Local-only command hooks do not establish support in cloud-orchestrated sessions
 [official packaging](https://developers.openai.com/plugins/build/plugins) and
 [hook support/trust](https://learn.chatgpt.com/docs/hooks).
 
+## Floating window behavior
+
+The launcher and an open card follow the active desktop/full-screen Space. Space changes restore
+only a logically open card and never activate Gajendra or reopen a dismissed card. Both windows
+retain all-Spaces/full-screen eligibility; macOS 15+ also uses the all-applications role. They use
+the transient Mission Control role rather than desktop-like stationary behavior.
+
+The launcher uses an opaque theme surface across supported macOS versions. Background refreshes
+do not fade it, and card visibility changes are immediate so a transparent window cannot intercept
+clicks. Local hover/press feedback still respects Reduce Motion.
+
 ## Build versus binary compatibility
 
 Source builds require macOS 13.5+, Xcode/Swift, and Node 20.19+ or 22.12+. A production-style bundle is expected

@@ -519,7 +519,6 @@ enum GajendraPreview {
         )
         try render(
             GajendraPillView(
-                model: cardModel,
                 visualSettings: setting,
                 editController: GajendraPillEditController()
             ),
