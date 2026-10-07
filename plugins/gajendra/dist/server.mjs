@@ -37378,7 +37378,7 @@ function productDeckProjection(snapshot) {
   const byUpdated = (a, b) => b.updatedAt - a.updatedAt;
   const running = threads.filter((thread) => isRunningThreadStatus(thread.status)).sort(byUpdated);
   const needsInput = threads.filter((thread) => thread.attention === "needs-input" && !isRunningThreadStatus(thread.status));
-  const readyForReview = threads.filter((thread) => thread.review?.state === "ready" && !isRunningThreadStatus(thread.status) && thread.attention !== "needs-input").sort((a, b) => (b.review?.updatedAt ?? 0) - (a.review?.updatedAt ?? 0));
+  const readyForReview = threads.filter((thread) => thread.review?.state === "ready" && thread.workState !== "completed" && !isRunningThreadStatus(thread.status) && thread.attention !== "needs-input").sort((a, b) => (b.review?.updatedAt ?? 0) - (a.review?.updatedAt ?? 0));
   const continueThreads = threads.filter((thread) => thread.level !== null && thread.workState !== "completed" && (thread.currentThreadId ?? thread.id) === thread.id);
   const active = new Set([...running, ...needsInput, ...readyForReview, ...continueThreads].map((thread) => thread.id));
   const history = threads.filter((thread) => thread.reviewAcknowledged || thread.workState === "completed" || (thread.currentThreadId ?? thread.id) !== thread.id || !active.has(thread.id)).sort(byUpdated);
@@ -40311,6 +40311,9 @@ var CodexReviewCache = class {
 var MAX_LIFECYCLE_INPUT_BYTES = 64 * 1024;
 var LIFECYCLE_EVENTS = ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"];
 var opaqueId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u;
+function resolveLifecycleDataDirectory(env = process.env) {
+  return resolveDataDirectory({ ...env, PLUGIN_DATA: void 0 });
+}
 function parseLifecycleIdentity(input2) {
   if (Buffer.byteLength(input2) > MAX_LIFECYCLE_INPUT_BYTES) return null;
   try {
@@ -40330,7 +40333,7 @@ function parseLifecycleIdentity(input2) {
 async function ingestLifecycleEvent(input2, env = process.env) {
   if (env.GAJENDRA_METADATA_CACHE === "off" || !parseLifecycleIdentity(input2)) return;
   try {
-    await new LifecycleInvalidationCache(resolveDataDirectory(env)).invalidate();
+    await new LifecycleInvalidationCache(resolveLifecycleDataDirectory(env)).invalidate();
   } catch {
   }
 }
@@ -41153,7 +41156,7 @@ function createGajendraServer(service = new GajendraService()) {
   });
   K3(server, "gajendra_set_work_completed", {
     title: "Finish or reopen work",
-    description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Finishing NOW clears NOW; priorities and pending review evidence are retained.",
+    description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Explicit done-with-this-thread or close-this-chat requests mean Finish. Finish clears NOW and removes Ready/Continue; priorities and pending review remain in History until Reopen. It does not archive the provider chat.",
     inputSchema: { threadId: external_exports.string().min(1).max(512), completed: external_exports.boolean(), currentThreadId: external_exports.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } }

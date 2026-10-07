@@ -113,9 +113,13 @@ const cases: Record<string, () => Promise<unknown>> = {
       await f.mutate({ type: "set-level", threadId: "codex:next", level: "focus" });
       const finished = await f.mutate({ type: "set-work-completed", threadId: "codex:one", completed: true });
       assert.equal(finished.current, null); assert.ok(finished.product?.history.some(t => t.id === "codex:one"));
-      assert.equal(finished.product?.readyForReview.length, 1, "finishing work must not consume review");
+      assert.equal(finished.product?.readyForReview.length, 0, "explicit Finish clears the review queue");
+      assert.equal(finished.product?.history.find(t => t.id === "codex:one")?.review?.state, "ready", "Finish is not review acknowledgement");
+      f.collection.threads[0]!.review!.updatedAt += 1;
+      assert.equal((await f.service.snapshot()).product?.readyForReview.length, 0, "a closing reply cannot resurrect finished work");
       const reopened = await f.mutate({ type: "set-work-completed", threadId: "codex:one", completed: false });
       assert.equal(reopened.current, null, "reopening does not select NOW");
+      assert.equal(reopened.product?.readyForReview.length, 1, "Reopen restores pending response review");
       await f.mutate({ type: "set-current", threadId: "codex:one" });
       const occupied = await f.service.mutate({ mutation: { type: "link-continuation", threadId: "codex:one", currentThreadId: "codex:next" } });
       assert.equal(occupied.outcome, "rejected", "continuation must not overwrite an already prioritized target");
@@ -124,6 +128,35 @@ const cases: Record<string, () => Promise<unknown>> = {
       assert.equal(linked.current?.id, "codex:next"); assert.ok(linked.product?.history.some(t => t.id === "codex:one"));
       return { finishClearsNow: true, pendingReviewPreserved: true, continuation: "codex:next" };
     } finally { await f.service.close(); }
+  },
+  "hook-shared-scope": async () => {
+    const home = path.join(temp, "hook-home");
+    const shared = process.platform === "darwin" ? path.join(home, "Library/Application Support/Gajendra")
+      : path.join(home, ".config/gajendra");
+    const pluginData = path.join(temp, "hook-plugin-data");
+    const store = new GajendraStoreRepository(shared, []);
+    await store.read();
+    const before = await store.read();
+    const env = { ...process.env, HOME: home, XDG_CONFIG_HOME: undefined, GAJENDRA_DATA_DIR: undefined,
+      PLUGIN_DATA: pluginData, PLUGIN_ROOT: path.join(root, "plugins/gajendra"), GAJENDRA_NODE_BIN: process.execPath,
+      GAJENDRA_METADATA_CACHE: undefined };
+    const hook = path.join(root, "plugins/gajendra/hooks/lifecycle-event.sh");
+    await new Promise<void>((resolve, reject) => {
+      const child = execFile("/bin/sh", [hook], { env, timeout: 5_000 }, (error, stdout, stderr) => {
+        if (error) return reject(error);
+        try { assert.equal(stdout, "{}\n"); assert.equal(stderr, ""); resolve(); } catch (failure) { reject(failure); }
+      });
+      child.stdin!.end(JSON.stringify({ session_id: "synthetic", hook_event_name: "Stop", prompt: "PRIVATE_NOT_AN_INSTRUCTION" }));
+    });
+    const marker = JSON.parse(await readFile(path.join(shared, "metadata-cache/lifecycle.v1.json"), "utf8"));
+    assert.deepEqual(Object.keys(marker).sort(), ["activityRevision", "version"]);
+    const service = new GajendraService(store, { collect: async () => { throw new Error("hook must not scan"); }, close: async () => {} });
+    try {
+      assert.equal((await service.sync()).activityRevision, marker.activityRevision);
+      assert.deepEqual(await store.read(), before, "hooks never finish work or change priority state");
+      assert.equal(await stat(pluginData).catch(() => null), null);
+      return { sharedEpochVisible: true, priorityStateUnchanged: true, hostPluginDataIgnored: true };
+    } finally { await service.close(); }
   },
   "private-restart": async () => {
     const f = await fixture("private-restart");

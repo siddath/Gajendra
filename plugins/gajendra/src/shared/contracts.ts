@@ -334,6 +334,7 @@ export function productDeckProjection(snapshot: DeckSnapshot): ProductSnapshot {
   // Only the explicit source contract status is accepted. Generic waiting/idle is never input evidence.
   const needsInput = threads.filter(thread => thread.attention === "needs-input" && !isRunningThreadStatus(thread.status));
   const readyForReview = threads.filter(thread => thread.review?.state === "ready"
+    && thread.workState !== "completed"
     && !isRunningThreadStatus(thread.status) && thread.attention !== "needs-input")
     .sort((a, b) => (b.review?.updatedAt ?? 0) - (a.review?.updatedAt ?? 0));
   const continueThreads = threads.filter(thread => thread.level !== null && thread.workState !== "completed"

@@ -98,7 +98,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   });
 
   registerAppTool(server, "gajendra_set_work_completed", {
-    title: "Finish or reopen work", description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Finishing NOW clears NOW; priorities and pending review evidence are retained.",
+    title: "Finish or reopen work", description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Explicit done-with-this-thread or close-this-chat requests mean Finish. Finish clears NOW and removes Ready/Continue; priorities and pending review remain in History until Reopen. It does not archive the provider chat.",
     inputSchema: { threadId: z.string().min(1).max(512), completed: z.boolean(), currentThreadId: z.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema },
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },

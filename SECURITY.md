@@ -54,6 +54,8 @@ within one second. They validate only event name and bounded opaque `session_id`
 other fields are ignored. Prompts, `last_assistant_message`, `transcript_path`, and raw payloads are
 never logged, retained, or used as paths or commands. Even the validated IDs are discarded.
 
+Hook ingestion uses the shared app data directory, ignoring hook-only host `PLUGIN_DATA`; an explicit `GAJENDRA_DATA_DIR` still isolates it. Hooks never migrate or alter authoritative state.
+
 One atomically replaced private `metadata-cache/lifecycle.v1.json` contains only a version and
 random `activityRevision` token. It never grows into an event log. Because hook IDs do not establish
 an independently verified local adapter mapping, a changed token invalidates the bounded 200-entry

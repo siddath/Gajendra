@@ -60,7 +60,7 @@ their next write, causing handled Ready rows to reappear without changing priori
 ## Optional hook compatibility
 
 The package's default `hooks/hooks.json` targets SessionStart, UserPromptSubmit, Stop, and SessionEnd
-using `${PLUGIN_ROOT}`. The wrapper uses the configured or installed-app Node runtime, then PATH
+using `${PLUGIN_ROOT}`. Hook invalidation ignores host-injected `PLUGIN_DATA` so it reaches the native/MCP shared default directory; `GAJENDRA_DATA_DIR` remains the explicit isolation override. The wrapper uses the configured or installed-app Node runtime, then PATH
 Node, and emits harmless JSON when unavailable. Hook trust is a host decision, never granted by
 installation. Unsupported, disabled, untrusted, or failed hooks leave ordinary polling intact.
 Local-only command hooks do not establish support in cloud-orchestrated sessions. See

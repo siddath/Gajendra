@@ -9,6 +9,12 @@ const opaqueId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u;
 
 export type LifecycleIdentity = { sessionId: string; event: typeof LIFECYCLE_EVENTS[number]; turnId?: string };
 
+export function resolveLifecycleDataDirectory(env: NodeJS.ProcessEnv = process.env): string {
+  // Codex injects PLUGIN_DATA into hook commands, but not the MCP/native clients.
+  // Use their shared default; an explicit GAJENDRA_DATA_DIR still isolates every client.
+  return resolveDataDirectory({ ...env, PLUGIN_DATA: undefined });
+}
+
 export function parseLifecycleIdentity(input: string): LifecycleIdentity | null {
   if (Buffer.byteLength(input) > MAX_LIFECYCLE_INPUT_BYTES) return null;
   try {
@@ -28,7 +34,7 @@ export async function ingestLifecycleEvent(input: string, env: NodeJS.ProcessEnv
   if (env.GAJENDRA_METADATA_CACHE === "off" || !parseLifecycleIdentity(input)) return;
   // Host session IDs can denote parent/remote sessions; no independently verified local mapping exists.
   // Invalidate the bounded completion cache globally, preserving rendered metadata and all priorities.
-  try { await new LifecycleInvalidationCache(resolveDataDirectory(env)).invalidate(); } catch { /* Optional fast path. */ }
+  try { await new LifecycleInvalidationCache(resolveLifecycleDataDirectory(env)).invalidate(); } catch { /* Optional fast path. */ }
 }
 
 export function readBoundedLifecycleInput(stream: Readable, timeoutMs = 1_000): Promise<string | null> {

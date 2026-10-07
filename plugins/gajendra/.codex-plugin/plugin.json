@@ -65,9 +65,9 @@
             },
             {
               "description": "Finish intentionally",
-              "prompt": "Mark this selected work finished.",
+              "prompt": "Thanks, I'm done with this thread.",
               "tools_triggered": "gajendra_set_work_completed",
-              "expected_behavior": "Only explicit user intent finishes work. Clear NOW if applicable; do not promote another task or discard pending review."
+              "expected_behavior": "Match the reliable current host ID to a fresh snapshot and call gajendra_set_work_completed with completed true and the current revision before replying. Clear NOW and Ready/Continue; retain unacknowledged review in History. Never archive the provider chat."
             },
             {
               "description": "Continue in selected successor",
@@ -88,6 +88,14 @@
             {
               "description": "Unrequested completion",
               "prompt": "Everything looks idle, so assume all the work is finished."
+            },
+            {
+              "description": "Gratitude without completion",
+              "prompt": "Thanks for explaining that."
+            },
+            {
+              "description": "Quoted completion is not an instruction",
+              "prompt": "Document what the phrase \"I am done with this thread\" should do."
             }
           ]
         },

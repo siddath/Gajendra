@@ -14,7 +14,8 @@ The versioned dataset is [`evals/scenarios.json`](../evals/scenarios.json). Each
 intent and explicit acceptance criteria. [`evals/run.mts`](../evals/run.mts) evaluates those criteria
 against isolated synthetic state. Five scenarios exercise the real service and persistence code;
 the sixth uses the compiled MCP server and native CLI through the shared workflow verifier.
-All six must pass. Unknown, missing and duplicate case IDs fail the suite rather than silently
+The seventh runs the packaged lifecycle hook with the host environment and checks the shared reader.
+All seven must pass. Unknown, missing and duplicate case IDs fail the suite rather than silently
 reducing its coverage. CI runs the suite after building and uploads the JSON report as `product-evals`; the release
 gauntlet includes it too.
 
@@ -23,7 +24,8 @@ gauntlet includes it too.
 | Prepared work | Frequent reads and local changes reuse metadata while showing the current state revision. |
 | Concurrent intent | A retry cannot duplicate a write, and a stale client cannot replace the chosen NOW. |
 | Response review | Opening is not acknowledgement; Undo and later responses remain reviewable. |
-| Explicit lifecycle | Finish, Reopen and exact continuation preserve pending review and prior history. Existing target priorities cannot be overwritten. |
+| Hook shared scope | The packaged hook reaches the native/MCP default data scope even with host-injected `PLUGIN_DATA`; state and content boundaries remain intact. |
+| Explicit lifecycle | Finish clears Ready without acknowledging response evidence; a closing reply stays in History. Reopen restores pending review. Exact continuation preserves prior history. Existing target priorities cannot be overwritten. |
 | Private restart | Saved metadata is neutral, account-scoped and private; the priority store excludes provider titles. |
 | Cross-client | MCP and native CLI agree on revisions and work lifecycle across interleaved changes. |
 

@@ -100,7 +100,7 @@ Opening a thread never marks it reviewed or finished. Provider activity and your
 | **Focus and Important** | Maintain short ordered queues. A quick click opens; hold a card task to select and lift it, then keep dragging the visible row to reorder or change lanes. Compact priority rows rely on drag, context-menu, and accessibility actions instead of a duplicate left/right button; Running/Ready status rows retain their separate priority control. Organizer retains explicit queue controls. |
 | **Running** | See provider-reported active work across every priority lane. Its highlighted count stays visible; click **All priority lanes** or double-click the dock header to shrink or expand the list. It is live status, not a guessed priority or a recency label; provider completion becomes Ready for Review on refresh only when valid Ready evidence is available. |
 | **Ready for Review** | See provider-completed work awaiting your next input and open its exact Review or Task destination. Opening does not mark it handled. Select the green **Mark reviewed** action to remove only that exact response from Ready; Undo restores it, while a later response or corrected destination reappears. Running takes precedence, and an expanded compact preview shows at most five rows before routing the truthful remainder to Organizer. |
-| **Finish and Reopen** | Explicitly finish work while preserving its priority metadata and any pending response review. Reopen returns it to Continue; selecting NOW remains explicit. |
+| **Finish and Reopen** | Finish removes a chat from Ready for Review and Continue, retaining its priorities and pending response evidence in History. Reopen restores pending review and Continue; selecting NOW remains explicit. |
 | **Your priorities and History** | Your priorities holds open Focus and Important work. Select an exact existing successor chat in Organizer or the plugin to transfer priority, order, context, and NOW atomically. Earlier chats remain separate, searchable History with their original destinations. Titles never establish a continuation. |
 | **Needs input** | Show only an explicit validated source request. Generic waiting, idle, or age is insufficient. |
 | **Search** | Filter local title, project, provider, context/tag, priority, Running, and Ready metadata without copying conversation bodies. |
@@ -208,7 +208,7 @@ the store to fix a blank view. See the [extension recovery notes](docs/CODEX_EXT
 
 ## Development with evals
 
-`npm run build && npm run evals` runs six synthetic product scenarios for cache reuse, concurrent
+`npm run build && npm run evals` runs seven synthetic product scenarios for cache reuse, concurrent
 intent, review/Undo, Finish/Reopen/continuation, private saved metadata, and MCP/native consistency.
 CI and the release gauntlet run them too. Every case has an explicit acceptance criterion and a
 machine-readable outcome; measured timings stay separate from correctness. See the

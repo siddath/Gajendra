@@ -46,6 +46,9 @@ if (processState.hostReloadNeeded) {
 if (hardChecks.statePermissionsPrivate === false) {
   nextActions.push("Restore owner-only permissions on the Gajendra state directory and file.");
 }
+if (mcpInventory.hooks?.status !== "enabled-and-trusted") {
+  nextActions.push("Review Gajendra hooks in Codex settings; polling still works when hooks are unavailable or untrusted.");
+}
 if (hardFailures.length === 0) {
   nextActions.push("Hover the configured lotus and confirm it only highlights; click once and confirm the details card opens.");
   nextActions.push("Click the search capsule and confirm typing starts with a visible focus state.");
@@ -66,6 +69,7 @@ const report = {
   cliFeatures,
   artifacts,
   mcpInventory,
+  hooks: mcpInventory.hooks ?? { status: "unavailable" },
   state,
   hardChecks,
   hardFailures,
@@ -165,17 +169,18 @@ function inspectCliFeatures() {
   try {
     const selected = new Map();
     for (const line of run("codex", ["features", "list"]).split("\n")) {
-      const match = line.match(/^(apps|plugins|enable_mcp_apps)\s+\S+(?:\s+\S+)*\s+(true|false)$/u);
+      const match = line.match(/^(apps|plugins|hooks|enable_mcp_apps)\s+\S+(?:\s+\S+)*\s+(true|false)$/u);
       if (match) selected.set(match[1], match[2] === "true");
     }
     return {
       apps: selected.get("apps") ?? null,
       plugins: selected.get("plugins") ?? null,
+      hooks: selected.get("hooks") ?? null,
       enableMcpApps: selected.get("enable_mcp_apps") ?? null,
       note: "CLI feature values do not prove the desktop account rollout gate.",
     };
   } catch {
-    return { apps: null, plugins: null, enableMcpApps: null, note: "Codex CLI feature status unavailable." };
+    return { apps: null, plugins: null, hooks: null, enableMcpApps: null, note: "Codex CLI feature status unavailable." };
   }
 }
 
@@ -223,6 +228,7 @@ async function inspectMcpInventory(appServerBinary) {
     let match = null;
     let requestId = 2;
     let timeout;
+    let hooks = { status: "unavailable" };
 
     const finish = (result) => {
       if (settled) return;
@@ -234,7 +240,7 @@ async function inspectMcpInventory(appServerBinary) {
       } catch {
         child.kill("SIGTERM");
       }
-      resolve(result);
+      resolve({ ...result, hooks });
     };
 
     const send = (message) => {
@@ -271,10 +277,26 @@ async function inspectMcpInventory(appServerBinary) {
             return;
           }
           send({ jsonrpc: "2.0", method: "initialized" });
-          requestPage();
+          send({ id: "gajendra-hooks", method: "hooks/list", params: { cwds: [repositoryRoot] } });
           continue;
         }
 
+        if (message.id === "gajendra-hooks") {
+          if (!message.error) {
+            const entries = Array.isArray(message.result?.data) ? message.result.data : [];
+            const selected = entries.flatMap(entry => entry.hooks ?? []).filter(hook => hook.pluginId === pluginId);
+            const events = ["sessionStart", "userPromptSubmit", "stop", "sessionEnd"];
+            hooks = {
+              status: events.every(event => selected.some(hook => hook.eventName === event && hook.enabled
+                && ["trusted", "managed"].includes(hook.trustStatus))) ? "enabled-and-trusted" : "needs-attention",
+              events: selected.map(({ eventName, enabled, trustStatus }) => ({ eventName, enabled, trustStatus })),
+              sharedSignalPresent: existsSync(path.join(path.dirname(statePath), "metadata-cache/lifecycle.v1.json")),
+              note: "Effective host configuration; signal presence alone does not prove when an event last ran. Hooks refresh metadata; explicit Finish is an MCP action.",
+            };
+          }
+          requestPage();
+          continue;
+        }
         if (message.id !== requestId) continue;
         if (message.error) {
           finish({ status: "unavailable", totalServers: null, reason: "inventory-request-failed" });

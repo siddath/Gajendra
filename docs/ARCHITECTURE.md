@@ -39,11 +39,11 @@ flowchart LR
 The service emits one `product` projection for both surfaces: `readyForReview`, `needsInput`,
 `running`, `continue`, and `history`. Running takes precedence over input/review. Needs input
 requires the configured catalog's explicit `attention: "needs-input"`; built-ins do not infer it
-from generic waiting. Ready is independent of age, priority, and explicit work completion.
+from generic waiting. Ready is independent of age and priority. Explicitly finished work leaves Ready until Reopen; its response evidence remains in History.
 Continue contains open prioritized current chats; History includes completed work, predecessors,
 and other inactive chats. Search retains exact individual chat identities.
 
-`set-work-completed` preserves priority/context/order and pending review receipts. Finishing NOW
+`set-work-completed` preserves priority/context/order and pending review evidence in History without acknowledging it. Completed chats, including later closing replies, stay out of Ready until Reopen. Finishing NOW
 sets `nowSelection: "cleared"` and leaves no replacement. Reopen restores Continue eligibility;
 NOW is selected explicitly (an inverse mutation can restore it atomically). `link-continuation`
 uses exact available IDs and transfers priority/context/order/NOW to the successor. It rejects

@@ -243,7 +243,7 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
     }
 
     public var isReadyForReview: Bool {
-        review?.isReady == true && !isRunning && attention != "needs-input"
+        review?.isReady == true && workState != "completed" && !isRunning && attention != "needs-input"
     }
 
     public var placementLabel: String? {
@@ -525,7 +525,7 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
     }
 
     public var reviewReadyThreads: [DeckThread] {
-        if let product { return product.readyForReview }
+        if let product { return product.readyForReview.filter(\.isReadyForReview) }
         return allThreads.filter(\.isReadyForReview).sorted { left, right in
             (left.review?.updatedAt ?? 0) > (right.review?.updatedAt ?? 0)
         }

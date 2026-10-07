@@ -1,6 +1,6 @@
 ---
 name: gajendra
-description: Use when the user wants to choose, review, finish, reopen, or explicitly continue AI-agent work in an exact chat.
+description: Use when the user wants to choose, review, finish, close, reopen, or continue AI-agent work, including "I'm done with this thread" or "close this chat".
 ---
 
 # Gajendra
@@ -39,9 +39,16 @@ A repository installation is not evidence of OpenAI directory approval.
   Report success only after an applied result and its returned snapshot agree with the request.
 - “Reviewed” acknowledges the exact current response via `gajendra_set_review_acknowledged`, using
   the snapshot's review timestamp and identity. It does not finish or archive the provider task.
-- For explicit “finish this work” or “reopen this work”, use `gajendra_set_work_completed` with
-  `completed: true` or `false`. Finish preserves priority metadata, History, and pending review;
-  it clears NOW if this is NOW. Reopen restores Continue eligibility without inventing a new NOW.
+- “I'm done with this thread”, “we're finished here”, “close this chat”, and “finish this work”
+  are explicit Finish requests, even in a thank-you message. Resolve the reliable current chat ID,
+  then call `gajendra_set_work_completed` with `completed: true` before replying; a farewell alone
+  does not update Gajendra. Do not archive/delete the provider conversation unless requested separately.
+- Finish removes the exact chat from Ready for Review and Continue, preserving priorities and
+  unacknowledged response evidence in History. It clears NOW if this is NOW. A final assistant
+  reply must not put finished work back in Ready. For “reopen this work”, use `completed: false`;
+  pending review and Continue eligibility return without inventing a new NOW.
+- “Thanks” alone, a question about completion, quoted examples, and provider/hook events are not
+  Finish requests. Never finish another chat based on its title or age.
 - For an explicit continuation choice, call `gajendra_link_continuation` with the predecessor's
   exact `threadId` and successor's exact `currentThreadId`. Explain that priority/order/context/NOW
   move together and older chats remain in History. Never derive the relationship from titles.

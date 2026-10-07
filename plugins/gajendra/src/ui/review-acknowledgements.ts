@@ -51,7 +51,7 @@ export class ReviewAcknowledgements {
   ready(snapshot: DeckSnapshot): DeckThread[] {
     return (snapshot.product ?? productDeckProjection(snapshot)).readyForReview.filter(thread => {
       const operation = thread.review?.identity ? this.operations.get(thread.review.identity) : undefined;
-      return operation?.state !== "pending";
+      return thread.workState !== "completed" && operation?.state !== "pending";
     });
   }
 }
