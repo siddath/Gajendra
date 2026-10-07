@@ -3,6 +3,10 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const startedAt = new Date();
+// Agent environments that require CUA must not silently execute the AX/CGEvent driver.
+// Keep those gates visibly incomplete; a partial run is never a full gauntlet receipt.
+const nonNativeUI = process.argv.includes("--non-native-ui");
+const nativeUIGates = new Set(["companion-ui", "companion-full-screen", "companion-widget-performance"]);
 const gates = [
   { id: "repository-scripts", command: "npm", args: ["run", "check:scripts"] },
   { id: "static", command: "npm", args: ["--workspace", "gajendra", "run", "typecheck"] },
@@ -29,6 +33,10 @@ const gates = [
 
 const results = [];
 for (const gate of gates) {
+  if (nonNativeUI && nativeUIGates.has(gate.id)) {
+    results.push({ gate: gate.id, trial: 1, status: "not-run", reason: "Requires separate native interface verification through the permitted UI driver." });
+    continue;
+  }
   const repetitions = gate.repeat ?? 1;
   for (let trial = 1; trial <= repetitions; trial += 1) {
     const before = performance.now();
@@ -47,8 +55,8 @@ for (const gate of gates) {
   }
 }
 
-await writeReport("passed");
-console.log(`Gauntlet passed: ${results.length} gate receipts recorded.`);
+await writeReport(nonNativeUI ? "partial" : "passed");
+console.log(`${nonNativeUI ? "Partial gauntlet: native UI gates not run" : "Gauntlet passed"}: ${results.length} gate receipts recorded.`);
 
 async function writeReport(status) {
   const evidenceDirectory = path.resolve("evidence/gauntlet");

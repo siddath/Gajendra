@@ -1,7 +1,9 @@
+import path from "node:path";
 import { createHash } from "node:crypto";
 
 import {
   MUTATION_PROTOCOL_VERSION,
+  MAX_WORKFLOW_RECORDS,
   isRunningThreadStatus,
   type DeckMutation,
   type DeckMutationRequest,
@@ -10,16 +12,19 @@ import {
   type MutationErrorCode,
   type PriorityStore,
 } from "../shared/contracts.js";
+import { isCanonicalWorkflowId, validContinuations } from "./workflow.js";
 import { applyMutation, buildSnapshot } from "./domain.js";
 import { hashIdempotencyKey } from "./idempotency.js";
 import { hashReviewAcknowledgement, hashReviewThread } from "./review-acknowledgements.js";
 import { GajendraStoreRepository } from "./store.js";
-import { ThreadSourceRegistry, type SourceCollection } from "./thread-sources.js";
+import { ThreadSourceRegistry, resolveSourcesConfigPath, type SourceCollection } from "./thread-sources.js";
+import { ThreadCatalog } from "./thread-catalog.js";
 import { CODEX_PROVIDER_COLLECTION_ENVELOPE_MS } from "./codex-app-server.js";
+import { LifecycleInvalidationCache, ThreadMetadataCache } from "./metadata-cache.js";
 
 type SourceRegistry = Pick<ThreadSourceRegistry, "collect" | "close">;
 type MutationInput = DeckMutation | DeckMutationRequest;
-type ValidationErrorCode = "unknown-thread" | "unknown-source" | "invalid-target" | "review-acknowledgement-limit";
+type ValidationErrorCode = Exclude<MutationErrorCode, "stale-revision" | "idempotency-key-reused" | "store-busy" | "store-recovery-required">;
 type SourceCollectionCache = Map<string, SourceCollection>;
 type MutationAttempt =
   | { retry: true }
@@ -37,6 +42,8 @@ export const DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS =
   CODEX_PROVIDER_COLLECTION_ENVELOPE_MS + 9_250;
 
 export type GajendraServiceOptions = {
+  sharedCatalog?: boolean;
+  metadataCache?: ThreadMetadataCache;
   /**
    * Provider work is deliberately outside the store lock. The default is derived from the
    * accepted Codex provider bounds plus the initial store read; callers may still inject a tighter
@@ -53,6 +60,10 @@ export class GajendraService {
   private readonly generationDeadlineMs: number;
   private readonly maxGenerationRetries: number;
   private readonly now: () => number;
+  private readonly metadataCache: ThreadMetadataCache | undefined;
+  private readonly lifecycleInvalidation: LifecycleInvalidationCache;
+  private readonly catalog: ThreadCatalog | undefined;
+  private backgroundRefresh: Promise<DeckSnapshot> | undefined;
 
   constructor(
     private readonly store = new GajendraStoreRepository(),
@@ -62,6 +73,12 @@ export class GajendraService {
     // Do not derive this from staleLockMs: the Codex provider can legally outlive that recovery
     // marker while still staying bounded. An explicit caller deadline remains a tighter opt-in.
     this.now = options.now ?? Date.now;
+    this.metadataCache = options.metadataCache;
+    this.lifecycleInvalidation = new LifecycleInvalidationCache(path.dirname(this.store.filePath));
+    this.catalog = options.sharedCatalog ? new ThreadCatalog(
+      (preferences, reviews) => this.collect(preferences, reviews),
+      () => this.lifecycleInvalidation.read(), resolveSourcesConfigPath(), this.now,
+    ) : undefined;
     this.generationDeadlineMs = boundedPositive(
       options.generationDeadlineMs,
       DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS,
@@ -74,7 +91,20 @@ export class GajendraService {
     );
   }
 
+  async sync(): Promise<{ revision: number; activityRevision?: string; catalogRevision?: number }> {
+    const activityRevision = await this.lifecycleInvalidation.read();
+    return { revision: (await this.store.read()).revision, ...(activityRevision ? { activityRevision } : {}),
+      ...(this.catalog ? { catalogRevision: this.catalog.revision } : {}) };
+  }
+
   async snapshot(): Promise<DeckSnapshot> {
+    // Capture the epoch before collection: a later hook still requires another refresh.
+    const activityRevision = await this.lifecycleInvalidation.read();
+    const snapshot = await this.liveSnapshot();
+    return { ...snapshot, ...(activityRevision ? { activityRevision } : {}) };
+  }
+
+  private async liveSnapshot(): Promise<DeckSnapshot> {
     // Provider work stays outside the store lock, then the entire store generation is checked.
     // Source preferences alone are not enough: a concurrent writer can otherwise make returned
     // priority metadata and the source collection describe different store generations.
@@ -93,13 +123,13 @@ export class GajendraService {
       }
       const confirmed = await this.store.read();
       if (confirmed.revision === state.revision) {
-        return buildSnapshot(state, collection.threads, collection.sources, collection.error);
+        return this.snapshotFromCollection(state, collection);
       }
       // The provider result depends on enabled sources, not priority ordering/collapse state. If
       // those preferences survived a concurrent write, derive the response from the confirmed
       // store generation without another slow provider call.
       if (sameSourcePreferences(confirmed.sourcePreferences, state.sourcePreferences)) {
-        return buildSnapshot(confirmed, collection.threads, collection.sources, collection.error);
+        return this.snapshotFromCollection(confirmed, collection);
       }
       if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       // A changed preference generation invalidates any older collection, even if a later toggle
@@ -107,6 +137,54 @@ export class GajendraService {
       collections.clear();
       retries += 1;
     }
+  }
+
+  async cachedSnapshot(): Promise<DeckSnapshot | null> {
+    const state = await this.store.read();
+    const activityRevision = await this.lifecycleInvalidation.read();
+    const live = await this.catalog?.peek(state.sourcePreferences);
+    if (live) {
+      const confirmed = await this.store.read();
+      if (!sameSourcePreferences(state.sourcePreferences, confirmed.sourcePreferences)) return null;
+      return { ...await this.snapshotFromCollection(confirmed, live), ...(activityRevision ? { activityRevision } : {}) };
+    }
+    const cached = await this.metadataCache?.load(state.sourcePreferences);
+    if (!cached) return null;
+    const confirmed = await this.store.read();
+    if (!sameSourcePreferences(state.sourcePreferences, confirmed.sourcePreferences)) return null;
+    return { ...buildSnapshot(confirmed, cached.collection.threads, cached.collection.sources), cachedAt: cached.savedAt };
+  }
+
+  /** Fast read, with refresh owned by the long-lived backend rather than the requesting UI. */
+  async readSnapshot(): Promise<DeckSnapshot> {
+    const cached = await this.cachedSnapshot();
+    if (cached) {
+      if (cached.cachedAt && cached.catalogRevision === undefined && !this.backgroundRefresh) {
+        const pending = this.snapshot();
+        this.backgroundRefresh = pending;
+        void pending.catch(() => undefined).finally(() => {
+          if (this.backgroundRefresh === pending) this.backgroundRefresh = undefined;
+        });
+      }
+      return cached;
+    }
+    return this.snapshot();
+  }
+
+  private async snapshotFromCollection(state: PriorityStore, collection: SourceCollection): Promise<DeckSnapshot> {
+    const version = this.catalog?.versionFor(collection);
+    const generation = version === undefined ? {} : { catalogRevision: version };
+    const failedSources = new Set(collection.sources.filter(source => source.enabled && source.state === "error").map(source => source.id));
+    if (collection.error || failedSources.size > 0) {
+      const cached = await this.metadataCache?.load(state.sourcePreferences);
+      if (cached) {
+        const liveIds = new Set(collection.threads.map(thread => thread.id));
+        const retained = cached.collection.threads.filter(thread => !liveIds.has(thread.id)
+          && (failedSources.has(thread.sourceId) || (collection.error && collection.sources.length === 0)));
+        if (retained.length > 0) return { ...buildSnapshot(state, [...collection.threads, ...retained], collection.sources, collection.error), cachedAt: cached.savedAt, ...generation };
+      }
+    }
+    return { ...buildSnapshot(state, collection.threads, collection.sources, collection.error), ...generation };
   }
 
   /** All writers enter here, whether they use the envelope or a legacy bare mutation shape. */
@@ -126,8 +204,22 @@ export class GajendraService {
       if (this.now() >= deadline) return this.storeBusyResult();
       const stateForSources = await this.store.read();
       let collection: SourceCollection;
+      let cachedAt: string | undefined;
       try {
-        collection = await this.collectForGeneration(stateForSources.sourcePreferences, collections, deadline);
+        const local = this.catalog && request.mutation.type !== "set-review-acknowledged"
+          && request.mutation.type !== "set-source-enabled";
+        const prepared = local ? await this.catalog?.peek(stateForSources.sourcePreferences) : undefined;
+        const failures = new Set(prepared?.sources.filter(source => source.enabled && source.state === "error").map(source => source.id));
+        const saved = local && (!prepared || prepared.error || failures.size)
+          ? await this.metadataCache?.load(stateForSources.sourcePreferences) : undefined;
+        cachedAt = saved?.savedAt;
+        const merged = prepared && saved ? { ...prepared, threads: [...prepared.threads,
+          ...saved.collection.threads.filter(thread => !prepared.threads.some(live => live.id === thread.id)
+            && (failures.has(thread.sourceId) || (prepared.error && prepared.sources.length === 0)))] } : prepared;
+        collection = merged ?? saved?.collection ?? (local && request.mutation.type === "set-collapsed"
+          ? { threads: [], sources: [], error: null }
+          : await this.collectForGeneration(stateForSources.sourcePreferences, collections, deadline,
+            request.mutation.type === "set-review-acknowledged"));
       } catch (error) {
         if (error instanceof GenerationDeadlineError) return this.storeBusyResult();
         throw error;
@@ -137,7 +229,9 @@ export class GajendraService {
           && !sameSourcePreferences(current.sourcePreferences, stateForSources.sourcePreferences)) {
           return { value: { retry: true } };
         }
-        const snapshot = (state = current): DeckSnapshot => buildSnapshot(state, collection.threads, collection.sources, collection.error);
+        const snapshot = (state = current): DeckSnapshot => ({ ...buildSnapshot(state, collection.threads, collection.sources, collection.error),
+          ...(this.catalog?.versionFor(collection) === undefined ? {} : { catalogRevision: this.catalog.versionFor(collection)! }),
+          ...(cachedAt ? { cachedAt } : {}) });
         const result = (value: DeckMutationResult, committedState?: PriorityStore): { value: MutationAttempt; next?: PriorityStore } => ({
           ...(committedState ? { next: committedState } : {}),
           value: {
@@ -226,13 +320,14 @@ export class GajendraService {
     }
   }
 
-  close(): Promise<void> {
-    return this.sources.close();
+  async close(): Promise<void> {
+    await this.sources.close();
+    await this.backgroundRefresh?.catch(() => undefined);
   }
 
-  private async collect(preferences: Record<string, boolean>): Promise<SourceCollection> {
+  private async collect(preferences: Record<string, boolean>, forceFreshReviews: boolean): Promise<SourceCollection> {
     try {
-      return await this.sources.collect(preferences);
+      return await this.sources.collect(preferences, forceFreshReviews);
     } catch {
       return { threads: [], sources: [], error: "Gajendra could not read the configured thread sources." };
     }
@@ -242,17 +337,21 @@ export class GajendraService {
     preferences: Record<string, boolean>,
     collections: SourceCollectionCache,
     deadline: number,
+    forceFreshReviews = false,
   ): Promise<SourceCollection> {
     const key = sourcePreferencesKey(preferences);
     const cached = collections.get(key);
     if (cached) return cached;
     const remaining = deadline - this.now();
     if (remaining <= 0) throw new GenerationDeadlineError();
-    const collection = await completeBeforeDeadline(this.collect(preferences), remaining);
+    const configuration = await this.metadataCache?.configuration();
+    const collection = await completeBeforeDeadline(this.catalog
+      ? this.catalog.get(preferences, true, forceFreshReviews) : this.collect(preferences, forceFreshReviews), remaining);
     // The timer protects real elapsed time; the injected clock makes a provider that resolves
     // after the absolute budget observable in deterministic tests as the same safe fallback.
     if (this.now() >= deadline) throw new GenerationDeadlineError();
     collections.set(key, collection);
+    await this.metadataCache?.save(preferences, collection, configuration);
     return collection;
   }
 
@@ -319,7 +418,7 @@ function mutationFingerprint(mutation: DeckMutation): string {
 }
 
 function validateMutation(
-  store: Pick<PriorityStore, "entries" | "currentFocusThreadId" | "reviewAcknowledgements">,
+  store: PriorityStore,
   mutation: DeckMutation,
   collection: SourceCollection,
   reviewAcknowledgementLimit: number,
@@ -333,6 +432,35 @@ function validateMutation(
 
   const knownThreadIds = new Set(collection.threads.map((thread) => thread.id));
   if (!knownThreadIds.has(mutation.threadId)) return "unknown-thread";
+  if (mutation.type === "set-work-completed" || mutation.type === "link-continuation") {
+    const thread = collection.threads.find(candidate => candidate.id === mutation.threadId)!;
+    if (!isCanonicalWorkflowId(thread.id) || !thread.id.startsWith(`${thread.sourceId}:`)) return "invalid-continuation";
+    const completed = new Set(store.completedThreadIds);
+    const links = store.continuations ?? [];
+    if (mutation.type === "set-work-completed") {
+      if (links.some(link => link.predecessorThreadId === mutation.threadId)) return "invalid-target";
+      if (mutation.completed && !completed.has(mutation.threadId) && completed.size >= MAX_WORKFLOW_RECORDS) return "workflow-limit";
+      if (mutation.completed) completed.add(mutation.threadId); else completed.delete(mutation.threadId);
+      if (mutation.currentThreadId && (completed.has(mutation.currentThreadId)
+        || !knownThreadIds.has(mutation.currentThreadId)
+        || !store.entries.some(entry => entry.threadId === mutation.currentThreadId && entry.level === "focus"))) return "invalid-target";
+      return null;
+    }
+    const prior = links.find(link => link.predecessorThreadId === mutation.threadId);
+    if (mutation.currentThreadId === null) {
+      if (!prior || completed.has(prior.currentThreadId) || links.some(link => link.predecessorThreadId === prior.currentThreadId)) return "invalid-continuation";
+      if (store.entries.some(entry => entry.threadId === mutation.threadId)) return "invalid-continuation";
+      return null;
+    }
+    const target = collection.threads.find(candidate => candidate.id === mutation.currentThreadId);
+    if (!target || !isCanonicalWorkflowId(target.id) || !target.id.startsWith(`${target.sourceId}:`)) return "invalid-continuation";
+    if (prior || links.some(link => link.predecessorThreadId === target.id) || completed.has(mutation.threadId) || completed.has(target.id)
+      || store.entries.some(entry => entry.threadId === target.id)) return "invalid-continuation";
+    if (links.length >= MAX_WORKFLOW_RECORDS) return "workflow-limit";
+    return validContinuations([...links, { predecessorThreadId: mutation.threadId, currentThreadId: target.id }]) ? null : "invalid-continuation";
+  }
+  if (mutation.type !== "set-review-acknowledged" && (store.completedThreadIds?.includes(mutation.threadId)
+    || store.continuations?.some(link => link.predecessorThreadId === mutation.threadId))) return "work-completed";
   if (mutation.type === "set-review-acknowledged") {
     const thread = collection.threads.find((candidate) => candidate.id === mutation.threadId);
     if (!thread?.review
@@ -379,14 +507,15 @@ function validateMutation(
 }
 
 function validatePostMoveCurrent(
-  store: Pick<PriorityStore, "entries" | "currentFocusThreadId">,
+  store: PriorityStore,
   mutation: Extract<DeckMutation, { type: "move-before" }>,
   knownThreadIds: Set<string>,
 ): ValidationErrorCode | null {
   if (!Object.hasOwn(mutation, "currentThreadId")) return null;
   const currentThreadId = mutation.currentThreadId;
   if (currentThreadId === undefined || currentThreadId === null) return null;
-  if (!knownThreadIds.has(currentThreadId)) return "invalid-target";
+  if (!knownThreadIds.has(currentThreadId) || store.completedThreadIds?.includes(currentThreadId)
+    || store.continuations?.some(link => link.predecessorThreadId === currentThreadId)) return "invalid-target";
   const postMoveFocusIds = new Set(store.entries
     .filter((entry) => entry.level === "focus")
     .map((entry) => entry.threadId));
@@ -407,6 +536,9 @@ function conflict(snapshot: DeckSnapshot, revision: number): DeckMutationResult 
 
 function rejected(snapshot: DeckSnapshot, revision: number, code: Exclude<MutationErrorCode, "stale-revision" | "store-busy" | "store-recovery-required">): DeckMutationResult {
   const messages: Record<typeof code, string> = {
+    "workflow-limit": "Gajendra workflow capacity is full. Existing work records were preserved.",
+    "invalid-continuation": "Choose two exact available chats without an existing conflicting continuation or priority.",
+    "work-completed": "Reopen this work or use its current continuation before changing priorities.",
     "idempotency-key-reused": "This request key was already used for a different change.",
     "unknown-thread": "That thread is no longer available from an enabled source.",
     "unknown-source": "That source is not available in the current Gajendra registry.",

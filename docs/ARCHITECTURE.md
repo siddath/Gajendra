@@ -1,12 +1,12 @@
 # Architecture
 
-Gajendra — **One clear focus across your AI tools.** — keeps one global NOW, a short Focus queue,
+Gajendra — **One clear focus across your AI tools.** — keeps at most one selected global NOW, a short Focus queue,
 and an Important queue while each provider retains its own sessions and credentials. Its promise is
 **One NOW. One short queue. One click back to the exact thread.**
 
-This describes the current **source-review candidate**. One exact ad-hoc local build has an
-installed automated interaction receipt; no clean-Mac, physical-accessibility, signed, notarized,
-or distributed app claim is made.
+This describes the local **0.4.0 source candidate**. Earlier installed receipts do not prove this
+candidate. Current installation/host acceptance, clean-Mac, physical accessibility, signing,
+notarization, and distribution require their own evidence.
 
 ```mermaid
 flowchart LR
@@ -23,17 +23,68 @@ flowchart LR
 
 - Canonical IDs are `source-id:provider-thread-id`; NOW must belong to Focus.
 - The store persists only IDs, priority order, the bounded Design/Engineering/Life context enum,
-  source preferences, a revision, bounded SHA-256 idempotency receipts, and at most 1,024 SHA-256
+  source preferences, explicit completed IDs and exact continuation relationships, a bounded
+  `nowSelection` enum, a revision, bounded SHA-256 idempotency receipts, and at most 1,024 SHA-256
   review acknowledgement receipts. It never persists live titles, prompts, transcripts, review
   timestamps/statuses/destinations, source files, credentials, or free-text labels.
 - Every mutation goes through the revisioned store authority. `expectedRevision` provides CAS;
   stale writes return a typed conflict with a fresh safe snapshot. The store serializes
   cross-process writers and supports replay-safe idempotency keys.
-- `move-before` is the sole atomic queue operation. It validates source/thread/target before
+- `move-before` is the atomic placement operation. It validates source/thread/target before
   changing state, handles same-lane/cross-lane/append placement, preserves context, repairs NOW,
-  and treats a self-drop as a no-op.
+  and rejects invalid targets.
+
+## Shared product state
+
+The service emits one `product` projection for both surfaces: `readyForReview`, `needsInput`,
+`running`, `continue`, and `history`. Running takes precedence over input/review. Needs input
+requires the configured catalog's explicit `attention: "needs-input"`; built-ins do not infer it
+from generic waiting. Ready is independent of age, priority, and explicit work completion.
+Continue contains open prioritized current chats; History includes completed work, predecessors,
+and other inactive chats. Search retains exact individual chat identities.
+
+`set-work-completed` preserves priority/context/order and pending review receipts. Finishing NOW
+sets `nowSelection: "cleared"` and leaves no replacement. Reopen restores Continue eligibility;
+NOW is selected explicitly (an inverse mutation can restore it atomically). `link-continuation`
+uses exact available IDs and transfers priority/context/order/NOW to the successor. It rejects
+cycles, ambiguous existing priorities, invalid namespaces, and conflicting links. The latest edge
+can be unlinked atomically. Neither action reads or mutates provider conversations. Each bounded
+workflow collection admits up to 1,024 records and rejects overflow rather than evicting history.
 
 ## Storage recovery and isolation
+
+The October 5 read-path implementation shares one session-scoped local backend between native CLI
+requests and MCP. It uses an owner-private Unix socket, keyed by build and data/provider scope,
+with no TCP listener or launch agent. Concurrent refresh requests join one collection; provider
+work is serialized, and a review acknowledgement never joins an earlier pre-click collection.
+The owner exits after five idle minutes. `GAJENDRA_SHARED_BACKEND=off` restores per-client execution.
+
+The backend holds a 30-second in-memory catalog of normalized thread metadata, separate from the
+revisioned durable store. Reads recompose current priorities/workflow state without discovery;
+`--read-json` returns the prepared view and starts a background refresh when only a disk fallback
+is available. `catalogRevision` lets visible clients pick up background results without rescanning.
+Account/source preferences, source-configuration replacement and lifecycle epochs invalidate reuse.
+Executable resume commands are removed from the memory projection as well as disk caches; native
+resume obtains fresh source metadata before opening a CLI destination.
+
+Local priority/context/order/collapse/workflow changes can use the scoped known catalog, including
+neutral saved rows when sources are offline. They still validate IDs and transact against current
+durable state with CAS/idempotency. Review acknowledgement always obtains fresh provider evidence.
+Source changes still collect under the new preference generation. No durable data schema changes.
+
+The native first-opening path calls `--cached-snapshot-json` followed by `--read-json`;
+`gajendra_open` is likewise cache-first unless `refresh: true` requests a live snapshot. The disk fallback
+reads only the disposable projection plus current authoritative state. `--read-json` can schedule
+discovery in the background. `cachedAt` labels disk fallback age, with neutral activity until live data arrives.
+Each ordinary refresh still lists current provider metadata to discover changes, removals and
+new continuations. Only unchanged Codex completion checks are reused across backend processes;
+changed threads and review acknowledgements receive fresh metadata checks. Visible clients check
+`gajendra_sync`/`--sync-json` about every five seconds and request ordinary
+source refreshes about every thirty seconds, plus provider latency. Optional trusted hooks replace
+one private invalidation token without scanning sources. Sync returns optional `activityRevision`;
+live snapshots capture it before provider work. Completion-cache reuse requires a matching epoch,
+including after racing writes. This is invalidation, not a provider event subscription or delta API.
+See [Daily widget](DAILY-WIDGET.md).
 
 The macOS default is `~/Library/Application Support/Gajendra/gajendra.v2.json`. Files are bounded,
 owner-private, atomically replaced, and protected by a token-owned lock/reclaim protocol. Primary
@@ -84,9 +135,10 @@ authoritative snapshot after its press animation, so mutable DOM attributes or a
 cannot redirect an Open action. Unknown, whitespace-padded, encoded, `javascript:`, `data:`, and
 `file:` URLs fail closed.
 
-Review acknowledgements reuse the version-3 store as an additive optional field so existing files
-remain readable. Rolling back to an older v3 writer can drop that unknown field on its next write,
-which may make handled Ready items reappear; it does not corrupt priority state. The service replaces
+Review acknowledgements and workflow fields extend version 3 additively, so existing files remain
+readable. Preserve a private store/backup before rollback: an older writer can drop review receipts,
+completion/continuation IDs, and cleared-NOW state on its next write. Review items may reappear and
+older clients cannot represent the new lifecycle choices. The service replaces
 an older receipt for the same thread and rejects a new-thread acknowledgement at the 1,024-thread
 ceiling rather than silently evicting another handled response.
 
@@ -105,8 +157,8 @@ remaining activity budget. Optional recovery failure does not erase completed li
 ## Native and release boundary
 
 The native source targets macOS 13.5 and expects a bundle containing checksum-verified Node
-v24.19.0 plus notices. The exact local ad-hoc candidate has an installed automated interaction
-receipt; that does not establish clean-Mac or physical interaction/accessibility proof. It has not
+v24.19.0 plus notices. Earlier ad-hoc builds have installed automated interaction
+receipts; these do not prove the current 0.4.0 candidate or clean-Mac/physical accessibility. It has not
 been Developer ID signed/notarized and is not downloadable. See [Companion](COMPANION.md) and
 [Status](../STATUS.md).
 

@@ -279,9 +279,11 @@ describe("Gajendra domain", () => {
       acknowledged: true,
     }, now, { review: ready.review });
     const hidden = buildSnapshot(acknowledged, [ready], sources);
-    expect(hidden.current).toMatchObject({ id: ready.id, level: "focus", isCurrent: true, context: "engineering" });
+    expect(hidden.current).toMatchObject({ id: ready.id, level: "focus", isCurrent: true, context: "engineering", reviewAcknowledged: true, workState: "open" });
     expect(hidden.current?.review).toBeUndefined();
     expect(reviewReadyDeckThreads(hidden)).toEqual([]);
+    expect(hidden.product?.history.map(thread => thread.id)).toEqual([ready.id]);
+    expect(hidden.product?.continue.map(thread => thread.id)).toEqual([ready.id]);
     expect(acknowledged.reviewAcknowledgements).toEqual([{
       threadHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
       signalHash: hashReviewAcknowledgement(ready.id, ready.review),
@@ -292,6 +294,13 @@ describe("Gajendra domain", () => {
       review: { ...ready.review, destination: { type: "url" as const, url: "https://example.test/review/corrected" } },
     };
     expect(reviewReadyDeckThreads(buildSnapshot(acknowledged, [changedDestination], sources)).map((thread) => thread.id)).toEqual([ready.id]);
+    const newer = buildSnapshot(acknowledged, [{ ...ready, review: { ...ready.review, updatedAt: 301 } }], sources);
+    expect(newer.current?.reviewAcknowledged).toBeUndefined();
+    expect(newer.product?.readyForReview.map(thread => thread.id)).toEqual([ready.id]);
+    expect(newer.product?.history).toEqual([]);
+    expect(buildSnapshot(acknowledged, [changedDestination], sources).current?.reviewAcknowledged).toBeUndefined();
+    const { review: _review, ...neutral } = ready;
+    expect(buildSnapshot(acknowledged, [neutral], sources).current?.reviewAcknowledged).toBeUndefined();
 
     const restored = applyMutation(acknowledged, {
       type: "set-review-acknowledged",
@@ -301,6 +310,7 @@ describe("Gajendra domain", () => {
       acknowledged: false,
     }, now, { review: ready.review });
     expect(reviewReadyDeckThreads(buildSnapshot(restored, [ready], sources)).map((thread) => thread.id)).toEqual([ready.id]);
+    expect(buildSnapshot(restored, [ready], sources).product?.history).toEqual([]);
   });
 
   it("normalizes malformed snapshots to one current task", () => {

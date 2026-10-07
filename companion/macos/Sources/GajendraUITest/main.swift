@@ -72,11 +72,11 @@ enum GajendraUITest {
                 )
             } else if scope == "widget" {
                 print(
-                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"earlierActivityDisclosure":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             } else {
                 print(
-                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"reviewDockDoubleClick":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                    #"{"status":"passed","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"dockSingleClickGuard":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"earlierActivityDisclosure":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"organizerQueueDragAndDrop":true,"organizerNowGuard":true,"organizerRunningDockControlClick":true,"organizerRunningDockDoubleClick":true,"organizerReviewDockDoubleClick":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
                 )
             }
         } catch {
@@ -240,11 +240,7 @@ enum GajendraUITest {
             label: "Running, 2 active threads",
             collapsedValue: "Collapsed"
         )
-        try verifyDockDoubleClick(
-            pid: rawPID,
-            label: "Ready for Review, 1 thread",
-            collapsedValue: "Collapsed"
-        )
+        try verifyDailyActivityDisclosure(pid: rawPID)
         try verifyWidgetSizing(pid: rawPID, stateURL: stateURL)
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "widget" {
             try verifyCompactPriorityActions(pid: rawPID, stateURL: stateURL)
@@ -579,7 +575,25 @@ enum GajendraUITest {
         _ = try waitForElement(pid: pid, label: "Run the drag regression, Synthetic UI Agent, Running now")
     }
 
+    private static func verifyDailyActivityDisclosure(pid: pid_t) throws {
+        _ = try waitForElement(pid: pid, label: "Ready for Review")
+        let earlier = try waitForElement(pid: pid, label: "History", value: "Collapsed")
+        guard AXUIElementPerformAction(earlier, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("History could not be expanded")
+        }
+        let expanded = try waitForElement(pid: pid, label: "History", value: "Expanded")
+        guard AXUIElementPerformAction(expanded, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("History could not be collapsed")
+        }
+        let collapsed = try waitForElement(pid: pid, label: "History", value: "Collapsed")
+        guard AXUIElementPerformAction(collapsed, kAXPressAction as CFString) == .success else {
+            throw GajendraUITestError.failed("History could not be reopened")
+        }
+        _ = try waitForElement(pid: pid, label: "History", value: "Expanded")
+    }
+
     private static func verifyCompactPriorityActions(pid: pid_t, stateURL: URL) throws {
+
         let marker = stateURL
             .deletingLastPathComponent()
             .appendingPathComponent(".gajendra-ui-opened-url", isDirectory: false)
@@ -596,11 +610,7 @@ enum GajendraUITest {
             duration: 0.2
         )
 
-        let readyHeader = try waitForStableDockHeader(
-            pid: pid,
-            label: "Ready for Review, 1 thread",
-            value: "Expanded"
-        )
+        let readyHeader = try waitForElement(pid: pid, label: "Ready for Review")
         try scrollVertically(at: try elementFrame(readyHeader).center, lines: -8)
         let readyPrimary = try waitForStableHittableElement(
             pid: pid,
@@ -757,11 +767,7 @@ enum GajendraUITest {
             label: "Running, 2 active threads",
             value: "Expanded"
         )
-        _ = try waitForStableDockHeader(
-            pid: pid,
-            label: "Ready for Review, 1 thread",
-            value: "Expanded"
-        )
+        _ = try waitForElement(pid: pid, label: "Ready for Review")
 
         let originalCatalog = try Data(contentsOf: catalogURL)
         let mutatedCatalog = try readyCatalogData(
@@ -795,11 +801,7 @@ enum GajendraUITest {
             label: "Running, 1 active threads",
             value: "Expanded"
         )
-        _ = try waitForStableDockHeader(
-            pid: pid,
-            label: "Ready for Review, 2 threads",
-            value: "Expanded"
-        )
+        _ = try waitForElement(pid: pid, label: "Ready for Review")
         try requireElementAbsent(pid: pid, label: runningRowLabel, duration: 0.45)
         _ = try waitForStableHittableElement(
             pid: pid,
@@ -824,11 +826,7 @@ enum GajendraUITest {
             label: "Running, 1 active threads",
             value: "Expanded"
         )
-        _ = try waitForStableDockHeader(
-            pid: pid,
-            label: "Ready for Review, 2 threads",
-            value: "Expanded"
-        )
+        _ = try waitForElement(pid: pid, label: "Ready for Review")
         try requireElementAbsent(pid: pid, label: runningRowLabel, duration: 0.45)
         let readyRow = try waitForStableHittableElement(
             pid: pid,
@@ -872,11 +870,7 @@ enum GajendraUITest {
         guard AXUIElementPerformAction(done, kAXPressAction as CFString) == .success else {
             throw GajendraUITestError.failed("the transitioned Ready row did not expose its acknowledgement action")
         }
-        _ = try waitForStableDockHeader(
-            pid: pid,
-            label: "Ready for Review, 1 thread",
-            value: "Expanded"
-        )
+        _ = try waitForElement(pid: pid, label: "Ready for Review")
         try requireElementAbsent(pid: pid, label: readyRowLabel, duration: 0.45)
         guard try readState(stateURL) == beforePriority else {
             throw GajendraUITestError.failed(

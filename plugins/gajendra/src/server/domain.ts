@@ -1,4 +1,5 @@
 import {
+  productDeckProjection,
   DEFAULT_IDEMPOTENCY_LEDGER_LIMIT,
   DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT,
   DEFAULT_SOURCE_PREFERENCES,
@@ -17,6 +18,7 @@ import {
   type ThreadSourceStatus,
   type ThreadContext,
 } from "../shared/contracts.js";
+import { validCompletedIds, validContinuations } from "./workflow.js";
 import { hashIdempotencyKey, isSha256Digest } from "./idempotency.js";
 import { hashReviewAcknowledgement, hashReviewThread } from "./review-acknowledgements.js";
 
@@ -33,16 +35,21 @@ export function normalizeStore(value: unknown): PriorityStore {
         .map(normalizeStoredEntry)
         .filter(uniqueByThreadId())
     : [];
+  const completed = validCompletedIds(candidate.completedThreadIds) ? candidate.completedThreadIds : [];
+  const continuations = validContinuations(candidate.continuations) ? candidate.continuations : [];
   const candidateCurrent = typeof candidate.currentFocusThreadId === "string"
     ? normalizeLegacyThreadId(candidate.currentFocusThreadId)
     : null;
   const current = candidateCurrent && entries.some(
-    (entry) => entry.threadId === candidateCurrent && entry.level === "focus",
+    (entry) => entry.threadId === candidateCurrent && entry.level === "focus" && !completed.includes(entry.threadId),
   )
     ? candidateCurrent
-    : entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+    : candidate.nowSelection === "cleared" ? null : entries.find((entry) => entry.level === "focus" && !completed.includes(entry.threadId))?.threadId ?? null;
 
   return {
+    ...(completed.length ? { completedThreadIds: [...completed] } : {}),
+    ...(continuations.length ? { continuations: continuations.map(link => ({ predecessorThreadId: link.predecessorThreadId, currentThreadId: link.currentThreadId })) } : {}),
+    ...(candidate.nowSelection === "cleared" ? { nowSelection: "cleared" as const } : {}),
     version: STORE_VERSION,
     revision: normalizeRevision(candidate.revision),
     currentFocusThreadId: current,
@@ -65,6 +72,34 @@ export function applyMutation(
 ): PriorityStore {
   const next = normalizeStore(store);
 
+  if (mutation.type === "set-work-completed") {
+    const completed = new Set(next.completedThreadIds);
+    if (mutation.completed) completed.add(mutation.threadId);
+    else completed.delete(mutation.threadId);
+    next.completedThreadIds = [...completed];
+    if (mutation.completed && next.currentFocusThreadId === mutation.threadId) {
+      next.currentFocusThreadId = null;
+      next.nowSelection = "cleared";
+    }
+    if (Object.hasOwn(mutation, "currentThreadId")) {
+      next.currentFocusThreadId = mutation.currentThreadId ?? null;
+      next.nowSelection = mutation.currentThreadId ? "automatic" : "cleared";
+    }
+    return next;
+  }
+  if (mutation.type === "link-continuation") {
+    const links = next.continuations ?? [];
+    const prior = links.find(link => link.predecessorThreadId === mutation.threadId);
+    const from = mutation.currentThreadId ? mutation.threadId : prior?.currentThreadId;
+    const to = mutation.currentThreadId ?? mutation.threadId;
+    if (from) {
+      next.entries = next.entries.map(entry => entry.threadId === from ? { ...entry, threadId: to } : entry);
+      if (next.currentFocusThreadId === from) next.currentFocusThreadId = to;
+    }
+    next.continuations = links.filter(link => link.predecessorThreadId !== mutation.threadId);
+    if (mutation.currentThreadId) next.continuations.push({ predecessorThreadId: mutation.threadId, currentThreadId: mutation.currentThreadId });
+    return next;
+  }
   if (mutation.type === "set-collapsed") {
     next.collapsed[mutation.level] = mutation.collapsed;
     return next;
@@ -113,11 +148,12 @@ export function applyMutation(
     if (mutation.level) {
       next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
-    if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.level === "focus" && !next.currentFocusThreadId && next.nowSelection !== "cleared") next.currentFocusThreadId = mutation.threadId;
     return repairCurrentFocus(next);
   }
 
   if (mutation.type === "set-current") {
+    next.nowSelection = "automatic";
     const existing = index >= 0 ? next.entries[index] : undefined;
     if (index >= 0) next.entries.splice(index, 1);
     next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
@@ -187,23 +223,25 @@ function moveBefore(
 
   if (Object.hasOwn(mutation, "currentThreadId")) {
     next.currentFocusThreadId = mutation.currentThreadId ?? null;
+    if (mutation.currentThreadId) next.nowSelection = "automatic";
   } else {
-    if (mutation.isCurrent === true) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.isCurrent === true) { next.currentFocusThreadId = mutation.threadId; next.nowSelection = "automatic"; }
     if (mutation.isCurrent === false && next.currentFocusThreadId === mutation.threadId) {
       next.currentFocusThreadId = null;
     }
   }
-  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId) {
+  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId && next.nowSelection !== "cleared") {
     next.currentFocusThreadId = mutation.threadId;
   }
   return repairCurrentFocus(next);
 }
 
 function repairCurrentFocus(store: PriorityStore): PriorityStore {
+  if (store.nowSelection === "cleared" && !store.currentFocusThreadId) return store;
   if (store.currentFocusThreadId && store.entries.some(
-    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus",
+    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus" && !store.completedThreadIds?.includes(entry.threadId),
   )) return store;
-  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus" && !store.completedThreadIds?.includes(entry.threadId))?.threadId ?? null;
   return store;
 }
 
@@ -215,14 +253,21 @@ export function buildSnapshot(
 ): DeckSnapshot {
   const normalized = normalizeStore(store);
   const acknowledgedSignals = new Set(normalized.reviewAcknowledgements.map((receipt) => receipt.signalHash));
-  const projectReview = (thread: AgentThread): AgentThread => {
+  const projectReview = (thread: AgentThread): AgentThread & Pick<DeckThread, "reviewAcknowledged"> => {
     if (!thread.review) return thread;
     const identity = hashReviewAcknowledgement(thread.id, thread.review);
     if (!acknowledgedSignals.has(identity)) return { ...thread, review: { ...thread.review, identity } };
     const { review: _review, ...withoutReview } = thread;
-    return withoutReview;
+    return { ...withoutReview, reviewAcknowledged: true };
   };
-  const threadsById = new Map(threads.map((thread) => [thread.id, projectReview(thread)]));
+  const nextById = new Map(normalized.continuations?.map(link => [link.predecessorThreadId, link.currentThreadId]));
+  const tip = (id: string): string => { let current = id; while (nextById.has(current)) current = nextById.get(current)!; return current; };
+  const projectThread = (thread: AgentThread) => ({ ...projectReview(thread),
+    workState: normalized.completedThreadIds?.includes(thread.id) ? "completed" as const : "open" as const,
+    currentThreadId: tip(thread.id), continuationThreadId: nextById.get(thread.id) ?? null,
+    predecessorThreadIds: [...nextById.keys()].filter(id => id !== thread.id && tip(id) === thread.id),
+  });
+  const threadsById = new Map(threads.map((thread) => [thread.id, projectThread(thread)]));
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry: StoredEntry): DeckThread | null => {
     const thread = threadsById.get(entry.threadId);
@@ -238,9 +283,9 @@ export function buildSnapshot(
   const available = threads
     .filter((thread) => !entriesById.has(thread.id))
     .sort((left, right) => right.updatedAt - left.updatedAt)
-    .map((thread) => ({ ...projectReview(thread), level: null, isCurrent: false, context: null }));
+    .map((thread) => ({ ...projectThread(thread), level: null, isCurrent: false, context: null }));
 
-  return {
+  const snapshot: DeckSnapshot = {
     generatedAt: new Date().toISOString(),
     revision: normalized.revision,
     current: focus.find((thread) => thread.isCurrent) ?? null,
@@ -255,6 +300,7 @@ export function buildSnapshot(
     sources,
     error,
   };
+  return { ...snapshot, product: productDeckProjection(snapshot) };
 }
 
 function normalizeLegacyThreadId(threadId: string): string {

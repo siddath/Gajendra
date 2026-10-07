@@ -48,3 +48,12 @@ product.
 The execution worksheet holds the gate matrix and marks local evidence separately from external
 gates:
 [release, brand, and mobile execution](../worksheets/2026-08-18-gajendra-release-brand-mobile-execution.md).
+
+## Restricted native automation environments
+
+`npm run gauntlet -- --non-native-ui` runs the data/build/browser/reliability/audit gates while
+recording the three AX-driver native gates as `not-run`. Its report is always `partial`, never a
+full gauntlet pass. Use the permitted native UI driver for separate visible interaction receipts;
+do not treat those narrower journeys as proof of fullscreen, physical drag/accessibility or strict
+widget latency. Release candidate notes must preserve these limits. The default command retains
+all existing gates.

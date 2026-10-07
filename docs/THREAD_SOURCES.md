@@ -93,6 +93,16 @@ review generation.
 
 ## Codex activity enrichment
 
+Routine Codex listing now requests the installed API's `useStateDbOnly: true` option. It reads the
+provider's index through app-server instead of scanning/repairing every rollout on each page.
+Full scan-and-repair is retained every five minutes of backend use (configurable through
+`GAJENDRA_CODEX_RECONCILE_INTERVAL_MS`, 0 means every listing, maximum one day). The initial
+listing is fast; metadata not yet indexed can wait for reconciliation. `GAJENDRA_CODEX_FAST_LIST=off`
+restores the original listing. Older providers rejecting the option with invalid-params fall back
+once and retain the compatible path for that connection. Existing activity enrichment, full bounded
+pagination, completion checks, failure handling and source caps remain in force. This is an API
+read, not direct access to the provider database.
+
 The app-server may report a desktop-owned thread as not loaded. On macOS only, Gajendra can perform
 optional, best-effort, metadata-only enrichment:
 

@@ -13,7 +13,7 @@ The following are stable compatibility identifiers and must not be renamed with 
 | Executable and bundle path | `Gajendra` / `Gajendra.app` |
 | Default state path | `~/Library/Application Support/Gajendra/gajendra.v2.json` |
 | Context values | `design`, `engineering`, `life` |
-| Store behavior | revision/CAS/idempotency, bounded hashed review acknowledgements, and bounded recovery metadata |
+| Store behavior | revision/CAS/idempotency, bounded review receipts, optional explicit lifecycle/continuation IDs and NOW-selection enum, bounded recovery metadata |
 
 ## Data compatibility
 
@@ -25,6 +25,20 @@ private last-known-good copy can restore it. Legacy Aadi/Priority Deck data is c
 Setting `GAJENDRA_DATA_DIR` creates an isolated state scope. It does not discover or consume legacy
 `~/.codex` data unless a migration was explicitly requested.
 
+The local 0.4.0 candidate retains store version 3 and the existing file path. Optional
+`completedThreadIds`, `continuations`, and `nowSelection` fields add bounded IDs/relationships and
+an enum; existing source/collapse preferences retain boolean values. Legacy files remain readable.
+Finish can clear NOW even when other Focus rows remain. Older clients cannot represent that choice.
+Before downgrading, preserve the private store and last-known-good copy: older v3 writers can drop
+unknown lifecycle/review fields on their next write. Rollback is not a lossless lifecycle migration.
+
+Snapshots add optional `product`, per-thread lifecycle/continuation metadata, `cachedAt`,
+`activityRevision`, and `catalogRevision`. Old entrypoint calls with empty arguments still work.
+`gajendra_open` uses the prepared backend view or neutral disk fallback; `refresh: true` forces
+live collection. `--read-json` provides the same prepared read to native clients. `gajendra_sync` and
+`--sync-json` return the store revision, optional opaque activity token and memory-catalog revision without discovery.
+Lifecycle tools retain the existing CAS/idempotency envelope and use exact canonical IDs.
+
 ## Source compatibility
 
 Built-in source IDs and the `configured-sources` namespace are reserved. Configured source IDs must
@@ -35,12 +49,23 @@ Deep links are compatibility data only when a source-specific safe scheme allows
 validation happens both on catalog parse and at open execution, so unsafe forms do not become
 portable through an old catalog.
 
-Configured catalog version 1 accepts the optional live-only `review` structure. Omitting it remains
+Configured catalog version 1 accepts the optional live-only `review` structure and explicit
+`attention: "needs-input"`. Generic waiting statuses do not substitute for the latter. Omitting it remains
 fully compatible. Invalid state/kind/timestamp/destination shapes fail the configured source closed;
 they are not downgraded to idle work. Live review metadata never enters the priority store. An
 explicit acknowledgement adds only bounded identity digests to an optional version-3 field and
 creates no new priority level. Older v3 writers can read the file but will drop the unknown field on
 their next write, causing handled Ready rows to reappear without changing priority state.
+
+## Optional hook compatibility
+
+The package's default `hooks/hooks.json` targets SessionStart, UserPromptSubmit, Stop, and SessionEnd
+using `${PLUGIN_ROOT}`. The wrapper uses the configured or installed-app Node runtime, then PATH
+Node, and emits harmless JSON when unavailable. Hook trust is a host decision, never granted by
+installation. Unsupported, disabled, untrusted, or failed hooks leave ordinary polling intact.
+Local-only command hooks do not establish support in cloud-orchestrated sessions. See
+[official packaging](https://developers.openai.com/plugins/build/plugins) and
+[hook support/trust](https://learn.chatgpt.com/docs/hooks).
 
 ## Build versus binary compatibility
 

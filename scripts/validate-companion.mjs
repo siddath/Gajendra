@@ -170,10 +170,10 @@ for (const source of [content, overlay]) {
     "GajendraBrandCopy.promise",
     "contextBadge(",
     "Ready for Review",
-    "No provider reports work ready for review.",
     "GajendraReviewStatusMark",
   ], "native visible brand/context contract");
 }
+assertContains(overlay, ["Ready for Review", "History", "snapshot.historyThreads", "snapshot.continueThreads", "Saved view ·", "reviewDoneButton", '.help("Mark reviewed")'], "work taxonomy and cache freshness contract");
 assertContains(overlay, [
   "performPrimaryAction",
   "DragGesture(minimumDistance: GajendraOverlayPlacement.dragThreshold)",
@@ -226,7 +226,7 @@ assertContains(uiTest, [
   "runningDockControlClick",
   "organizerRunningDockControlClick",
   "runningDockDoubleClick",
-  "reviewDockDoubleClick",
+  "earlierActivityDisclosure",
   "popupLatencyBudgetMet",
   "popupLatencyBudgetMilliseconds = 200",
   "waitForState",

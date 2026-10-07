@@ -147,15 +147,21 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
     public let sourceName: String
     public let title: String
     public let project: String
-    public let updatedAt: Double
-    public let status: String
+    public private(set) var updatedAt: Double
+    public private(set) var status: String
     public let level: PriorityLevel?
     public let isCurrent: Bool
     public let context: ThreadContext?
     public let deepLink: String
     public let allowedDeepLinkSchemes: [String]
     public let resumeCommand: ResumeCommand?
-    public let review: ReviewSignal?
+    public private(set) var review: ReviewSignal?
+    public private(set) var reviewAcknowledged: Bool
+    public private(set) var attention: String?
+    public let workState: String
+    public let currentThreadId: String
+    public let predecessorThreadIds: [String]
+    public let continuationThreadId: String?
 
     public init(
         id: String,
@@ -171,7 +177,13 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
         deepLink: String,
         allowedDeepLinkSchemes: [String] = [],
         resumeCommand: ResumeCommand? = nil,
-        review: ReviewSignal? = nil
+        review: ReviewSignal? = nil,
+        reviewAcknowledged: Bool = false,
+        attention: String? = nil,
+        workState: String = "open",
+        currentThreadId: String? = nil,
+        predecessorThreadIds: [String] = [],
+        continuationThreadId: String? = nil
     ) {
         self.id = id
         self.sourceId = sourceId
@@ -187,11 +199,17 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
         self.allowedDeepLinkSchemes = allowedDeepLinkSchemes
         self.resumeCommand = resumeCommand
         self.review = review
+        self.reviewAcknowledged = reviewAcknowledged
+        self.attention = attention
+        self.workState = workState
+        self.currentThreadId = currentThreadId ?? id
+        self.predecessorThreadIds = predecessorThreadIds
+        self.continuationThreadId = continuationThreadId
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, sourceId, sourceName, title, project, updatedAt, status, level, isCurrent, context
-        case deepLink, allowedDeepLinkSchemes, resumeCommand, review
+        case deepLink, allowedDeepLinkSchemes, resumeCommand, review, reviewAcknowledged, attention, workState, currentThreadId, predecessorThreadIds, continuationThreadId
     }
 
     public init(from decoder: Decoder) throws {
@@ -210,7 +228,13 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
             deepLink: try container.decode(String.self, forKey: .deepLink),
             allowedDeepLinkSchemes: try container.decodeIfPresent([String].self, forKey: .allowedDeepLinkSchemes) ?? [],
             resumeCommand: try container.decodeIfPresent(ResumeCommand.self, forKey: .resumeCommand),
-            review: try container.decodeIfPresent(ReviewSignal.self, forKey: .review)
+            review: try container.decodeIfPresent(ReviewSignal.self, forKey: .review),
+            reviewAcknowledged: try container.decodeIfPresent(Bool.self, forKey: .reviewAcknowledged) ?? false,
+            attention: try container.decodeIfPresent(String.self, forKey: .attention),
+            workState: try container.decodeIfPresent(String.self, forKey: .workState) ?? "open",
+            currentThreadId: try container.decodeIfPresent(String.self, forKey: .currentThreadId),
+            predecessorThreadIds: try container.decodeIfPresent([String].self, forKey: .predecessorThreadIds) ?? [],
+            continuationThreadId: try container.decodeIfPresent(String.self, forKey: .continuationThreadId)
         )
     }
 
@@ -219,7 +243,7 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
     }
 
     public var isReadyForReview: Bool {
-        review?.isReady == true && !isRunning
+        review?.isReady == true && !isRunning && attention != "needs-input"
     }
 
     public var placementLabel: String? {
@@ -268,8 +292,50 @@ public struct DeckThread: Codable, Identifiable, Equatable, Sendable {
             deepLink: deepLink,
             allowedDeepLinkSchemes: allowedDeepLinkSchemes,
             resumeCommand: resumeCommand,
-            review: review
+            review: review,
+            reviewAcknowledged: reviewAcknowledged,
+            attention: attention,
+            workState: workState,
+            currentThreadId: currentThreadId,
+            predecessorThreadIds: predecessorThreadIds,
+            continuationThreadId: continuationThreadId
         )
+    }
+
+    fileprivate func acknowledgingReview(_ receipts: Set<GajendraReviewReceipt>) -> DeckThread {
+        guard let identity = review?.identity,
+              isReadyForReview,
+              receipts.contains(GajendraReviewReceipt(threadId: id, identity: identity)) else { return self }
+        var result = self
+        result.review = nil
+        result.reviewAcknowledged = true
+        return result
+    }
+
+    fileprivate func preservingReviewEvidence(from previous: DeckThread, receipt: GajendraReviewReceipt) -> DeckThread {
+        guard id == receipt.threadId, previous.id == id,
+              !isRunning, attention != "needs-input" else { return self }
+        let previousIdentity = previous.review?.identity
+        let changedWhileWaiting = previous.isRunning || previous.attention == "needs-input"
+            || (previousIdentity != nil && previousIdentity != receipt.identity)
+        guard changedWhileWaiting else { return self }
+        // Fresh evidence C wins over known B. Only an old A/receipt-only result can resurrect A.
+        if let incoming = review, incoming.identity != receipt.identity,
+           incoming.updatedAt >= (previous.review?.updatedAt ?? 0) { return self }
+        var result = self
+        result.review = previous.review
+        result.reviewAcknowledged = previous.reviewAcknowledged
+        result.status = previous.status
+        result.attention = previous.attention
+        result.updatedAt = max(updatedAt, previous.updatedAt)
+        return result
+    }
+
+    public var historyStatus: String {
+        if workState == "completed" { return "Finished" }
+        if currentThreadId != id { return "Continued" }
+        if reviewAcknowledged { return "Reviewed" }
+        return "Earlier"
     }
 
     public static func isRunningStatus(_ status: String) -> Bool {
@@ -326,9 +392,31 @@ public struct CollapsedSections: Codable, Equatable, Sendable {
     }
 }
 
+public struct ProductSections: Codable, Equatable, Sendable {
+    public let readyForReview: [DeckThread]
+    public let needsInput: [DeckThread]
+    public let running: [DeckThread]
+    public let `continue`: [DeckThread]
+    public let history: [DeckThread]
+}
+
+public struct GajendraReviewReceipt: Hashable, Sendable {
+    public let threadId: String
+    public let identity: String
+
+    public init(threadId: String, identity: String) {
+        self.threadId = threadId
+        self.identity = identity
+    }
+}
+
 public struct DeckSnapshot: Codable, Equatable, Sendable {
     public let revision: Int
     public let generatedAt: String
+    public let cachedAt: String?
+    public let activityRevision: String?
+    public let catalogRevision: Int?
+    public let product: ProductSections?
     public let current: DeckThread?
     public let focus: [DeckThread]
     public let important: [DeckThread]
@@ -341,9 +429,27 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
     public let sources: [ThreadSourceStatus]
     public let error: String?
 
+    public var sourceWarning: String? {
+        if error != nil { return "Thread sources are unavailable. Saved priorities are unchanged. Refresh or manage AI tools to reconnect." }
+        let unavailable = sources.filter { $0.enabled && $0.state != "ready" }
+        if !unavailable.isEmpty {
+            return unavailable.map(\.name).joined(separator: ", ") + " unavailable. Manage AI tools to review the connection."
+        }
+        if staleEntryCount > 0 {
+            return staleEntryCount == 1
+                ? "1 saved priority is outside the available source results. It has not been removed."
+                : "\(staleEntryCount) saved priorities are outside the available source results. They have not been removed."
+        }
+        return nil
+    }
+
     public init(
         revision: Int = 0,
         generatedAt: String,
+        cachedAt: String? = nil,
+        activityRevision: String? = nil,
+        catalogRevision: Int? = nil,
+        product: ProductSections? = nil,
         current: DeckThread?,
         focus: [DeckThread],
         important: [DeckThread],
@@ -358,6 +464,10 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
     ) {
         self.revision = revision
         self.generatedAt = generatedAt
+        self.cachedAt = cachedAt
+        self.activityRevision = activityRevision
+        self.catalogRevision = catalogRevision
+        self.product = product
         let currentId = current?.id
         self.current = current?.settingCurrent(true)
         self.focus = focus.map { $0.settingCurrent($0.id == currentId) }
@@ -374,7 +484,7 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case revision, generatedAt, current, focus, important, available, collapsed, focusGuide, focusOverGuide
-        case staleEntryCount, source, sources, error
+        case staleEntryCount, source, sources, error, cachedAt, activityRevision, catalogRevision, product
     }
 
     public init(from decoder: Decoder) throws {
@@ -382,6 +492,10 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
         self.init(
             revision: try container.decodeIfPresent(Int.self, forKey: .revision) ?? 0,
             generatedAt: try container.decode(String.self, forKey: .generatedAt),
+            cachedAt: try container.decodeIfPresent(String.self, forKey: .cachedAt),
+            activityRevision: try container.decodeIfPresent(String.self, forKey: .activityRevision),
+            catalogRevision: try container.decodeIfPresent(Int.self, forKey: .catalogRevision),
+            product: try container.decodeIfPresent(ProductSections.self, forKey: .product),
             current: try container.decodeIfPresent(DeckThread.self, forKey: .current),
             focus: try container.decode([DeckThread].self, forKey: .focus),
             important: try container.decode([DeckThread].self, forKey: .important),
@@ -404,14 +518,71 @@ public struct DeckSnapshot: Codable, Equatable, Sendable {
     }
 
     public var runningThreads: [DeckThread] {
-        allThreads.filter(\.isRunning).sorted { left, right in
+        if let product { return product.running }
+        return allThreads.filter(\.isRunning).sorted { left, right in
             left.updatedAt > right.updatedAt
         }
     }
 
     public var reviewReadyThreads: [DeckThread] {
-        allThreads.filter(\.isReadyForReview).sorted { left, right in
+        if let product { return product.readyForReview }
+        return allThreads.filter(\.isReadyForReview).sorted { left, right in
             (left.review?.updatedAt ?? 0) > (right.review?.updatedAt ?? 0)
+        }
+    }
+
+    public var needsInputThreads: [DeckThread] { product?.needsInput ?? allThreads.filter { $0.attention == "needs-input" && !$0.isRunning } }
+    public var continueThreads: [DeckThread] {
+        product?.continue ?? (focus + important).filter { $0.workState != "completed" && $0.currentThreadId == $0.id }
+    }
+    public var historyThreads: [DeckThread] {
+        (product?.history ?? allThreads.filter {
+            $0.workState == "completed" || $0.currentThreadId != $0.id || $0.reviewAcknowledged
+                || (!$0.isCurrent && !$0.isRunning && !$0.isReadyForReview && $0.attention != "needs-input" && $0.level == nil)
+        }).sorted { $0.updatedAt == $1.updatedAt ? $0.id < $1.id : $0.updatedAt > $1.updatedAt }
+    }
+
+    /// Local presentation only; the authoritative snapshot and persisted receipt stay separate.
+    public func acknowledgingReviews(_ receipts: Set<GajendraReviewReceipt>) -> DeckSnapshot {
+        guard !receipts.isEmpty else { return self }
+        return mappingThreads { $0.acknowledgingReview(receipts) }
+    }
+
+    public func preservingReviewEvidence(from previous: DeckSnapshot?, receipt: GajendraReviewReceipt) -> DeckSnapshot {
+        guard let known = previous?.allThreads.first(where: { $0.id == receipt.threadId }) else { return self }
+        return mappingThreads { $0.preservingReviewEvidence(from: known, receipt: receipt) }
+    }
+
+    private func mappingThreads(_ transform: (DeckThread) -> DeckThread) -> DeckSnapshot {
+        let threads = allThreads.map(transform)
+        let running = threads.filter(\.isRunning).sorted { $0.updatedAt > $1.updatedAt }
+        let input = threads.filter { $0.attention == "needs-input" && !$0.isRunning }
+        let ready = threads.filter(\.isReadyForReview).sorted { ($0.review?.updatedAt ?? 0) > ($1.review?.updatedAt ?? 0) }
+        let priorities = threads.filter { $0.level != nil && $0.workState != "completed" && $0.currentThreadId == $0.id }
+        let active = Set((running + input + ready + priorities).map(\.id))
+        let history = threads.filter { $0.reviewAcknowledged || $0.workState == "completed"
+            || $0.currentThreadId != $0.id || !active.contains($0.id) }
+        return DeckSnapshot(
+            revision: revision, generatedAt: generatedAt, cachedAt: cachedAt, activityRevision: activityRevision, catalogRevision: catalogRevision,
+            product: ProductSections(readyForReview: ready, needsInput: input, running: running, continue: priorities, history: history),
+            current: current.map(transform), focus: focus.map(transform), important: important.map(transform),
+            available: available.map(transform), collapsed: collapsed, focusGuide: focusGuide,
+            focusOverGuide: focusOverGuide, staleEntryCount: staleEntryCount,
+            source: source, sources: sources, error: error
+        )
+    }
+
+    /// A calendar day is a display grouping, never a completion or priority decision.
+    /// New continuation chats enter automatically by activity; no title matching is involved.
+    public func activityThreads(today: Bool, now: Date = Date(), calendar: Calendar = .current) -> [DeckThread] {
+        let start = calendar.startOfDay(for: now).timeIntervalSince1970
+        return allThreads.filter { thread in
+            let activity = max(thread.updatedAt, thread.review?.updatedAt ?? 0)
+            return !thread.isRunning && !thread.isCurrent && (today ? activity >= start : activity < start)
+        }.sorted { left, right in
+            let lhs = max(left.updatedAt, left.review?.updatedAt ?? 0)
+            let rhs = max(right.updatedAt, right.review?.updatedAt ?? 0)
+            return lhs == rhs ? left.id < right.id : lhs > rhs
         }
     }
 
@@ -433,6 +604,8 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
     )
     case setContext(threadId: String, context: ThreadContext?)
     case setReviewAcknowledged(threadId: String, reviewUpdatedAt: Double, reviewIdentity: String, acknowledged: Bool)
+    case setWorkCompleted(threadId: String, completed: Bool, currentThreadId: String? = nil)
+    case linkContinuation(threadId: String, currentThreadId: String?)
     case setCollapsed(level: PriorityLevel, collapsed: Bool)
     case setSourceEnabled(sourceId: String, enabled: Bool)
 
@@ -442,7 +615,7 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, threadId, level, direction, beforeThreadId, context, currentThreadId, reviewUpdatedAt, reviewIdentity, acknowledged, collapsed, sourceId, enabled
+        case type, threadId, level, direction, beforeThreadId, context, currentThreadId, reviewUpdatedAt, reviewIdentity, acknowledged, completed, collapsed, sourceId, enabled
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -476,6 +649,15 @@ public enum DeckMutation: Encodable, Equatable, Sendable {
             try container.encode(reviewUpdatedAt, forKey: .reviewUpdatedAt)
             try container.encode(reviewIdentity, forKey: .reviewIdentity)
             try container.encode(acknowledged, forKey: .acknowledged)
+        case let .setWorkCompleted(threadId, completed, currentThreadId):
+            try container.encode("set-work-completed", forKey: .type)
+            try container.encode(threadId, forKey: .threadId)
+            try container.encode(completed, forKey: .completed)
+            try container.encodeIfPresent(currentThreadId, forKey: .currentThreadId)
+        case let .linkContinuation(threadId, currentThreadId):
+            try container.encode("link-continuation", forKey: .type)
+            try container.encode(threadId, forKey: .threadId)
+            try container.encode(currentThreadId, forKey: .currentThreadId)
         case let .setCollapsed(level, collapsed):
             try container.encode("set-collapsed", forKey: .type)
             try container.encode(level, forKey: .level)
@@ -573,15 +755,17 @@ public struct GajendraErrorChannels: Equatable, Sendable {
     public private(set) var open: String?
     public private(set) var mutation: String?
     public private(set) var client: String?
+    public private(set) var sync: String?
 
-    public init(open: String? = nil, mutation: String? = nil, client: String? = nil) {
+    public init(open: String? = nil, mutation: String? = nil, client: String? = nil, sync: String? = nil) {
         self.open = open
         self.mutation = mutation
         self.client = client
+        self.sync = sync
     }
 
     public var visible: String? {
-        mutation ?? open ?? client
+        mutation ?? open ?? client ?? sync
     }
 
     public mutating func openFailed(_ message: String) {
@@ -598,6 +782,14 @@ public struct GajendraErrorChannels: Equatable, Sendable {
 
     public mutating func mutationSucceeded() {
         mutation = nil
+    }
+
+    public mutating func syncFailed(_ message: String) {
+        sync = message
+    }
+
+    public mutating func syncSucceeded() {
+        sync = nil
     }
 
     public mutating func clientFailed(_ message: String) {

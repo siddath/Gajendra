@@ -268,10 +268,10 @@ function mergeDefs(...defs) {
 function cloneDef(schema) {
   return mergeDefs(schema._zod.def);
 }
-function getElementAtPath(obj, path5) {
-  if (!path5)
+function getElementAtPath(obj, path8) {
+  if (!path8)
     return obj;
-  return path5.reduce((acc, key) => acc?.[key], obj);
+  return path8.reduce((acc, key) => acc?.[key], obj);
 }
 function promiseAllObject(promisesObj) {
   const keys = Object.keys(promisesObj);
@@ -530,11 +530,11 @@ function explicitlyAborted(x, startIndex = 0) {
   }
   return false;
 }
-function prefixIssues(path5, issues) {
+function prefixIssues(path8, issues) {
   return issues.map((iss) => {
     var _a3;
     (_a3 = iss).path ?? (_a3.path = []);
-    iss.path.unshift(path5);
+    iss.path.unshift(path8);
     return iss;
   });
 }
@@ -1055,16 +1055,16 @@ function flattenError(error62, mapper = (issue2) => issue2.message) {
 }
 function formatError(error62, mapper = (issue2) => issue2.message) {
   const fieldErrors = { _errors: [] };
-  const processError = (error63, path5 = []) => {
+  const processError = (error63, path8 = []) => {
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path5, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           fieldErrors._errors.push(mapper(issue2));
         } else {
@@ -1103,17 +1103,17 @@ function formatError(error62, mapper = (issue2) => issue2.message) {
 }
 function treeifyError(error62, mapper = (issue2) => issue2.message) {
   const result = { errors: [] };
-  const processError = (error63, path5 = []) => {
+  const processError = (error63, path8 = []) => {
     var _a3;
     for (const issue2 of error63.issues) {
       if (issue2.code === "invalid_union" && issue2.errors.length) {
-        issue2.errors.map((issues) => processError({ issues }, [...path5, ...issue2.path]));
+        issue2.errors.map((issues) => processError({ issues }, [...path8, ...issue2.path]));
       } else if (issue2.code === "invalid_key") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else if (issue2.code === "invalid_element") {
-        processError({ issues: issue2.issues }, [...path5, ...issue2.path]);
+        processError({ issues: issue2.issues }, [...path8, ...issue2.path]);
       } else {
-        const fullpath = [...path5, ...issue2.path];
+        const fullpath = [...path8, ...issue2.path];
         if (fullpath.length === 0) {
           result.errors.push(mapper(issue2));
           continue;
@@ -1152,8 +1152,8 @@ function treeifyError(error62, mapper = (issue2) => issue2.message) {
 }
 function toDotPath(_path) {
   const segs = [];
-  const path5 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
-  for (const seg of path5) {
+  const path8 = _path.map((seg) => typeof seg === "object" ? seg.key : seg);
+  for (const seg of path8) {
     if (typeof seg === "number")
       segs.push(`[${seg}]`);
     else if (typeof seg === "symbol")
@@ -2232,12 +2232,12 @@ function isIso7064Mod97(iban3) {
   let remainder = 0;
   const len = iban3.length;
   for (let i = 4; i < len; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   for (let i = 0; i < 4; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   return remainder === 1;
 }
@@ -8991,8 +8991,8 @@ var capitalizeFirstCharacter, error33;
 var init_lt = __esm({
   "../../node_modules/zod/v4/locales/lt.js"() {
     init_util();
-    capitalizeFirstCharacter = (text) => {
-      return text.charAt(0).toUpperCase() + text.slice(1);
+    capitalizeFirstCharacter = (text2) => {
+      return text2.charAt(0).toUpperCase() + text2.slice(1);
     };
     error33 = () => {
       const Sizable = {
@@ -12977,12 +12977,12 @@ function compileFn(schema, options) {
   doc.write(outputAccessor === null ? `return true;` : `return ${outputAccessor};`);
   const constantNames = ["INVALID", ...ctx.constants.keys()];
   const constantValues = [INVALID2, ...ctx.constants.values()];
-  const code = doc.content.join("\n");
+  const code2 = doc.content.join("\n");
   const fullCode = options?.debug ? constantNames.length > 0 ? `// Constants: ${constantNames.join(", ")}
-${code}` : code : "";
+${code2}` : code2 : "";
   const F = Function;
   const factoryCode = `return (input) => {
-${code}
+${code2}
 }`;
   let fn;
   try {
@@ -19311,13 +19311,13 @@ function resolveRef(ref, ctx) {
   if (!ref.startsWith("#")) {
     throw new Error("External $ref is not supported, only local refs (#/...) are allowed");
   }
-  const path5 = ref.slice(1).split("/").filter(Boolean);
-  if (path5.length === 0) {
+  const path8 = ref.slice(1).split("/").filter(Boolean);
+  if (path8.length === 0) {
     return ctx.rootSchema;
   }
   const defsKey = ctx.version === "draft-2020-12" ? "$defs" : "definitions";
-  if (path5[0] === defsKey) {
-    const key = path5[1] === void 0 ? void 0 : decodeJSONPointerSegment(path5[1]);
+  if (path8[0] === defsKey) {
+    const key = path8[1] === void 0 ? void 0 : decodeJSONPointerSegment(path8[1]);
     if (!key || !ctx.defs[key]) {
       throw new Error(`Reference not found: ${ref}`);
     }
@@ -20442,9 +20442,9 @@ var require_code = __commonJS({
     };
     exports.Name = Name;
     var _Code = class extends _CodeOrName {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this._items = typeof code === "string" ? [code] : code;
+        this._items = typeof code2 === "string" ? [code2] : code2;
       }
       toString() {
         return this.str;
@@ -20471,13 +20471,13 @@ var require_code = __commonJS({
     exports._Code = _Code;
     exports.nil = new _Code("");
     function _2(strs, ...args) {
-      const code = [strs[0]];
+      const code2 = [strs[0]];
       let i = 0;
       while (i < args.length) {
-        addCodeArg(code, args[i]);
-        code.push(strs[++i]);
+        addCodeArg(code2, args[i]);
+        code2.push(strs[++i]);
       }
-      return new _Code(code);
+      return new _Code(code2);
     }
     exports._ = _2;
     var plus = new _Code("+");
@@ -20493,13 +20493,13 @@ var require_code = __commonJS({
       return new _Code(expr);
     }
     exports.str = str;
-    function addCodeArg(code, arg) {
+    function addCodeArg(code2, arg) {
       if (arg instanceof _Code)
-        code.push(...arg._items);
+        code2.push(...arg._items);
       else if (arg instanceof Name)
-        code.push(arg);
+        code2.push(arg);
       else
-        code.push(interpolate(arg));
+        code2.push(interpolate(arg));
     }
     exports.addCodeArg = addCodeArg;
     function optimize(expr) {
@@ -20683,7 +20683,7 @@ var require_scope = __commonJS({
         }, usedValues, getCode);
       }
       _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
+        let code2 = code_1.nil;
         for (const prefix in values) {
           const vs = values[prefix];
           if (!vs)
@@ -20696,16 +20696,16 @@ var require_scope = __commonJS({
             let c = valueCode(name);
             if (c) {
               const def = this.opts.es5 ? exports.varKinds.var : exports.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name} = ${c};${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${def} ${name} = ${c};${this.opts._n}`;
             } else if (c = getCode === null || getCode === void 0 ? void 0 : getCode(name)) {
-              code = (0, code_1._)`${code}${c}${this.opts._n}`;
+              code2 = (0, code_1._)`${code2}${c}${this.opts._n}`;
             } else {
               throw new ValueError(name);
             }
             nameSet.set(name, UsedValueState.Completed);
           });
         }
-        return code;
+        return code2;
       }
     };
     exports.ValueScope = ValueScope;
@@ -20790,11 +20790,11 @@ var require_codegen = __commonJS({
         const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
         return `${varKind} ${this.name}${rhs};` + _n;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         if (!names[this.name.str])
           return;
         if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants3);
+          this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -20811,10 +20811,10 @@ var require_codegen = __commonJS({
       render({ _n }) {
         return `${this.lhs} = ${this.rhs};` + _n;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
           return;
-        this.rhs = optimizeExpr(this.rhs, names, constants3);
+        this.rhs = optimizeExpr(this.rhs, names, constants4);
         return this;
       }
       get names() {
@@ -20865,9 +20865,9 @@ var require_codegen = __commonJS({
       }
     };
     var AnyCode = class extends Node {
-      constructor(code) {
+      constructor(code2) {
         super();
-        this.code = code;
+        this.code = code2;
       }
       render({ _n }) {
         return `${this.code};` + _n;
@@ -20875,8 +20875,8 @@ var require_codegen = __commonJS({
       optimizeNodes() {
         return `${this.code}` ? this : void 0;
       }
-      optimizeNames(names, constants3) {
-        this.code = optimizeExpr(this.code, names, constants3);
+      optimizeNames(names, constants4) {
+        this.code = optimizeExpr(this.code, names, constants4);
         return this;
       }
       get names() {
@@ -20889,7 +20889,7 @@ var require_codegen = __commonJS({
         this.nodes = nodes;
       }
       render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
+        return this.nodes.reduce((code2, n) => code2 + n.render(opts), "");
       }
       optimizeNodes() {
         const { nodes } = this;
@@ -20905,12 +20905,12 @@ var require_codegen = __commonJS({
         }
         return nodes.length > 0 ? this : void 0;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         const { nodes } = this;
         let i = nodes.length;
         while (i--) {
           const n = nodes[i];
-          if (n.optimizeNames(names, constants3))
+          if (n.optimizeNames(names, constants4))
             continue;
           subtractNames(names, n.names);
           nodes.splice(i, 1);
@@ -20937,10 +20937,10 @@ var require_codegen = __commonJS({
         this.condition = condition;
       }
       render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
+        let code2 = `if(${this.condition})` + super.render(opts);
         if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
+          code2 += "else " + this.else.render(opts);
+        return code2;
       }
       optimizeNodes() {
         super.optimizeNodes();
@@ -20963,12 +20963,12 @@ var require_codegen = __commonJS({
           return void 0;
         return this;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         var _a3;
-        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
-        if (!(super.optimizeNames(names, constants3) || this.else))
+        this.else = (_a3 = this.else) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        if (!(super.optimizeNames(names, constants4) || this.else))
           return;
-        this.condition = optimizeExpr(this.condition, names, constants3);
+        this.condition = optimizeExpr(this.condition, names, constants4);
         return this;
       }
       get names() {
@@ -20991,10 +20991,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.iteration})` + super.render(opts);
       }
-      optimizeNames(names, constants3) {
-        if (!super.optimizeNames(names, constants3))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iteration = optimizeExpr(this.iteration, names, constants3);
+        this.iteration = optimizeExpr(this.iteration, names, constants4);
         return this;
       }
       get names() {
@@ -21030,10 +21030,10 @@ var require_codegen = __commonJS({
       render(opts) {
         return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
       }
-      optimizeNames(names, constants3) {
-        if (!super.optimizeNames(names, constants3))
+      optimizeNames(names, constants4) {
+        if (!super.optimizeNames(names, constants4))
           return;
-        this.iterable = optimizeExpr(this.iterable, names, constants3);
+        this.iterable = optimizeExpr(this.iterable, names, constants4);
         return this;
       }
       get names() {
@@ -21061,12 +21061,12 @@ var require_codegen = __commonJS({
     Return.kind = "return";
     var Try = class extends BlockNode {
       render(opts) {
-        let code = "try" + super.render(opts);
+        let code2 = "try" + super.render(opts);
         if (this.catch)
-          code += this.catch.render(opts);
+          code2 += this.catch.render(opts);
         if (this.finally)
-          code += this.finally.render(opts);
-        return code;
+          code2 += this.finally.render(opts);
+        return code2;
       }
       optimizeNodes() {
         var _a3, _b;
@@ -21075,11 +21075,11 @@ var require_codegen = __commonJS({
         (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
         return this;
       }
-      optimizeNames(names, constants3) {
+      optimizeNames(names, constants4) {
         var _a3, _b;
-        super.optimizeNames(names, constants3);
-        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants3);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants3);
+        super.optimizeNames(names, constants4);
+        (_a3 = this.catch) === null || _a3 === void 0 ? void 0 : _a3.optimizeNames(names, constants4);
+        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants4);
         return this;
       }
       get names() {
@@ -21183,18 +21183,18 @@ var require_codegen = __commonJS({
       }
       // returns code for object literal for the passed argument list of key-value pairs
       object(...keyValues) {
-        const code = ["{"];
+        const code2 = ["{"];
         for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
+          if (code2.length > 1)
+            code2.push(",");
+          code2.push(key);
           if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
+            code2.push(":");
+            (0, code_1.addCodeArg)(code2, value);
           }
         }
-        code.push("}");
-        return new code_1._Code(code);
+        code2.push("}");
+        return new code_1._Code(code2);
       }
       // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
       if(condition, thenBody, elseBody) {
@@ -21380,7 +21380,7 @@ var require_codegen = __commonJS({
     function addExprNames(names, from) {
       return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
     }
-    function optimizeExpr(expr, names, constants3) {
+    function optimizeExpr(expr, names, constants4) {
       if (expr instanceof code_1.Name)
         return replaceName(expr);
       if (!canOptimize(expr))
@@ -21395,14 +21395,14 @@ var require_codegen = __commonJS({
         return items;
       }, []));
       function replaceName(n) {
-        const c = constants3[n.str];
+        const c = constants4[n.str];
         if (c === void 0 || names[n.str] !== 1)
           return n;
         delete names[n.str];
         return c;
       }
       function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants3[c.str] !== void 0);
+        return e instanceof code_1._Code && e._items.some((c) => c instanceof code_1.Name && names[c.str] === 1 && constants4[c.str] !== void 0);
       }
     }
     function subtractNames(names, from) {
@@ -23513,22 +23513,22 @@ var require_utils = __commonJS({
     }
     function stringArrayToHexStripped(input2) {
       let acc = "";
-      let code = 0;
+      let code2 = 0;
       let i = 0;
       for (i = 0; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (code === 48) {
+        code2 = input2[i].charCodeAt(0);
+        if (code2 === 48) {
           continue;
         }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
         break;
       }
       for (i += 1; i < input2.length; i++) {
-        code = input2[i].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
+        code2 = input2[i].charCodeAt(0);
+        if (!(code2 >= 48 && code2 <= 57 || code2 >= 65 && code2 <= 70 || code2 >= 97 && code2 <= 102)) {
           return "";
         }
         acc += input2[i];
@@ -23642,8 +23642,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path5) {
-      let input2 = path5;
+    function removeDotSegments(path8) {
+      let input2 = path8;
       const output2 = [];
       let nextSlash = -1;
       let len = 0;
@@ -23770,15 +23770,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -23809,15 +23809,15 @@ var require_utils = __commonJS({
         if (isPathCharacter(ch) && (ch !== ":" || !firstSegment)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -23844,15 +23844,15 @@ var require_utils = __commonJS({
         if (isAllowed(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -23897,15 +23897,15 @@ var require_utils = __commonJS({
         if (isQueryFragmentCharacter(ch)) {
           output2 += ch;
         } else {
-          const code = input2.charCodeAt(i);
-          if (code < 128) {
-            output2 += isEscapeSafe(code) ? ch : BYTE_HEX[code];
-          } else if (code < 55296 || code > 57343) {
-            output2 += percentEncodeNonAscii(code);
-          } else if (code <= 56319 && i + 1 < input2.length) {
+          const code2 = input2.charCodeAt(i);
+          if (code2 < 128) {
+            output2 += isEscapeSafe(code2) ? ch : BYTE_HEX[code2];
+          } else if (code2 < 55296 || code2 > 57343) {
+            output2 += percentEncodeNonAscii(code2);
+          } else if (code2 <= 56319 && i + 1 < input2.length) {
             const low = input2.charCodeAt(i + 1);
             if (low >= 56320 && low <= 57343) {
-              output2 += percentEncodeNonAscii(65536 + (code - 55296 << 10) + (low - 56320));
+              output2 += percentEncodeNonAscii(65536 + (code2 - 55296 << 10) + (low - 56320));
               i++;
             } else {
               output2 += percentEncodeNonAscii(65533);
@@ -24052,8 +24052,8 @@ var require_schemes = __commonJS({
       }
       if (wsComponent.resourceName) {
         const queryIndex = wsComponent.resourceName.indexOf("?");
-        const path5 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
-        wsComponent.path = path5 && path5 !== "/" ? path5 : void 0;
+        const path8 = queryIndex === -1 ? wsComponent.resourceName : wsComponent.resourceName.slice(0, queryIndex);
+        wsComponent.path = path8 && path8 !== "/" ? path8 : void 0;
         wsComponent.query = queryIndex === -1 ? void 0 : wsComponent.resourceName.slice(queryIndex + 1);
         wsComponent.resourceName = void 0;
       }
@@ -25005,7 +25005,7 @@ var require_core = __commonJS({
       errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
         if (!errors || errors.length === 0)
           return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
+        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text2, msg) => text2 + separator + msg);
       }
       $dataMetaSchema(metaSchema, keywordsJsonPointers) {
         const rules = this.RULES.all;
@@ -26838,8 +26838,8 @@ var require_format = __commonJS({
             }
           }
           function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
+            const code2 = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
+            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code: code2 });
             if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
               return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
             }
@@ -27580,9 +27580,9 @@ var require_dist = __commonJS({
 });
 
 // src/server/index.ts
-import { readFile } from "node:fs/promises";
-import path4 from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFile as readFile2 } from "node:fs/promises";
+import path7 from "node:path";
+import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../../node_modules/zod/v3/helpers/util.js
 var util;
@@ -27958,8 +27958,8 @@ function getErrorMap() {
 
 // ../../node_modules/zod/v3/helpers/parseUtil.js
 var makeIssue = (params) => {
-  const { data, path: path5, errorMaps, issueData } = params;
-  const fullPath = [...path5, ...issueData.path || []];
+  const { data, path: path8, errorMaps, issueData } = params;
+  const fullPath = [...path8, ...issueData.path || []];
   const fullIssue = {
     ...issueData,
     path: fullPath
@@ -28074,11 +28074,11 @@ var errorUtil;
 
 // ../../node_modules/zod/v3/types.js
 var ParseInputLazyPath = class {
-  constructor(parent, value, path5, key) {
+  constructor(parent, value, path8, key) {
     this._cachedPath = [];
     this.parent = parent;
     this.data = value;
-    this._path = path5;
+    this._path = path8;
     this._key = key;
   }
   get path() {
@@ -31641,11 +31641,11 @@ function normalizeObjectSchema(schema) {
   }
   return void 0;
 }
-function getDotPath(path5) {
-  if (path5.length === 0) {
+function getDotPath(path8) {
+  if (path8.length === 0) {
     return "object root";
   }
-  return path5.reduce((acc, seg, index) => {
+  return path8.reduce((acc, seg, index) => {
     if (index === 0) {
       return String(seg);
     }
@@ -33219,23 +33219,23 @@ var ServerResultSchema = union([
   CreateTaskResultSchema
 ]);
 var McpError = class _McpError extends Error {
-  constructor(code, message, data) {
-    super(`MCP error ${code}: ${message}`);
-    this.code = code;
+  constructor(code2, message, data) {
+    super(`MCP error ${code2}: ${message}`);
+    this.code = code2;
     this.data = data;
     this.name = "McpError";
   }
   /**
    * Factory method to create the appropriate error type based on the error code and data
    */
-  static fromError(code, message, data) {
-    if (code === ErrorCode.UrlElicitationRequired && data) {
+  static fromError(code2, message, data) {
+    if (code2 === ErrorCode.UrlElicitationRequired && data) {
       const errorData = data;
       if (errorData.elicitations) {
         return new UrlElicitationRequiredError(errorData.elicitations, message);
       }
     }
-    return new _McpError(code, message, data);
+    return new _McpError(code2, message, data);
   }
 };
 var UrlElicitationRequiredError = class extends McpError {
@@ -37314,6 +37314,7 @@ var DEFAULT_IDEMPOTENCY_LEDGER_LIMIT = 128;
 var DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT = 1024;
 var DEFAULT_CONFIGURED_DEEP_LINK_SCHEMES = ["https"];
 var MAX_BACKGROUND_THREADS_PER_SOURCE = 200;
+var MAX_WORKFLOW_RECORDS = DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT;
 var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
   "active",
   "busy",
@@ -37325,6 +37326,13 @@ var RUNNING_STATUS_KEYS = /* @__PURE__ */ new Set([
 ]);
 function isRunningThreadStatus(status) {
   return RUNNING_STATUS_KEYS.has(status.toLowerCase().replace(/[^a-z]/gu, ""));
+}
+function allDeckThreads(snapshot) {
+  const unique = /* @__PURE__ */ new Map();
+  for (const thread of [snapshot.current, ...snapshot.focus, ...snapshot.important, ...snapshot.available]) {
+    if (thread && !unique.has(thread.id)) unique.set(thread.id, thread);
+  }
+  return [...unique.values()];
 }
 function isPermittedDeepLink(value, allowedSchemes) {
   if (!value || value !== value.trim()) return false;
@@ -37365,9 +37373,58 @@ var EMPTY_STORE = {
   idempotency: [],
   reviewAcknowledgements: []
 };
+function productDeckProjection(snapshot) {
+  const threads = allDeckThreads(snapshot);
+  const byUpdated = (a, b) => b.updatedAt - a.updatedAt;
+  const running = threads.filter((thread) => isRunningThreadStatus(thread.status)).sort(byUpdated);
+  const needsInput = threads.filter((thread) => thread.attention === "needs-input" && !isRunningThreadStatus(thread.status));
+  const readyForReview = threads.filter((thread) => thread.review?.state === "ready" && !isRunningThreadStatus(thread.status) && thread.attention !== "needs-input").sort((a, b) => (b.review?.updatedAt ?? 0) - (a.review?.updatedAt ?? 0));
+  const continueThreads = threads.filter((thread) => thread.level !== null && thread.workState !== "completed" && (thread.currentThreadId ?? thread.id) === thread.id);
+  const active = new Set([...running, ...needsInput, ...readyForReview, ...continueThreads].map((thread) => thread.id));
+  const history = threads.filter((thread) => thread.reviewAcknowledged || thread.workState === "completed" || (thread.currentThreadId ?? thread.id) !== thread.id || !active.has(thread.id)).sort(byUpdated);
+  return { readyForReview, needsInput, running, continue: continueThreads, history };
+}
 
-// src/server/service.ts
-import { createHash as createHash3 } from "node:crypto";
+// src/server/metadata-cache.ts
+import { createHash as createHash3, randomUUID as randomUUID2 } from "node:crypto";
+import { constants as constants3 } from "node:fs";
+import { lstat, mkdir as mkdir2, open as open5, rename as rename2, stat as stat3, unlink as unlink2 } from "node:fs/promises";
+import os4 from "node:os";
+import path4 from "node:path";
+
+// src/server/store.ts
+import { chmod, mkdir, open as open2, readdir, rename, rmdir, stat, unlink, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+
+// src/server/workflow.ts
+function isCanonicalWorkflowId(value) {
+  return typeof value === "string" && value.length <= 512 && /^[a-z0-9][a-z0-9-]{0,48}:[^\s\x00-\x1f]+$/u.test(value);
+}
+function validContinuations(value) {
+  if (!Array.isArray(value) || value.length > MAX_WORKFLOW_RECORDS) return false;
+  const next = /* @__PURE__ */ new Map();
+  const incoming = /* @__PURE__ */ new Set();
+  for (const link of value) {
+    if (!link || typeof link !== "object" || !isCanonicalWorkflowId(link.predecessorThreadId) || !isCanonicalWorkflowId(link.currentThreadId) || link.predecessorThreadId === link.currentThreadId || next.has(link.predecessorThreadId) || incoming.has(link.currentThreadId)) return false;
+    next.set(link.predecessorThreadId, link.currentThreadId);
+    incoming.add(link.currentThreadId);
+  }
+  for (const id of next.keys()) {
+    const visited = /* @__PURE__ */ new Set();
+    let current = id;
+    while (next.has(current)) {
+      if (visited.has(current)) return false;
+      visited.add(current);
+      current = next.get(current);
+    }
+  }
+  return true;
+}
+function validCompletedIds(value) {
+  return Array.isArray(value) && value.length <= MAX_WORKFLOW_RECORDS && value.every(isCanonicalWorkflowId) && new Set(value).size === value.length;
+}
 
 // src/server/idempotency.ts
 import { createHash } from "node:crypto";
@@ -37399,11 +37456,16 @@ function normalizeStore(value) {
   if (!value || typeof value !== "object") return structuredClone(EMPTY_STORE);
   const candidate = value;
   const entries = Array.isArray(candidate.entries) ? candidate.entries.filter(isStoredEntry).map(normalizeStoredEntry).filter(uniqueByThreadId()) : [];
+  const completed = validCompletedIds(candidate.completedThreadIds) ? candidate.completedThreadIds : [];
+  const continuations = validContinuations(candidate.continuations) ? candidate.continuations : [];
   const candidateCurrent = typeof candidate.currentFocusThreadId === "string" ? normalizeLegacyThreadId(candidate.currentFocusThreadId) : null;
   const current = candidateCurrent && entries.some(
-    (entry) => entry.threadId === candidateCurrent && entry.level === "focus"
-  ) ? candidateCurrent : entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+    (entry) => entry.threadId === candidateCurrent && entry.level === "focus" && !completed.includes(entry.threadId)
+  ) ? candidateCurrent : candidate.nowSelection === "cleared" ? null : entries.find((entry) => entry.level === "focus" && !completed.includes(entry.threadId))?.threadId ?? null;
   return {
+    ...completed.length ? { completedThreadIds: [...completed] } : {},
+    ...continuations.length ? { continuations: continuations.map((link) => ({ predecessorThreadId: link.predecessorThreadId, currentThreadId: link.currentThreadId })) } : {},
+    ...candidate.nowSelection === "cleared" ? { nowSelection: "cleared" } : {},
     version: STORE_VERSION,
     revision: normalizeRevision(candidate.revision),
     currentFocusThreadId: current,
@@ -37419,6 +37481,34 @@ function normalizeStore(value) {
 }
 function applyMutation(store, mutation, now = /* @__PURE__ */ new Date(), evidence = {}) {
   const next = normalizeStore(store);
+  if (mutation.type === "set-work-completed") {
+    const completed = new Set(next.completedThreadIds);
+    if (mutation.completed) completed.add(mutation.threadId);
+    else completed.delete(mutation.threadId);
+    next.completedThreadIds = [...completed];
+    if (mutation.completed && next.currentFocusThreadId === mutation.threadId) {
+      next.currentFocusThreadId = null;
+      next.nowSelection = "cleared";
+    }
+    if (Object.hasOwn(mutation, "currentThreadId")) {
+      next.currentFocusThreadId = mutation.currentThreadId ?? null;
+      next.nowSelection = mutation.currentThreadId ? "automatic" : "cleared";
+    }
+    return next;
+  }
+  if (mutation.type === "link-continuation") {
+    const links = next.continuations ?? [];
+    const prior = links.find((link) => link.predecessorThreadId === mutation.threadId);
+    const from = mutation.currentThreadId ? mutation.threadId : prior?.currentThreadId;
+    const to = mutation.currentThreadId ?? mutation.threadId;
+    if (from) {
+      next.entries = next.entries.map((entry2) => entry2.threadId === from ? { ...entry2, threadId: to } : entry2);
+      if (next.currentFocusThreadId === from) next.currentFocusThreadId = to;
+    }
+    next.continuations = links.filter((link) => link.predecessorThreadId !== mutation.threadId);
+    if (mutation.currentThreadId) next.continuations.push({ predecessorThreadId: mutation.threadId, currentThreadId: mutation.currentThreadId });
+    return next;
+  }
   if (mutation.type === "set-collapsed") {
     next.collapsed[mutation.level] = mutation.collapsed;
     return next;
@@ -37461,10 +37551,11 @@ function applyMutation(store, mutation, now = /* @__PURE__ */ new Date(), eviden
     if (mutation.level) {
       next.entries.push(storedEntry(mutation.threadId, mutation.level, existing?.addedAt ?? now.toISOString(), existing?.context));
     }
-    if (mutation.level === "focus" && !next.currentFocusThreadId) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.level === "focus" && !next.currentFocusThreadId && next.nowSelection !== "cleared") next.currentFocusThreadId = mutation.threadId;
     return repairCurrentFocus(next);
   }
   if (mutation.type === "set-current") {
+    next.nowSelection = "automatic";
     const existing = index >= 0 ? next.entries[index] : void 0;
     if (index >= 0) next.entries.splice(index, 1);
     next.entries.unshift(storedEntry(mutation.threadId, "focus", existing?.addedAt ?? now.toISOString(), existing?.context));
@@ -37518,22 +37609,27 @@ function moveBefore(store, mutation, now) {
   }
   if (Object.hasOwn(mutation, "currentThreadId")) {
     next.currentFocusThreadId = mutation.currentThreadId ?? null;
+    if (mutation.currentThreadId) next.nowSelection = "automatic";
   } else {
-    if (mutation.isCurrent === true) next.currentFocusThreadId = mutation.threadId;
+    if (mutation.isCurrent === true) {
+      next.currentFocusThreadId = mutation.threadId;
+      next.nowSelection = "automatic";
+    }
     if (mutation.isCurrent === false && next.currentFocusThreadId === mutation.threadId) {
       next.currentFocusThreadId = null;
     }
   }
-  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId) {
+  if (!Object.hasOwn(mutation, "currentThreadId") && mutation.level === "focus" && !next.currentFocusThreadId && next.nowSelection !== "cleared") {
     next.currentFocusThreadId = mutation.threadId;
   }
   return repairCurrentFocus(next);
 }
 function repairCurrentFocus(store) {
+  if (store.nowSelection === "cleared" && !store.currentFocusThreadId) return store;
   if (store.currentFocusThreadId && store.entries.some(
-    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus"
+    (entry) => entry.threadId === store.currentFocusThreadId && entry.level === "focus" && !store.completedThreadIds?.includes(entry.threadId)
   )) return store;
-  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus")?.threadId ?? null;
+  store.currentFocusThreadId = store.entries.find((entry) => entry.level === "focus" && !store.completedThreadIds?.includes(entry.threadId))?.threadId ?? null;
   return store;
 }
 function buildSnapshot(store, threads, sources, error62 = null) {
@@ -37544,9 +37640,22 @@ function buildSnapshot(store, threads, sources, error62 = null) {
     const identity = hashReviewAcknowledgement(thread.id, thread.review);
     if (!acknowledgedSignals.has(identity)) return { ...thread, review: { ...thread.review, identity } };
     const { review: _review, ...withoutReview } = thread;
-    return withoutReview;
+    return { ...withoutReview, reviewAcknowledged: true };
   };
-  const threadsById = new Map(threads.map((thread) => [thread.id, projectReview(thread)]));
+  const nextById = new Map(normalized.continuations?.map((link) => [link.predecessorThreadId, link.currentThreadId]));
+  const tip = (id) => {
+    let current = id;
+    while (nextById.has(current)) current = nextById.get(current);
+    return current;
+  };
+  const projectThread = (thread) => ({
+    ...projectReview(thread),
+    workState: normalized.completedThreadIds?.includes(thread.id) ? "completed" : "open",
+    currentThreadId: tip(thread.id),
+    continuationThreadId: nextById.get(thread.id) ?? null,
+    predecessorThreadIds: [...nextById.keys()].filter((id) => id !== thread.id && tip(id) === thread.id)
+  });
+  const threadsById = new Map(threads.map((thread) => [thread.id, projectThread(thread)]));
   const entriesById = new Map(normalized.entries.map((entry) => [entry.threadId, entry]));
   const resolve = (entry) => {
     const thread = threadsById.get(entry.threadId);
@@ -37559,8 +37668,8 @@ function buildSnapshot(store, threads, sources, error62 = null) {
   };
   const focus = normalized.entries.filter((entry) => entry.level === "focus").map(resolve).filter(isPresent);
   const important = normalized.entries.filter((entry) => entry.level === "important").map(resolve).filter(isPresent);
-  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...projectReview(thread), level: null, isCurrent: false, context: null }));
-  return {
+  const available = threads.filter((thread) => !entriesById.has(thread.id)).sort((left, right) => right.updatedAt - left.updatedAt).map((thread) => ({ ...projectThread(thread), level: null, isCurrent: false, context: null }));
+  const snapshot = {
     generatedAt: (/* @__PURE__ */ new Date()).toISOString(),
     revision: normalized.revision,
     current: focus.find((thread) => thread.isCurrent) ?? null,
@@ -37575,6 +37684,7 @@ function buildSnapshot(store, threads, sources, error62 = null) {
     sources,
     error: error62
   };
+  return { ...snapshot, product: productDeckProjection(snapshot) };
 }
 function normalizeLegacyThreadId(threadId) {
   return threadId.includes(":") ? threadId : canonicalThreadId("codex", threadId);
@@ -37660,10 +37770,6 @@ function isPresent(value) {
 }
 
 // src/server/store.ts
-import { chmod, mkdir, open as open2, readdir, rename, rmdir, stat, unlink, writeFile } from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 var DEFAULT_MAX_STORE_BYTES = 512 * 1024;
 var DEFAULT_LOCK_TIMEOUT_MS = 5e3;
 var DEFAULT_STALE_LOCK_MS = 3e4;
@@ -38144,6 +38250,9 @@ function hasKnownStoreShape(value, purpose) {
   if (!isCollapsedShape(candidate.collapsed)) return false;
   if (version2 >= 2 && !isSourcePreferencesShape(candidate.sourcePreferences)) return false;
   if (version2 === 3) {
+    if (candidate.completedThreadIds !== void 0 && !validCompletedIds(candidate.completedThreadIds)) return false;
+    if (candidate.continuations !== void 0 && !validContinuations(candidate.continuations)) return false;
+    if (candidate.nowSelection !== void 0 && candidate.nowSelection !== "automatic" && candidate.nowSelection !== "cleared") return false;
     if (!isRevision(candidate.revision) || !Array.isArray(candidate.idempotency) || !candidate.idempotency.every(isStrictReceipt)) return false;
     if (candidate.reviewAcknowledgements !== void 0 && (!Array.isArray(candidate.reviewAcknowledgements) || candidate.reviewAcknowledgements.length > DEFAULT_REVIEW_ACKNOWLEDGEMENT_LIMIT || !candidate.reviewAcknowledgements.every(isStrictReviewAcknowledgement))) return false;
   }
@@ -38195,10 +38304,32 @@ import path3 from "node:path";
 
 // src/server/codex-app-server.ts
 import { spawn } from "node:child_process";
-import { constants } from "node:fs";
+import { constants, accessSync } from "node:fs";
 import { open as open3, realpath } from "node:fs/promises";
 import os2 from "node:os";
 import path2 from "node:path";
+function resolveCodexExecutable(env = process.env, platform = process.platform, isExecutable = (candidate) => {
+  try {
+    accessSync(candidate, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}) {
+  const explicit = env.GAJENDRA_CODEX_BIN || env.AADI_CODEX_BIN || env.PRIORITY_DECK_CODEX_BIN;
+  if (explicit) return explicit;
+  if (platform === "darwin") {
+    const candidates = [
+      "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
+      "/Applications/ChatGPT.app/Contents/Resources/codex",
+      "/opt/homebrew/bin/codex",
+      "/usr/local/bin/codex"
+    ];
+    const installed = candidates.find(isExecutable);
+    if (installed) return installed;
+  }
+  return "codex";
+}
 var MAX_ROLLOUT_TAIL_BYTES = 256 * 1024;
 var LSOF_TIMEOUT_MS = 2e3;
 var LSOF_KILL_GRACE_MS = 250;
@@ -38225,9 +38356,9 @@ var DEFAULT_CODEX_REVIEW_DEADLINE_MS = 5e3;
 var MAX_CODEX_REVIEW_DEADLINE_MS = DEFAULT_CODEX_REVIEW_DEADLINE_MS;
 var CODEX_PROVIDER_COLLECTION_ENVELOPE_MS = DEFAULT_CODEX_RPC_TIMEOUT_MS * 2 + CODEX_APP_SERVER_RETRY_SETTLEMENT_MS + MAX_CODEX_THREAD_LIST_DURATION_MS + MAX_CODEX_ENRICHMENT_DEADLINE_MS;
 var CodexAppServerRpcError = class extends Error {
-  constructor(code, message) {
+  constructor(code2, message) {
     super(message);
-    this.code = code;
+    this.code = code2;
     this.name = "CodexAppServerRpcError";
   }
   code;
@@ -38262,17 +38393,39 @@ var CodexAppServerClient = class {
   ready = null;
   experimentalApiEnabled = false;
   experimentalTurnsUnsupported = false;
-  async listThreads() {
+  fastListingSupported = true;
+  lastReconciledAt = Date.now();
+  async listThreads(options = {}) {
     await this.ensureReady();
-    const threads = await listBoundedCodexThreads(async (params) => this.request("thread/list", params));
+    const requestedInterval = Number(this.env.GAJENDRA_CODEX_RECONCILE_INTERVAL_MS ?? 3e5);
+    const interval = Number.isFinite(requestedInterval) && requestedInterval >= 0 ? Math.min(requestedInterval, 864e5) : 3e5;
+    const fast = this.env.GAJENDRA_CODEX_FAST_LIST !== "off" && this.fastListingSupported && Date.now() - this.lastReconciledAt < interval;
+    const list = (metadataOnly) => listBoundedCodexThreads((params) => this.request("thread/list", {
+      ...params,
+      ...metadataOnly ? { useStateDbOnly: true } : {}
+    }));
+    let threads;
+    try {
+      threads = await list(fast);
+    } catch (error62) {
+      if (!fast || !(error62 instanceof CodexAppServerRpcError) || error62.code !== -32602) throw error62;
+      this.fastListingSupported = false;
+      threads = await list(false);
+    }
+    if (!fast || !this.fastListingSupported) this.lastReconciledAt = Date.now();
     const runtimeThreads = await enrichCodexRuntimeStatuses(threads, this.env, {
       readThread: (params) => this.request("thread/read", params)
     });
     if (!this.experimentalApiEnabled || this.experimentalTurnsUnsupported) return runtimeThreads;
+    const reviewCache = new CodexReviewCache({ ...this.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable(this.env) });
+    const cacheEnabled = this.env.GAJENDRA_METADATA_CACHE !== "off";
+    const entries = cacheEnabled ? await reviewCache.load() : /* @__PURE__ */ new Map();
     const reviews = await enrichCodexReviewSignals(
       runtimeThreads,
-      (params) => this.request("thread/turns/list", params)
+      (params) => this.request("thread/turns/list", params),
+      { cache: entries, cacheMaxAgeMs: options.forceFreshReviews ? 0 : Number(this.env.GAJENDRA_REVIEW_CACHE_MAX_AGE_MS ?? 3e5) }
     );
+    if (cacheEnabled && reviews.availability === "available") await reviewCache.save(entries);
     if (reviews.availability === "unsupported") this.experimentalTurnsUnsupported = true;
     return reviews.threads;
   }
@@ -38301,7 +38454,7 @@ var CodexAppServerClient = class {
     if (this.terminallyClosed || epoch !== this.closeEpoch) {
       throw new Error("Codex app-server client is closed.");
     }
-    const executable = this.env.GAJENDRA_CODEX_BIN || this.env.AADI_CODEX_BIN || this.env.PRIORITY_DECK_CODEX_BIN || "codex";
+    const executable = resolveCodexExecutable(this.env);
     const child = spawn(executable, ["app-server", "--stdio"], {
       stdio: ["pipe", "pipe", "pipe"],
       env: this.env,
@@ -38313,15 +38466,15 @@ var CodexAppServerClient = class {
     this.lifecycle = lifecycle;
     child.stderr.setEncoding("utf8");
     child.stderr.on("data", () => void 0);
-    child.once("exit", (code, signal) => {
-      this.handleAppServerExit(lifecycle, code, signal);
+    child.once("exit", (code2, signal) => {
+      this.handleAppServerExit(lifecycle, code2, signal);
     });
     child.once("error", (error62) => {
       this.handleAppServerError(lifecycle, error62);
     });
     child.once("close", () => this.handleAppServerClose(lifecycle));
     this.attachStdoutFraming(child);
-    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.3.1" };
+    const clientInfo = { name: "gajendra", title: "Gajendra", version: "0.4.0" };
     try {
       await this.request("initialize", {
         clientInfo,
@@ -38347,16 +38500,16 @@ var CodexAppServerClient = class {
    */
   attachStdoutFraming(child) {
     let buffered = Buffer.alloc(0);
-    let open5 = true;
+    let open6 = true;
     const discard = () => {
-      if (!open5) return;
-      open5 = false;
+      if (!open6) return;
+      open6 = false;
       child.stdout.off("data", onStdout);
       child.stdout.resume();
       if (this.stdoutCleanup === discard) this.stdoutCleanup = null;
     };
     const onStdout = (value) => {
-      if (!open5) return;
+      if (!open6) return;
       const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
       let start = 0;
       while (start < chunk.length) {
@@ -38435,12 +38588,12 @@ var CodexAppServerClient = class {
     }
     return lifecycle.closed;
   }
-  handleAppServerExit(lifecycle, code, signal) {
+  handleAppServerExit(lifecycle, code2, signal) {
     lifecycle.exited = true;
     if (lifecycle.killTimer) clearTimeout(lifecycle.killTimer);
     lifecycle.killTimer = null;
     if (!lifecycle.closing) {
-      void this.shutdownAppServer(lifecycle, new Error(`Codex app-server exited (${signal ?? code ?? "unknown"}).`));
+      void this.shutdownAppServer(lifecycle, new Error(`Codex app-server exited (${signal ?? code2 ?? "unknown"}).`));
       return;
     }
     this.startAppServerCloseWatchdog(lifecycle);
@@ -38603,8 +38756,23 @@ async function enrichCodexReviewSignals(threads, requestTurns, options = {}) {
   );
   const deadline = now() + deadlineMs;
   const candidates = [...baseThreads].filter((thread) => typeof thread.id === "string" && thread.id.length > 0 && isEligibleCodexReviewThread(thread)).sort((left, right) => codexThreadRecency(right) - codexThreadRecency(left)).slice(0, maxCandidates);
-  if (candidates.length === 0) return { threads: baseThreads, availability: "available" };
+  if (candidates.length === 0) {
+    options.cache?.clear();
+    return { threads: baseThreads, availability: "available" };
+  }
   const signals = /* @__PURE__ */ new Map();
+  const nextCache = /* @__PURE__ */ new Map();
+  const cacheMaxAgeMs = Number.isFinite(options.cacheMaxAgeMs) && options.cacheMaxAgeMs >= 0 ? Math.min(options.cacheMaxAgeMs, 864e5) : 3e5;
+  const pendingCandidates = candidates.filter((thread) => {
+    const key = metadataHash(thread.id);
+    const fingerprint = reviewFingerprint(thread);
+    const cached2 = options.cache?.get(key);
+    const age = cached2 ? now() - cached2.checkedAt : Infinity;
+    if (!cached2 || codexThreadRecency(thread) <= 0 || cached2.fingerprint !== fingerprint || age < 0 || age >= cacheMaxAgeMs || cached2.completedAt !== null && codexCompletedAt(cached2.completedAt, now()) === null) return true;
+    nextCache.set(key, cached2);
+    if (cached2.completedAt !== null) signals.set(thread.id, codexReviewSignal(thread.id, cached2.completedAt));
+    return false;
+  });
   let nextCandidate = 0;
   let availability = "available";
   const inspectCandidate = async (thread) => {
@@ -38616,12 +38784,17 @@ async function enrichCodexReviewSignals(threads, requestTurns, options = {}) {
       );
       const outcome = classifyCodexReviewTurnPage(thread, response, now());
       if (outcome.kind === "ready") signals.set(thread.id, outcome.signal);
+      if (outcome.kind !== "invalid") nextCache.set(metadataHash(thread.id), {
+        fingerprint: reviewFingerprint(thread),
+        checkedAt: now(),
+        completedAt: outcome.kind === "ready" ? outcome.signal.updatedAt : null
+      });
       else if (outcome.kind === "invalid") availability = "transient";
     } catch (error62) {
       availability = isUnsupportedExperimentalError(error62) ? "unsupported" : "transient";
     }
   };
-  const firstCandidate = candidates[nextCandidate++];
+  const firstCandidate = pendingCandidates[nextCandidate++];
   if (firstCandidate) await inspectCandidate(firstCandidate);
   if (availability !== "available" || now() >= deadline) {
     return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
@@ -38632,14 +38805,18 @@ async function enrichCodexReviewSignals(threads, requestTurns, options = {}) {
         if (availability === "available") availability = "transient";
         return;
       }
-      const thread = candidates[nextCandidate++];
+      const thread = pendingCandidates[nextCandidate++];
       if (!thread) return;
       await inspectCandidate(thread);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(maxConcurrency, candidates.length) }, () => worker()));
+  await Promise.all(Array.from({ length: Math.min(maxConcurrency, pendingCandidates.length) }, () => worker()));
   if (availability !== "available" || now() >= deadline) {
     return { threads: baseThreads, availability: availability === "available" ? "transient" : availability };
+  }
+  if (options.cache) {
+    options.cache.clear();
+    for (const [key, value] of nextCache) options.cache.set(key, value);
   }
   return {
     threads: baseThreads.map((thread) => {
@@ -38667,6 +38844,18 @@ function codexBaseThread(thread) {
 function codexThreadRecency(thread) {
   const value = thread.recencyAt ?? thread.updatedAt ?? 0;
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+function reviewFingerprint(thread) {
+  return metadataHash([thread.updatedAt, thread.recencyAt, codexStatusType(thread.status)]);
+}
+function codexReviewSignal(id, completedAt) {
+  return {
+    state: "ready",
+    kind: "result",
+    updatedAt: completedAt,
+    destination: { type: "thread", deepLink: `codex://threads/${encodeURIComponent(id)}` },
+    providerStatus: "completed"
+  };
 }
 function isEligibleCodexReviewThread(thread) {
   const status = normalizeCodexStatus(codexStatusType(thread.status));
@@ -38977,13 +39166,13 @@ function listOpenFiles(lockDirectory, env, options = {}) {
       signalProcessGroup(child, "SIGTERM");
       startCloseWatchdog();
     });
-    child.once("close", (code) => {
+    child.once("close", (code2) => {
       if (terminationError) {
         finish(terminationError);
-      } else if (code === 0 || code === 1) {
+      } else if (code2 === 0 || code2 === 1) {
         finish(null, Buffer.concat(chunks, capturedBytes).toString("utf8"));
       } else {
-        finish(new Error(`lsof exited with status ${code ?? "unknown"}.`));
+        finish(new Error(`lsof exited with status ${code2 ?? "unknown"}.`));
       }
     });
   });
@@ -39071,6 +39260,7 @@ var PROCESS_CLOSE_GRACE_MS = PROCESS_KILL_GRACE_MS;
 var DEFAULT_MAX_SOURCES_CONFIG_BYTES = 128 * 1024;
 var MAX_CONFIGURABLE_SOURCES_CONFIG_BYTES = 2 * 1024 * 1024;
 var MAX_DISCOVERY_CANDIDATES = MAX_BACKGROUND_THREADS_PER_SOURCE * 10;
+var DEFAULT_DISCOVERY_DIRECTORY_ENTRIES = MAX_DISCOVERY_CANDIDATES * 3;
 var DEFAULT_SOURCE_COLLECTION_CONCURRENCY = 4;
 var MAX_SOURCE_COLLECTION_CONCURRENCY = 8;
 var DISCOVERY_STAT_CONCURRENCY = MAX_SOURCE_COLLECTION_CONCURRENCY;
@@ -39083,10 +39273,10 @@ var ThreadSourceRegistry = class {
   env;
   codex;
   sourceCollectionConcurrency;
-  async collect(preferences) {
+  async collect(preferences, forceFreshReviews = false) {
     const configured = await loadConfiguredSources(this.env);
     const adapters = [
-      new CodexThreadSource(this.codex),
+      new CodexThreadSource(this.codex, forceFreshReviews),
       new ClaudeThreadSource(this.env),
       new CursorThreadSource(this.env),
       new GrokThreadSource(this.env),
@@ -39149,16 +39339,18 @@ async function collectSourceAdapter(adapter, preferences) {
   }
 }
 var CodexThreadSource = class {
-  constructor(client) {
+  constructor(client, forceFreshReviews = false) {
     this.client = client;
+    this.forceFreshReviews = forceFreshReviews;
   }
   client;
+  forceFreshReviews;
   id = "codex";
   name = "Codex";
   kind = "builtin";
   enabledByDefault = true;
   async listThreads() {
-    return (await this.client.listThreads()).map((thread) => codexThread(thread));
+    return (await this.client.listThreads({ forceFreshReviews: this.forceFreshReviews })).map((thread) => codexThread(thread));
   }
 };
 var ClaudeThreadSource = class {
@@ -39277,7 +39469,8 @@ var CatalogThreadSource = class {
         deepLink: thread.deepLink || (resumeCommand ? gajendraThreadLink(id) : ""),
         allowedDeepLinkSchemes,
         ...resumeCommand ? { resumeCommand } : {},
-        ...review ? { review } : {}
+        ...review ? { review } : {},
+        ...thread.attention ? { attention: thread.attention } : {}
       };
     });
   }
@@ -39330,7 +39523,7 @@ async function recentClaudeSessionFiles(projectsDirectory, options = {}) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonl")) continue;
       if (measurement) measurement.candidateFiles += 1;
       if (candidates.length >= candidateLimit) {
-        throw new Error("Claude Code has too many session files to inspect safely.");
+        throw new SourceUnavailableError("error", "Claude Code has too many session files to inspect safely. Saved priorities are unchanged.");
       }
       candidates.push(path3.join(directory, entry.name));
     }
@@ -39563,6 +39756,15 @@ async function loadConfiguredSources(env) {
     return { adapters: [], issue: "Configured source configuration is invalid." };
   }
 }
+async function relativeCatalogWorkingDirectory(env) {
+  try {
+    const raw = await readBoundedSourcesConfig(resolveSourcesConfigPath(env), sourcesConfigByteLimit(env));
+    const config2 = sourcesConfigSchema.parse(JSON.parse(raw));
+    return config2.sources.some((source) => source.catalog !== "~" && !source.catalog.startsWith("~/") && !path3.isAbsolute(source.catalog)) ? process.cwd() : null;
+  } catch {
+    return null;
+  }
+}
 async function readBoundedSourcesConfig(configPath, maxBytes) {
   return readBoundedRegularFile(configPath, maxBytes);
 }
@@ -39726,13 +39928,13 @@ function collectProcessOutput(executable, args, env, options = {}) {
       signalProcessGroup2(child, "SIGTERM");
       startCloseWatchdog();
     });
-    child.once("close", (code, signal) => {
+    child.once("close", (code2, signal) => {
       if (terminationError) {
         settle2(terminationError);
-      } else if (code === 0) {
+      } else if (code2 === 0) {
         settle2(null, Buffer.concat(chunks, capturedBytes).toString("utf8"));
       } else {
-        settle2(new Error(`Cursor session listing failed (${signal ?? code ?? "unknown"}).`));
+        settle2(new Error(`Cursor session listing failed (${signal ?? code2 ?? "unknown"}).`));
       }
     });
   });
@@ -39803,8 +40005,8 @@ function deduplicate(threads) {
 function selectSourceThreads(threads) {
   const ordered = [...threads].sort((left, right) => right.updatedAt - left.updatedAt);
   const running = ordered.filter((thread) => isRunningThreadStatus(thread.status));
-  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state === "ready");
-  const background = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready").slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
+  const reviewReady = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && (thread.review?.state === "ready" || thread.attention === "needs-input"));
+  const background = ordered.filter((thread) => !isRunningThreadStatus(thread.status) && thread.review?.state !== "ready" && thread.attention !== "needs-input").slice(0, MAX_BACKGROUND_THREADS_PER_SOURCE);
   return [...running, ...reviewReady, ...background].sort((left, right) => right.updatedAt - left.updatedAt);
 }
 function readableError(error62) {
@@ -39860,7 +40062,8 @@ var catalogThreadSchema = external_exports.object({
   status: external_exports.string().max(80).default("unknown"),
   deepLink: external_exports.string().url().optional(),
   resumeCommand: resumeCommandSchema.optional(),
-  review: reviewSignalSchema.optional()
+  review: reviewSignalSchema.optional(),
+  attention: external_exports.literal("needs-input").optional()
 }).refine((thread) => Boolean(thread.deepLink || thread.resumeCommand), {
   message: "A configured thread must declare deepLink or resumeCommand."
 });
@@ -39898,18 +40101,331 @@ function positiveCandidateLimit(value) {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : MAX_DISCOVERY_CANDIDATES;
 }
 function positiveDirectoryEntryLimit(value) {
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : MAX_DISCOVERY_CANDIDATES;
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : DEFAULT_DISCOVERY_DIRECTORY_ENTRIES;
 }
 async function boundedDirectoryEntries(directoryPath, budget) {
   const entries = [];
   const directory = await opendir(directoryPath);
   for await (const entry of directory) {
-    if (budget.remaining <= 0) throw new Error("Thread source directory catalog exceeded the safe scan limit.");
+    if (budget.remaining <= 0) throw new SourceUnavailableError("error", "Thread source directory catalog exceeded the safe scan limit. Saved priorities are unchanged.");
     budget.remaining -= 1;
     entries.push(entry);
   }
   return entries;
 }
+
+// src/server/metadata-cache.ts
+var MAX_CACHE_BYTES = 4 * 1024 * 1024;
+var metadataHash = (value) => createHash3("sha256").update(JSON.stringify(value)).digest("hex");
+async function cacheScope(env) {
+  const optionalPath = (value) => value ? path4.resolve(value) : null;
+  const codexExecutable = env.GAJENDRA_CODEX_BIN || env.AADI_CODEX_BIN || env.PRIORITY_DECK_CODEX_BIN;
+  const codexIdentity = codexExecutable && /[/\\]/u.test(codexExecutable) ? path4.resolve(codexExecutable) : codexExecutable;
+  const codexSearchPath = !codexExecutable || !/[/\\]/u.test(codexExecutable) ? env.PATH?.split(path4.delimiter).map((directory) => path4.resolve(directory)) : void 0;
+  return metadataHash([
+    path4.resolve(env.CODEX_HOME ?? path4.join(os4.homedir(), ".codex")),
+    codexIdentity,
+    codexSearchPath,
+    path4.resolve(env.GAJENDRA_CLAUDE_CONFIG_DIR ?? env.CLAUDE_CONFIG_DIR ?? path4.join(os4.homedir(), ".claude")),
+    optionalPath(env.GAJENDRA_CLAUDE_BIN),
+    optionalPath(env.GAJENDRA_CURSOR_BIN),
+    path4.resolve(env.GAJENDRA_GROK_CONFIG_DIR ?? path4.join(os4.homedir(), ".grok")),
+    optionalPath(env.GAJENDRA_GROK_BIN),
+    resolveSourcesConfigPath(env),
+    await relativeCatalogWorkingDirectory(env)
+  ]);
+}
+var PrivateMetadataFile = class {
+  filePath;
+  constructor(name, directory = resolveDataDirectory()) {
+    this.filePath = path4.join(directory, "metadata-cache", name);
+  }
+  async read() {
+    let handle;
+    try {
+      const directory = await lstat(path4.dirname(this.filePath));
+      if (!directory.isDirectory() || directory.isSymbolicLink() || (directory.mode & 63) !== 0) return null;
+      handle = await open5(this.filePath, constants3.O_RDONLY | constants3.O_NOFOLLOW);
+      const stat5 = await handle.stat();
+      if (!stat5.isFile() || stat5.size > MAX_CACHE_BYTES || (stat5.mode & 63) !== 0 || process.getuid && stat5.uid !== process.getuid()) return null;
+      const buffer = Buffer.alloc(MAX_CACHE_BYTES + 1);
+      let size = 0;
+      while (size < buffer.length) {
+        const { bytesRead } = await handle.read(buffer, size, buffer.length - size, null);
+        if (bytesRead === 0) break;
+        size += bytesRead;
+      }
+      return size > MAX_CACHE_BYTES ? null : JSON.parse(buffer.subarray(0, size).toString("utf8"));
+    } catch {
+      return null;
+    } finally {
+      await handle?.close().catch(() => void 0);
+    }
+  }
+  async write(value) {
+    const temporary = `${this.filePath}.${randomUUID2()}.tmp`;
+    try {
+      const body = JSON.stringify(value);
+      if (Buffer.byteLength(body) > MAX_CACHE_BYTES) return;
+      const directory = path4.dirname(this.filePath);
+      await mkdir2(directory, { recursive: true, mode: 448 });
+      const stat5 = await lstat(directory);
+      if (!stat5.isDirectory() || stat5.isSymbolicLink() || (stat5.mode & 63) !== 0 || process.getuid && stat5.uid !== process.getuid()) return;
+      const handle = await open5(temporary, "wx", 384);
+      try {
+        await handle.writeFile(body);
+      } finally {
+        await handle.close();
+      }
+      await rename2(temporary, this.filePath);
+    } catch {
+    } finally {
+      await unlink2(temporary).catch(() => void 0);
+    }
+  }
+};
+var text = external_exports.string().max(4096);
+var projectionSchema = external_exports.object({
+  version: external_exports.literal(1),
+  scope: external_exports.string(),
+  preferences: external_exports.string(),
+  savedAt: external_exports.number().finite(),
+  configuration: external_exports.string().optional(),
+  // Zod deliberately strips every unlisted field, including commands, reviews and provider payloads.
+  threads: external_exports.array(external_exports.object({
+    id: text,
+    sourceId: text,
+    sourceName: text,
+    title: text,
+    project: text,
+    updatedAt: external_exports.number().finite().nonnegative(),
+    status: text,
+    deepLink: text,
+    allowedDeepLinkSchemes: external_exports.array(external_exports.string().max(64)).max(32).optional()
+  })).max(8e3),
+  sources: external_exports.array(external_exports.object({
+    id: text,
+    name: text,
+    kind: external_exports.enum(["builtin", "configured"]),
+    state: external_exports.enum(["ready", "disabled", "not-installed", "not-configured", "error"]),
+    enabled: external_exports.boolean(),
+    threadCount: external_exports.number().int().nonnegative()
+  })).max(36)
+});
+var ThreadMetadataCache = class {
+  constructor(env = process.env, now = Date.now) {
+    this.env = env;
+    this.now = now;
+    this.file = new PrivateMetadataFile("threads.v1.json", resolveDataDirectory(env));
+  }
+  env;
+  now;
+  file;
+  async configuration() {
+    const file2 = await stat3(resolveSourcesConfigPath(this.env)).then((s) => [s.ino, s.size, s.mtimeMs, s.ctimeMs], () => null);
+    return metadataHash(file2);
+  }
+  async save(preferences, collection, startedConfiguration) {
+    if (this.env.GAJENDRA_METADATA_CACHE === "off") return;
+    if (collection.error || collection.sources.some((source) => source.enabled && source.state === "error")) return;
+    const configuration = await this.configuration();
+    if (startedConfiguration !== void 0 && configuration !== startedConfiguration) return;
+    const parsed = projectionSchema.safeParse({
+      version: 1,
+      scope: await cacheScope(this.env),
+      configuration,
+      preferences: preferenceHash(preferences),
+      savedAt: this.now(),
+      ...collection
+    });
+    if (parsed.success) await this.file.write(parsed.data);
+  }
+  async load(preferences) {
+    if (this.env.GAJENDRA_METADATA_CACHE === "off") return null;
+    const parsed = projectionSchema.safeParse(await this.file.read());
+    if (!parsed.success) return null;
+    const value = parsed.data;
+    const age = this.now() - value.savedAt;
+    if (age < 0 || age > 24 * 60 * 60 * 1e3 || value.scope !== await cacheScope(this.env) || value.configuration !== await this.configuration() || value.preferences !== preferenceHash(preferences)) return null;
+    return { savedAt: new Date(value.savedAt).toISOString(), collection: {
+      // Cached activity must not appear as a currently running process or a fresh completion claim.
+      threads: value.threads.map((thread) => ({ ...thread, allowedDeepLinkSchemes: thread.allowedDeepLinkSchemes ?? [], status: "cached" })),
+      sources: value.sources.map((source) => ({ ...source, detail: null })),
+      error: null
+    } };
+  }
+};
+function preferenceHash(preferences) {
+  return metadataHash(Object.entries(preferences).sort(([a], [b]) => a.localeCompare(b)));
+}
+var activityMarkerSchema = external_exports.object({ version: external_exports.literal(1), activityRevision: external_exports.string().uuid() }).strict();
+var LifecycleInvalidationCache = class {
+  file;
+  constructor(directory = resolveDataDirectory()) {
+    this.file = new PrivateMetadataFile("lifecycle.v1.json", directory);
+  }
+  async read() {
+    const parsed = activityMarkerSchema.safeParse(await this.file.read());
+    return parsed.success ? parsed.data.activityRevision : void 0;
+  }
+  async invalidate() {
+    await this.file.write({ version: 1, activityRevision: randomUUID2() });
+  }
+};
+var reviewCacheSchema = external_exports.object({
+  version: external_exports.literal(1),
+  scope: external_exports.string(),
+  activityRevision: external_exports.string().uuid().optional(),
+  entries: external_exports.array(external_exports.tuple([external_exports.string().regex(/^[a-f0-9]{64}$/u), external_exports.object({
+    fingerprint: external_exports.string().regex(/^[a-f0-9]{64}$/u),
+    checkedAt: external_exports.number().finite(),
+    completedAt: external_exports.number().int().positive().nullable()
+  })])).max(200)
+});
+var CodexReviewCache = class {
+  constructor(env = process.env) {
+    this.env = env;
+    this.file = new PrivateMetadataFile("codex-reviews.v1.json", resolveDataDirectory(env));
+    this.invalidation = new LifecycleInvalidationCache(resolveDataDirectory(env));
+  }
+  env;
+  file;
+  invalidation;
+  loadedActivityRevision;
+  async load() {
+    this.loadedActivityRevision = await this.invalidation.read();
+    const parsed = reviewCacheSchema.safeParse(await this.file.read());
+    return new Map(parsed.success && parsed.data.scope === await cacheScope(this.env) && parsed.data.activityRevision === this.loadedActivityRevision ? parsed.data.entries : []);
+  }
+  async save(entries) {
+    await this.file.write({
+      version: 1,
+      scope: await cacheScope(this.env),
+      ...this.loadedActivityRevision ? { activityRevision: this.loadedActivityRevision } : {},
+      entries: [...entries].slice(0, 200)
+    });
+  }
+};
+
+// src/server/lifecycle-events.ts
+var MAX_LIFECYCLE_INPUT_BYTES = 64 * 1024;
+var LIFECYCLE_EVENTS = ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"];
+var opaqueId = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$/u;
+function parseLifecycleIdentity(input2) {
+  if (Buffer.byteLength(input2) > MAX_LIFECYCLE_INPUT_BYTES) return null;
+  try {
+    const value = JSON.parse(input2);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const payload = value;
+    if (typeof payload.session_id !== "string" || !opaqueId.test(payload.session_id) || typeof payload.hook_event_name !== "string" || !LIFECYCLE_EVENTS.some((event) => event === payload.hook_event_name) || payload.turn_id !== void 0 && (typeof payload.turn_id !== "string" || !opaqueId.test(payload.turn_id))) return null;
+    return {
+      sessionId: payload.session_id,
+      event: payload.hook_event_name,
+      ...typeof payload.turn_id === "string" ? { turnId: payload.turn_id } : {}
+    };
+  } catch {
+    return null;
+  }
+}
+async function ingestLifecycleEvent(input2, env = process.env) {
+  if (env.GAJENDRA_METADATA_CACHE === "off" || !parseLifecycleIdentity(input2)) return;
+  try {
+    await new LifecycleInvalidationCache(resolveDataDirectory(env)).invalidate();
+  } catch {
+  }
+}
+function readBoundedLifecycleInput(stream, timeoutMs = 1e3) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    const finish = (value) => {
+      clearTimeout(timer);
+      stream.off("data", onData);
+      stream.off("end", onEnd);
+      stream.off("error", onError);
+      stream.pause();
+      resolve(value);
+    };
+    const onData = (chunk) => {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += bytes.length;
+      if (size > MAX_LIFECYCLE_INPUT_BYTES) finish(null);
+      else chunks.push(bytes);
+    };
+    const onEnd = () => finish(Buffer.concat(chunks).toString("utf8"));
+    const onError = () => finish(null);
+    const timer = setTimeout(() => finish(null), Math.max(1, Math.min(timeoutMs, 1e3)));
+    stream.on("data", onData);
+    stream.once("end", onEnd);
+    stream.once("error", onError);
+  });
+}
+
+// src/server/service.ts
+import path5 from "node:path";
+import { createHash as createHash4 } from "node:crypto";
+
+// src/server/thread-catalog.ts
+import { stat as stat4 } from "node:fs/promises";
+var ThreadCatalog = class {
+  constructor(collect, epoch, configPath, now = Date.now, maxAgeMs = 3e4) {
+    this.collect = collect;
+    this.epoch = epoch;
+    this.configPath = configPath;
+    this.now = now;
+    this.maxAgeMs = maxAgeMs;
+  }
+  collect;
+  epoch;
+  configPath;
+  now;
+  maxAgeMs;
+  revision = 0;
+  versions = /* @__PURE__ */ new WeakMap();
+  versionFor(collection) {
+    return this.versions.get(collection);
+  }
+  value;
+  pending = /* @__PURE__ */ new Map();
+  tail = Promise.resolve();
+  async key(preferences) {
+    const config2 = await stat4(this.configPath).then((s) => [s.ino, s.size, s.mtimeMs, s.ctimeMs], () => null);
+    return metadataHash([Object.entries(preferences).sort(), await this.epoch(), config2]);
+  }
+  async peek(preferences) {
+    const key = await this.key(preferences);
+    const age = this.value ? this.now() - this.value.at : Infinity;
+    return this.value?.key === key && age >= 0 && age < this.maxAgeMs ? this.value.collection : void 0;
+  }
+  async get(preferences, fresh, reviews = false) {
+    if (!fresh && !reviews) {
+      const value = await this.peek(preferences);
+      if (value) return value;
+    }
+    const key = await this.key(preferences);
+    const existing = !reviews ? this.pending.get(key) : void 0;
+    if (existing) return existing;
+    const operation = this.tail.catch(() => void 0).then(async () => {
+      const started = this.now();
+      const collection = await this.collect(preferences, reviews);
+      if (key === await this.key(preferences)) {
+        const projection = { ...collection, threads: collection.threads.map(({ resumeCommand: _command, ...thread }) => thread) };
+        this.value = { key, at: started, collection: projection };
+        this.revision++;
+        this.versions.set(collection, this.revision);
+        this.versions.set(projection, this.revision);
+      }
+      return collection;
+    });
+    this.tail = operation.then(() => void 0, () => void 0);
+    if (!reviews) this.pending.set(key, operation);
+    try {
+      return await operation;
+    } finally {
+      if (this.pending.get(key) === operation) this.pending.delete(key);
+    }
+  }
+};
 
 // src/server/service.ts
 var GENERATION_BUSY_MESSAGE = "Gajendra changed repeatedly while sources were loading. Refresh and retry.";
@@ -39920,6 +40436,14 @@ var GajendraService = class {
     this.store = store;
     this.sources = sources;
     this.now = options.now ?? Date.now;
+    this.metadataCache = options.metadataCache;
+    this.lifecycleInvalidation = new LifecycleInvalidationCache(path5.dirname(this.store.filePath));
+    this.catalog = options.sharedCatalog ? new ThreadCatalog(
+      (preferences, reviews) => this.collect(preferences, reviews),
+      () => this.lifecycleInvalidation.read(),
+      resolveSourcesConfigPath(),
+      this.now
+    ) : void 0;
     this.generationDeadlineMs = boundedPositive2(
       options.generationDeadlineMs,
       DEFAULT_GAJENDRA_GENERATION_DEADLINE_MS,
@@ -39936,7 +40460,24 @@ var GajendraService = class {
   generationDeadlineMs;
   maxGenerationRetries;
   now;
+  metadataCache;
+  lifecycleInvalidation;
+  catalog;
+  backgroundRefresh;
+  async sync() {
+    const activityRevision = await this.lifecycleInvalidation.read();
+    return {
+      revision: (await this.store.read()).revision,
+      ...activityRevision ? { activityRevision } : {},
+      ...this.catalog ? { catalogRevision: this.catalog.revision } : {}
+    };
+  }
   async snapshot() {
+    const activityRevision = await this.lifecycleInvalidation.read();
+    const snapshot = await this.liveSnapshot();
+    return { ...snapshot, ...activityRevision ? { activityRevision } : {} };
+  }
+  async liveSnapshot() {
     const deadline = this.now() + this.generationDeadlineMs;
     const collections = /* @__PURE__ */ new Map();
     let retries = 0;
@@ -39952,15 +40493,59 @@ var GajendraService = class {
       }
       const confirmed = await this.store.read();
       if (confirmed.revision === state.revision) {
-        return buildSnapshot(state, collection.threads, collection.sources, collection.error);
+        return this.snapshotFromCollection(state, collection);
       }
       if (sameSourcePreferences(confirmed.sourcePreferences, state.sourcePreferences)) {
-        return buildSnapshot(confirmed, collection.threads, collection.sources, collection.error);
+        return this.snapshotFromCollection(confirmed, collection);
       }
       if (retries >= this.maxGenerationRetries || this.now() >= deadline) return this.safeAuthoritativeSnapshot();
       collections.clear();
       retries += 1;
     }
+  }
+  async cachedSnapshot() {
+    const state = await this.store.read();
+    const activityRevision = await this.lifecycleInvalidation.read();
+    const live = await this.catalog?.peek(state.sourcePreferences);
+    if (live) {
+      const confirmed2 = await this.store.read();
+      if (!sameSourcePreferences(state.sourcePreferences, confirmed2.sourcePreferences)) return null;
+      return { ...await this.snapshotFromCollection(confirmed2, live), ...activityRevision ? { activityRevision } : {} };
+    }
+    const cached2 = await this.metadataCache?.load(state.sourcePreferences);
+    if (!cached2) return null;
+    const confirmed = await this.store.read();
+    if (!sameSourcePreferences(state.sourcePreferences, confirmed.sourcePreferences)) return null;
+    return { ...buildSnapshot(confirmed, cached2.collection.threads, cached2.collection.sources), cachedAt: cached2.savedAt };
+  }
+  /** Fast read, with refresh owned by the long-lived backend rather than the requesting UI. */
+  async readSnapshot() {
+    const cached2 = await this.cachedSnapshot();
+    if (cached2) {
+      if (cached2.cachedAt && cached2.catalogRevision === void 0 && !this.backgroundRefresh) {
+        const pending = this.snapshot();
+        this.backgroundRefresh = pending;
+        void pending.catch(() => void 0).finally(() => {
+          if (this.backgroundRefresh === pending) this.backgroundRefresh = void 0;
+        });
+      }
+      return cached2;
+    }
+    return this.snapshot();
+  }
+  async snapshotFromCollection(state, collection) {
+    const version2 = this.catalog?.versionFor(collection);
+    const generation = version2 === void 0 ? {} : { catalogRevision: version2 };
+    const failedSources = new Set(collection.sources.filter((source) => source.enabled && source.state === "error").map((source) => source.id));
+    if (collection.error || failedSources.size > 0) {
+      const cached2 = await this.metadataCache?.load(state.sourcePreferences);
+      if (cached2) {
+        const liveIds = new Set(collection.threads.map((thread) => thread.id));
+        const retained = cached2.collection.threads.filter((thread) => !liveIds.has(thread.id) && (failedSources.has(thread.sourceId) || collection.error && collection.sources.length === 0));
+        if (retained.length > 0) return { ...buildSnapshot(state, [...collection.threads, ...retained], collection.sources, collection.error), cachedAt: cached2.savedAt, ...generation };
+      }
+    }
+    return { ...buildSnapshot(state, collection.threads, collection.sources, collection.error), ...generation };
   }
   /** All writers enter here, whether they use the envelope or a legacy bare mutation shape. */
   async mutate(input2) {
@@ -39974,8 +40559,23 @@ var GajendraService = class {
       if (this.now() >= deadline) return this.storeBusyResult();
       const stateForSources = await this.store.read();
       let collection;
+      let cachedAt;
       try {
-        collection = await this.collectForGeneration(stateForSources.sourcePreferences, collections, deadline);
+        const local = this.catalog && request.mutation.type !== "set-review-acknowledged" && request.mutation.type !== "set-source-enabled";
+        const prepared = local ? await this.catalog?.peek(stateForSources.sourcePreferences) : void 0;
+        const failures = new Set(prepared?.sources.filter((source) => source.enabled && source.state === "error").map((source) => source.id));
+        const saved = local && (!prepared || prepared.error || failures.size) ? await this.metadataCache?.load(stateForSources.sourcePreferences) : void 0;
+        cachedAt = saved?.savedAt;
+        const merged = prepared && saved ? { ...prepared, threads: [
+          ...prepared.threads,
+          ...saved.collection.threads.filter((thread) => !prepared.threads.some((live) => live.id === thread.id) && (failures.has(thread.sourceId) || prepared.error && prepared.sources.length === 0))
+        ] } : prepared;
+        collection = merged ?? saved?.collection ?? (local && request.mutation.type === "set-collapsed" ? { threads: [], sources: [], error: null } : await this.collectForGeneration(
+          stateForSources.sourcePreferences,
+          collections,
+          deadline,
+          request.mutation.type === "set-review-acknowledged"
+        ));
       } catch (error62) {
         if (error62 instanceof GenerationDeadlineError) return this.storeBusyResult();
         throw error62;
@@ -39984,7 +40584,11 @@ var GajendraService = class {
         if (current.revision !== stateForSources.revision && !sameSourcePreferences(current.sourcePreferences, stateForSources.sourcePreferences)) {
           return { value: { retry: true } };
         }
-        const snapshot = (state = current) => buildSnapshot(state, collection.threads, collection.sources, collection.error);
+        const snapshot = (state = current) => ({
+          ...buildSnapshot(state, collection.threads, collection.sources, collection.error),
+          ...this.catalog?.versionFor(collection) === void 0 ? {} : { catalogRevision: this.catalog.versionFor(collection) },
+          ...cachedAt ? { cachedAt } : {}
+        });
         const result = (value, committedState) => ({
           ...committedState ? { next: committedState } : {},
           value: {
@@ -40065,25 +40669,28 @@ var GajendraService = class {
       return attempt.result;
     }
   }
-  close() {
-    return this.sources.close();
+  async close() {
+    await this.sources.close();
+    await this.backgroundRefresh?.catch(() => void 0);
   }
-  async collect(preferences) {
+  async collect(preferences, forceFreshReviews) {
     try {
-      return await this.sources.collect(preferences);
+      return await this.sources.collect(preferences, forceFreshReviews);
     } catch {
       return { threads: [], sources: [], error: "Gajendra could not read the configured thread sources." };
     }
   }
-  async collectForGeneration(preferences, collections, deadline) {
+  async collectForGeneration(preferences, collections, deadline, forceFreshReviews = false) {
     const key = sourcePreferencesKey(preferences);
     const cached2 = collections.get(key);
     if (cached2) return cached2;
     const remaining = deadline - this.now();
     if (remaining <= 0) throw new GenerationDeadlineError();
-    const collection = await completeBeforeDeadline(this.collect(preferences), remaining);
+    const configuration = await this.metadataCache?.configuration();
+    const collection = await completeBeforeDeadline(this.catalog ? this.catalog.get(preferences, true, forceFreshReviews) : this.collect(preferences, forceFreshReviews), remaining);
     if (this.now() >= deadline) throw new GenerationDeadlineError();
     collections.set(key, collection);
+    await this.metadataCache?.save(preferences, collection, configuration);
     return collection;
   }
   async safeAuthoritativeSnapshot() {
@@ -40135,7 +40742,7 @@ function normalizeRequest(input2) {
   return { mutation: input2 };
 }
 function mutationFingerprint(mutation) {
-  return createHash3("sha256").update(JSON.stringify(mutation)).digest("hex");
+  return createHash4("sha256").update(JSON.stringify(mutation)).digest("hex");
 }
 function validateMutation(store, mutation, collection, reviewAcknowledgementLimit) {
   if (mutation.type === "set-collapsed") return null;
@@ -40144,6 +40751,32 @@ function validateMutation(store, mutation, collection, reviewAcknowledgementLimi
   }
   const knownThreadIds = new Set(collection.threads.map((thread) => thread.id));
   if (!knownThreadIds.has(mutation.threadId)) return "unknown-thread";
+  if (mutation.type === "set-work-completed" || mutation.type === "link-continuation") {
+    const thread = collection.threads.find((candidate) => candidate.id === mutation.threadId);
+    if (!isCanonicalWorkflowId(thread.id) || !thread.id.startsWith(`${thread.sourceId}:`)) return "invalid-continuation";
+    const completed = new Set(store.completedThreadIds);
+    const links = store.continuations ?? [];
+    if (mutation.type === "set-work-completed") {
+      if (links.some((link) => link.predecessorThreadId === mutation.threadId)) return "invalid-target";
+      if (mutation.completed && !completed.has(mutation.threadId) && completed.size >= MAX_WORKFLOW_RECORDS) return "workflow-limit";
+      if (mutation.completed) completed.add(mutation.threadId);
+      else completed.delete(mutation.threadId);
+      if (mutation.currentThreadId && (completed.has(mutation.currentThreadId) || !knownThreadIds.has(mutation.currentThreadId) || !store.entries.some((entry) => entry.threadId === mutation.currentThreadId && entry.level === "focus"))) return "invalid-target";
+      return null;
+    }
+    const prior = links.find((link) => link.predecessorThreadId === mutation.threadId);
+    if (mutation.currentThreadId === null) {
+      if (!prior || completed.has(prior.currentThreadId) || links.some((link) => link.predecessorThreadId === prior.currentThreadId)) return "invalid-continuation";
+      if (store.entries.some((entry) => entry.threadId === mutation.threadId)) return "invalid-continuation";
+      return null;
+    }
+    const target = collection.threads.find((candidate) => candidate.id === mutation.currentThreadId);
+    if (!target || !isCanonicalWorkflowId(target.id) || !target.id.startsWith(`${target.sourceId}:`)) return "invalid-continuation";
+    if (prior || links.some((link) => link.predecessorThreadId === target.id) || completed.has(mutation.threadId) || completed.has(target.id) || store.entries.some((entry) => entry.threadId === target.id)) return "invalid-continuation";
+    if (links.length >= MAX_WORKFLOW_RECORDS) return "workflow-limit";
+    return validContinuations([...links, { predecessorThreadId: mutation.threadId, currentThreadId: target.id }]) ? null : "invalid-continuation";
+  }
+  if (mutation.type !== "set-review-acknowledged" && (store.completedThreadIds?.includes(mutation.threadId) || store.continuations?.some((link) => link.predecessorThreadId === mutation.threadId))) return "work-completed";
   if (mutation.type === "set-review-acknowledged") {
     const thread = collection.threads.find((candidate) => candidate.id === mutation.threadId);
     if (!thread?.review || isRunningThreadStatus(thread.status) || thread.review.updatedAt !== mutation.reviewUpdatedAt) return "invalid-target";
@@ -40184,7 +40817,7 @@ function validatePostMoveCurrent(store, mutation, knownThreadIds) {
   if (!Object.hasOwn(mutation, "currentThreadId")) return null;
   const currentThreadId = mutation.currentThreadId;
   if (currentThreadId === void 0 || currentThreadId === null) return null;
-  if (!knownThreadIds.has(currentThreadId)) return "invalid-target";
+  if (!knownThreadIds.has(currentThreadId) || store.completedThreadIds?.includes(currentThreadId) || store.continuations?.some((link) => link.predecessorThreadId === currentThreadId)) return "invalid-target";
   const postMoveFocusIds = new Set(store.entries.filter((entry) => entry.level === "focus").map((entry) => entry.threadId));
   if (mutation.level === "focus") postMoveFocusIds.add(mutation.threadId);
   else postMoveFocusIds.delete(mutation.threadId);
@@ -40199,8 +40832,11 @@ function conflict(snapshot, revision) {
     error: { code: "stale-revision", message: "Gajendra changed elsewhere. Refresh and retry this change." }
   };
 }
-function rejected(snapshot, revision, code) {
+function rejected(snapshot, revision, code2) {
   const messages = {
+    "workflow-limit": "Gajendra workflow capacity is full. Existing work records were preserved.",
+    "invalid-continuation": "Choose two exact available chats without an existing conflicting continuation or priority.",
+    "work-completed": "Reopen this work or use its current continuation before changing priorities.",
     "idempotency-key-reused": "This request key was already used for a different change.",
     "unknown-thread": "That thread is no longer available from an enabled source.",
     "unknown-source": "That source is not available in the current Gajendra registry.",
@@ -40212,8 +40848,236 @@ function rejected(snapshot, revision, code) {
     outcome: "rejected",
     revision,
     snapshot,
-    error: { code, message: messages[code] }
+    error: { code: code2, message: messages[code2] }
   };
+}
+
+// src/server/shared-backend.ts
+import { createHash as createHash5 } from "node:crypto";
+import { spawn as spawn3 } from "node:child_process";
+import { chmod as chmod2, lstat as lstat2, mkdir as mkdir3, readFile, rmdir as rmdir2, unlink as unlink3, writeFile as writeFile2 } from "node:fs/promises";
+import { createConnection, createServer } from "node:net";
+import path6 from "node:path";
+import { fileURLToPath } from "node:url";
+var REQUEST_LIMIT = 64 * 1024;
+var RESPONSE_LIMIT = 4 * 1024 * 1024;
+var REQUEST_TIMEOUT = 8e4;
+var delay2 = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+var code = (error62) => error62?.code;
+async function backendDirectory(env = process.env, executable = fileURLToPath(import.meta.url)) {
+  const build = createHash5("sha256").update(await readFile(executable)).digest("hex");
+  const signature = createHash5("sha256").update(JSON.stringify([
+    build,
+    resolveDataDirectory(env),
+    await cacheScope(env),
+    Object.entries(env).filter(([key]) => /^GAJENDRA_(CODEX_|CLAUDE_|CURSOR_|GROK_|SOURCE_COLLECTION_|SOURCES_CONFIG_|REVIEW_CACHE_|METADATA_CACHE$)/u.test(key)).sort()
+  ])).digest("hex").slice(0, 24);
+  return path6.join("/tmp", `gajendra-${process.getuid?.() ?? "local"}-${signature}`);
+}
+async function privateDirectory(directory) {
+  await mkdir3(directory, { mode: 448 }).catch((error62) => {
+    if (code(error62) !== "EEXIST") throw error62;
+  });
+  const stat5 = await lstat2(directory);
+  if (!stat5.isDirectory() || stat5.isSymbolicLink() || stat5.mode & 63 || process.getuid && stat5.uid !== process.getuid()) throw new Error("Unsafe backend directory.");
+}
+async function connect(socketPath) {
+  return new Promise((resolve, reject) => {
+    const socket = createConnection(socketPath);
+    const fail = (error62) => {
+      socket.destroy();
+      reject(error62);
+    };
+    socket.once("error", fail);
+    socket.setTimeout(1e3, () => fail(new Error("Backend connection timed out.")));
+    socket.once("connect", () => {
+      socket.removeListener("error", fail);
+      socket.setTimeout(0);
+      resolve(socket);
+    });
+  });
+}
+async function readySocket(directory, executable, env) {
+  const socketPath = path6.join(directory, "service.sock");
+  try {
+    return await connect(socketPath);
+  } catch (error62) {
+    if (!["ENOENT", "ECONNREFUSED"].includes(code(error62) ?? "")) throw error62;
+  }
+  const lock = path6.join(directory, "start");
+  const lockOwner = path6.join(lock, "pid");
+  let owner = false;
+  try {
+    await mkdir3(lock, { mode: 448 });
+    owner = true;
+  } catch (error62) {
+    if (code(error62) !== "EEXIST") throw error62;
+    const candidate = await lstat2(lock);
+    const pid = Number(await readFile(lockOwner, "utf8").catch(() => ""));
+    let alive = false;
+    if (Number.isSafeInteger(pid) && pid > 0) {
+      try {
+        process.kill(pid, 0);
+        alive = true;
+      } catch (failure2) {
+        if (code(failure2) !== "ESRCH") alive = true;
+      }
+    }
+    if (!alive && Date.now() - candidate.mtimeMs > 1e4 && (await lstat2(lock)).ino === candidate.ino) {
+      await unlink3(lockOwner).catch((failure2) => {
+        if (code(failure2) !== "ENOENT") throw failure2;
+      });
+      await rmdir2(lock).catch(() => void 0);
+      return readySocket(directory, executable, env);
+    }
+  }
+  if (owner) {
+    try {
+      await writeFile2(lockOwner, String(process.pid), { mode: 384 });
+      try {
+        return await connect(socketPath);
+      } catch (error62) {
+        if (!["ENOENT", "ECONNREFUSED"].includes(code(error62) ?? "")) throw error62;
+      }
+      await unlink3(socketPath).catch((error62) => {
+        if (code(error62) !== "ENOENT") throw error62;
+      });
+      const child = spawn3(process.execPath, [executable, "--shared-backend"], {
+        env,
+        detached: true,
+        stdio: "ignore"
+      });
+      let spawnError;
+      child.on("error", (error62) => {
+        spawnError = error62;
+      });
+      child.unref();
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (spawnError) throw spawnError;
+        try {
+          return await connect(socketPath);
+        } catch (error62) {
+          if (!["ENOENT", "ECONNREFUSED"].includes(code(error62) ?? "")) throw error62;
+        }
+        await delay2(50);
+      }
+      throw new Error("Backend startup timed out.");
+    } finally {
+      await unlink3(lockOwner).catch(() => void 0);
+      await rmdir2(lock).catch(() => void 0);
+    }
+  }
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      return await connect(socketPath);
+    } catch (error62) {
+      if (!["ENOENT", "ECONNREFUSED"].includes(code(error62) ?? "")) throw error62;
+    }
+    await delay2(50);
+  }
+  throw new Error("Backend is still starting. Retry the request.");
+}
+async function callSharedBackend(command, input2 = "", env = process.env) {
+  const executable = fileURLToPath(import.meta.url);
+  const directory = await backendDirectory(env, executable);
+  await privateDirectory(directory);
+  const body = JSON.stringify({ command, input: input2 }) + "\n";
+  if (Buffer.byteLength(body) > REQUEST_LIMIT) throw new Error("Backend request too large.");
+  const socket = await readySocket(directory, executable, env);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let complete = false;
+    const fail = () => {
+      if (!complete) {
+        complete = true;
+        socket.destroy();
+        reject(new Error("Local backend request failed. Retry with the same operation key."));
+      }
+    };
+    socket.on("error", fail);
+    socket.setTimeout(REQUEST_TIMEOUT, fail);
+    socket.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > RESPONSE_LIMIT) return fail();
+      chunks.push(chunk);
+    });
+    socket.on("end", () => {
+      if (complete) return;
+      try {
+        const response = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        if (response.ok !== true) return fail();
+        complete = true;
+        socket.destroy();
+        resolve(response.value);
+      } catch {
+        fail();
+      }
+    });
+    socket.on("close", () => {
+      if (!complete) fail();
+    });
+    socket.write(body);
+  });
+}
+async function serveSharedBackend(handler, close, env = process.env) {
+  const directory = await backendDirectory(env);
+  await privateDirectory(directory);
+  const socketPath = path6.join(directory, "service.sock");
+  let active = 0, lastRequest = Date.now(), stopping = false;
+  const sockets = /* @__PURE__ */ new Set();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.on("close", () => sockets.delete(socket));
+    socket.on("error", () => socket.destroy());
+    socket.setTimeout(REQUEST_TIMEOUT, () => socket.destroy());
+    let bytes = 0, input2 = "", dispatched = false;
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk) => {
+      if (dispatched) return socket.destroy();
+      bytes += Buffer.byteLength(chunk);
+      if (bytes > REQUEST_LIMIT) return socket.destroy();
+      input2 += chunk;
+      if (!input2.includes("\n")) return;
+      dispatched = true;
+      active++;
+      lastRequest = Date.now();
+      void (async () => {
+        try {
+          const request = JSON.parse(input2);
+          if (!request || !["snapshot", "cached-snapshot", "read", "sync", "mutate"].includes(request.command) || typeof request.input !== "string") throw new Error("Invalid backend request.");
+          const result = JSON.stringify({ ok: true, value: await handler(request.command, request.input) });
+          if (Buffer.byteLength(result) > RESPONSE_LIMIT) throw new Error("Backend response too large.");
+          socket.end(result);
+        } catch {
+          socket.end(JSON.stringify({ ok: false }));
+        } finally {
+          active--;
+          lastRequest = Date.now();
+        }
+      })();
+    });
+  });
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(socketPath, resolve);
+  });
+  await chmod2(socketPath, 384);
+  await writeFile2(path6.join(directory, "pid"), String(process.pid), { mode: 384 });
+  const stop = async () => {
+    if (stopping) return;
+    stopping = true;
+    clearInterval(timer);
+    server.close();
+    for (const socket of sockets) socket.destroy();
+    await close();
+    while (active > 0) await delay2(10);
+  };
+  const timer = setInterval(() => {
+    if (!active && Date.now() - lastRequest >= 3e5) void stop();
+  }, 3e4);
+  process.once("SIGTERM", () => void stop());
+  process.once("SIGINT", () => void stop());
 }
 
 // src/server/index.ts
@@ -40223,6 +41087,8 @@ var mutationOptionsSchema = {
   idempotencyKey: external_exports.string().min(1).max(256).optional()
 };
 var deckMutationSchema = external_exports.discriminatedUnion("type", [
+  external_exports.object({ type: external_exports.literal("set-work-completed"), threadId: external_exports.string().min(1).max(512), completed: external_exports.boolean(), currentThreadId: external_exports.string().min(1).max(512).nullable().optional() }),
+  external_exports.object({ type: external_exports.literal("link-continuation"), threadId: external_exports.string().min(1).max(512), currentThreadId: external_exports.string().min(1).max(512).nullable() }),
   external_exports.object({ type: external_exports.literal("set-level"), threadId: external_exports.string().min(1), level: external_exports.enum(["focus", "important"]).nullable() }),
   external_exports.object({ type: external_exports.literal("set-current"), threadId: external_exports.string().min(1) }),
   external_exports.object({ type: external_exports.literal("move"), threadId: external_exports.string().min(1), direction: external_exports.enum(["up", "down"]) }),
@@ -40252,22 +41118,61 @@ var deckMutationRequestSchema = external_exports.object({
   ...mutationOptionsSchema
 });
 function createGajendraServer(service = new GajendraService()) {
-  const server = new McpServer({ name: "gajendra", version: "0.3.1" });
+  const server = new McpServer({ name: "gajendra", version: "0.4.0" });
   N3(server, "gajendra-ui", RESOURCE_URI, { mimeType: p }, async () => ({
-    contents: [{ uri: RESOURCE_URI, mimeType: p, text: await loadUiHtml() }]
+    contents: [{
+      uri: RESOURCE_URI,
+      mimeType: p,
+      text: await loadUiHtml(),
+      _meta: {
+        "openai/ui": { preferredDisplayMode: "fullscreen", availableDisplayModes: ["inline", "fullscreen"] }
+      }
+    }]
   }));
   K3(server, "gajendra_open", {
-    title: "Gajendra",
+    title: "Gajendra priorities",
     description: "Read Gajendra priorities and available task metadata. Resolve the exact canonical thread ID here before changing focus or review state; never guess an ID from a title.",
-    inputSchema: {},
+    inputSchema: { refresh: external_exports.boolean().optional() },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
       ui: { resourceUri: RESOURCE_URI, visibility: ["app", "model"] },
       "openai/outputTemplate": RESOURCE_URI,
       "openai/widgetAccessible": true,
-      "openai/ui": { entrypoints: [{ type: "global" }] }
+      "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] }
     }
-  }, async () => snapshotToolResult(await service.snapshot()));
+  }, async ({ refresh }) => snapshotToolResult(!refresh && service.readSnapshot ? await service.readSnapshot() : (!refresh ? await service.cachedSnapshot?.() : null) ?? await service.snapshot()));
+  K3(server, "gajendra_sync", {
+    title: "Check Gajendra revision",
+    description: "Read only the local authoritative revision without scanning providers.",
+    inputSchema: {},
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } }
+  }, async () => {
+    const value = service.sync ? await service.sync() : { revision: (await service.snapshot()).revision };
+    return { structuredContent: value, content: [{ type: "text", text: `Gajendra revision ${value.revision}.` }] };
+  });
+  K3(server, "gajendra_set_work_completed", {
+    title: "Finish or reopen work",
+    description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Finishing NOW clears NOW; priorities and pending review evidence are retained.",
+    inputSchema: { threadId: external_exports.string().min(1).max(512), completed: external_exports.boolean(), currentThreadId: external_exports.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app", "model"] } }
+  }, async ({ threadId, completed, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-work-completed", threadId, completed, ...currentThreadId === void 0 ? {} : { currentThreadId } },
+    expectedRevision,
+    idempotencyKey
+  ))));
+  K3(server, "gajendra_link_continuation", {
+    title: "Select exact continuation chat",
+    description: "Only when the user selects an exact successor chat, link its canonical ID to an exact predecessor. Never match titles or infer a continuation. Transfers priority and NOW atomically; old chat remains in History. Null unlinks the most recent edge and transfers priority back. Read gajendra_open first and use its revision.",
+    inputSchema: { threadId: external_exports.string().min(1).max(512), currentThreadId: external_exports.string().min(1).max(512).nullable(), ...mutationOptionsSchema },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app", "model"] } }
+  }, async ({ threadId, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "link-continuation", threadId, currentThreadId },
+    expectedRevision,
+    idempotencyKey
+  ))));
   K3(server, "gajendra_set_level", {
     title: "Set thread priority",
     description: "When the user asks, add, move, or remove one exact agent thread in Gajendra Focus or Important. Read gajendra_open first; use its canonical ID and revision. Do not infer priority from conversation content.",
@@ -40406,15 +41311,15 @@ function mutationToolResult(result) {
   };
 }
 async function loadUiHtml() {
-  const currentDirectory = path4.dirname(fileURLToPath(import.meta.url));
+  const currentDirectory = path7.dirname(fileURLToPath2(import.meta.url));
   const candidates = [
-    path4.join(currentDirectory, "gajendra.html"),
-    path4.join(currentDirectory, "..", "dist", "gajendra.html"),
-    path4.join(currentDirectory, "..", "..", "dist", "gajendra.html")
+    path7.join(currentDirectory, "gajendra.html"),
+    path7.join(currentDirectory, "..", "dist", "gajendra.html"),
+    path7.join(currentDirectory, "..", "..", "dist", "gajendra.html")
   ];
   for (const candidate of candidates) {
     try {
-      return await readFile(candidate, "utf8");
+      return await readFile2(candidate, "utf8");
     } catch (error62) {
       if (!error62 || typeof error62 !== "object" || !("code" in error62) || error62.code !== "ENOENT") throw error62;
     }
@@ -40422,6 +41327,9 @@ async function loadUiHtml() {
   throw new Error("Gajendra UI bundle is missing. Run npm run build.");
 }
 async function runCompanionCommand(command, input2, service) {
+  if (command === "sync") return service.sync ? service.sync() : { revision: (await service.snapshot()).revision };
+  if (command === "read") return service.readSnapshot ? service.readSnapshot() : service.snapshot();
+  if (command === "cached-snapshot") return service.cachedSnapshot?.() ?? null;
   if (command === "snapshot") return service.snapshot();
   const parsed = JSON.parse(input2);
   const request = deckMutationRequestSchema.safeParse(parsed);
@@ -40430,9 +41338,38 @@ async function runCompanionCommand(command, input2, service) {
   const result = await service.mutate(legacyMutation);
   return result.snapshot;
 }
-var companionCommand = process.argv.includes("--snapshot-json") ? "snapshot" : process.argv.includes("--mutate-json") ? "mutate" : null;
-if (companionCommand) {
-  const service = new GajendraService();
+var companionCommand = process.argv.includes("--snapshot-json") ? "snapshot" : process.argv.includes("--read-json") ? "read" : process.argv.includes("--cached-snapshot-json") ? "cached-snapshot" : process.argv.includes("--sync-json") ? "sync" : process.argv.includes("--mutate-json") ? "mutate" : null;
+function localService(sharedCatalog = false) {
+  return new GajendraService(void 0, void 0, {
+    sharedCatalog: sharedCatalog && process.env.GAJENDRA_METADATA_CACHE !== "off",
+    metadataCache: new ThreadMetadataCache({ ...process.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable() })
+  });
+}
+function runtimeService() {
+  if (process.env.GAJENDRA_SHARED_BACKEND === "off" || process.platform === "win32") return localService();
+  const env = { ...process.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable() };
+  return {
+    snapshot: () => callSharedBackend("snapshot", "", env),
+    cachedSnapshot: () => callSharedBackend("cached-snapshot", "", env),
+    readSnapshot: () => callSharedBackend("read", "", env),
+    sync: () => callSharedBackend("sync", "", env),
+    mutate: (request) => callSharedBackend("mutate", JSON.stringify("mutation" in request ? request : { protocolVersion: MUTATION_PROTOCOL_VERSION, mutation: request }), env),
+    close: async () => {
+    }
+  };
+}
+if (process.argv.includes("--shared-backend")) {
+  const service = localService(true);
+  await serveSharedBackend((command, input2) => runCompanionCommand(command, input2, service), () => service.close());
+} else if (process.argv.includes("--lifecycle-event")) {
+  try {
+    const input2 = await readBoundedLifecycleInput(process.stdin);
+    if (input2 !== null) await ingestLifecycleEvent(input2);
+  } catch {
+  }
+  process.stdout.write("{}\n");
+} else if (companionCommand) {
+  const service = runtimeService();
   try {
     const input2 = companionCommand === "mutate" ? await readStandardInput() : "";
     process.stdout.write(`${JSON.stringify(await runCompanionCommand(companionCommand, input2, service))}
@@ -40444,7 +41381,7 @@ if (companionCommand) {
     await service.close();
   }
 } else if (process.argv.includes("--stdio")) {
-  const service = new GajendraService();
+  const service = runtimeService();
   const server = createGajendraServer(service);
   const shutdown = async () => {
     await service.close();

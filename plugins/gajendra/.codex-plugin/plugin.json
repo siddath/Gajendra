@@ -1,24 +1,102 @@
 {
   "name": "gajendra",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "One clear focus across your AI tools.",
   "author": {
     "name": "Gajendra contributors"
   },
   "license": "MIT",
-  "keywords": ["codex", "claude", "cursor", "focus", "threads", "mcp-app", "macos"],
+  "keywords": [
+    "codex",
+    "claude",
+    "cursor",
+    "focus",
+    "threads",
+    "mcp-app",
+    "macos"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Gajendra",
-    "shortDescription": "One clear focus across your AI tools.",
-    "longDescription": "One NOW. One short queue. One click back to the exact thread.",
+    "shortDescription": "One focus across AI tools",
+    "longDescription": "One NOW. One short queue. One click back to the exact thread. Organize local AI-agent threads with Focus and Important priorities, provider-reported Running and Ready for Review, exact-response acknowledgement with Undo, and explicit Finish/Reopen and continuation history. The Codex plugin and optional macOS companion share your local state. Requires Node.js and locally installed providers; Claude Code discovery is opt-in. Gajendra stores bounded priorities and disposable metadata, never prompts or transcripts. Cloud-only sessions and mobile access are not supported.",
     "developerName": "Gajendra",
     "category": "Productivity",
-    "capabilities": ["MCP App", "Multi-agent thread organization", "Local metadata adapters", "Native macOS companion"],
+    "capabilities": [
+      "MCP App",
+      "Multi-agent thread organization",
+      "Local metadata adapters",
+      "Native macOS companion"
+    ],
     "defaultPrompt": "Open Gajendra and help me choose the one AI-agent thread I should focus on now.",
-    "brandColor": "#E8B447",
+    "brandColor": "#B78220",
     "composerIcon": "./assets/gajendra.svg",
-    "logo": "./assets/gajendra-icon.png"
+    "logo": "./assets/gajendra-icon.png",
+    "websiteURL": "https://github.com/siddath/Gajendra",
+    "supportURL": "https://github.com/siddath/Gajendra/issues",
+    "brandColorDark": "#E8B447"
   },
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "homepage": "https://github.com/siddath/Gajendra",
+  "repository": "https://github.com/siddath/Gajendra",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/gajendra/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Open the local overview",
+              "prompt": "Open Gajendra and show my current focus.",
+              "tools_triggered": "gajendra_open",
+              "expected_behavior": "Show the local catalog and current priorities; label saved metadata and report unavailable sources without removing priorities."
+            },
+            {
+              "description": "Choose exact focus",
+              "prompt": "Put the thread I selected in Focus and make it NOW.",
+              "tools_triggered": "gajendra_set_level, gajendra_set_current",
+              "expected_behavior": "Resolve the exact returned canonical ID, keep one NOW in open Focus, and persist the confirmed change."
+            },
+            {
+              "description": "Acknowledge reviewed response",
+              "prompt": "I reviewed this exact response. Clear it from Ready for Review.",
+              "tools_triggered": "gajendra_set_review_acknowledged",
+              "expected_behavior": "Require fresh exact-response evidence, keep priority unchanged, and preserve a newer response if it arrives."
+            },
+            {
+              "description": "Finish intentionally",
+              "prompt": "Mark this selected work finished.",
+              "tools_triggered": "gajendra_set_work_completed",
+              "expected_behavior": "Only explicit user intent finishes work. Clear NOW if applicable; do not promote another task or discard pending review."
+            },
+            {
+              "description": "Continue in selected successor",
+              "prompt": "Continue this work in the successor thread I selected.",
+              "tools_triggered": "gajendra_link_continuation",
+              "expected_behavior": "Validate both returned IDs; retain predecessor history and transfer priority/context/NOW atomically."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Provider conversation deletion",
+              "prompt": "Delete every provider conversation and transcript."
+            },
+            {
+              "description": "Unavailable remote session",
+              "prompt": "Read a cloud-only session on a computer that is not connected."
+            },
+            {
+              "description": "Unrequested completion",
+              "prompt": "Everything looks idle, so assume all the work is finished."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "Gajendra does not sell products or process payments."
+      },
+      "publication": {
+        "release_notes": "Shared local backend and prepared reads; faster bounded provider refresh; explicit work lifecycle and review Undo; native/plugin motion feedback and keyboard/reduced-motion support."
+      }
+    }
+  }
 }

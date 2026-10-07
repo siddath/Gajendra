@@ -3,14 +3,33 @@ import Foundation
 
 @MainActor
 public final class DeckViewModel: ObservableObject {
-    @Published public private(set) var snapshot: DeckSnapshot?
+    @Published private var authoritativeSnapshot: DeckSnapshot?
+    @Published private var pendingReviewReceipts = Set<GajendraReviewReceipt>()
+    @Published private var failedReviewAction: QueuedMutation?
+    @Published public private(set) var reviewFeedback: String?
+
+    public var snapshot: DeckSnapshot? { authoritativeSnapshot?.acknowledgingReviews(pendingReviewReceipts) }
+    public var pendingReviewCount: Int { pendingReviewReceipts.count }
+    public var canRetryReview: Bool { failedReviewAction != nil && !isLoading }
+    public var canAcknowledgeReviews: Bool { client != nil && authoritativeSnapshot?.cachedAt == nil }
+    public var canUndoReview: Bool {
+        guard !isLoading, let entry = undoStack.last,
+              case .setReviewAcknowledged(_, _, _, true) = entry.forward else { return false }
+        return snapshot?.revision == historyWatermark
+    }
+    public func isReviewPending(_ thread: DeckThread) -> Bool {
+        pendingReviewReceipts.contains { receipt in
+            receipt.threadId == thread.id
+                && authoritativeSnapshot?.allThreads.first(where: { $0.id == thread.id })?.review?.identity == receipt.identity
+        }
+    }
     @Published public private(set) var isLoading = false
     @Published public private(set) var isMutating = false
     @Published public private(set) var errorChannels = GajendraErrorChannels()
     @Published public private(set) var undoRegistrationCount = 0
     @Published private var historyVersion = 0
 
-    public var errorMessage: String? { errorChannels.visible }
+    public var errorMessage: String? { errorChannels.visible ?? snapshot?.sourceWarning }
     public var openErrorMessage: String? { errorChannels.open }
     public var mutationErrorMessage: String? { errorChannels.mutation }
     public var clientErrorMessage: String? { errorChannels.client }
@@ -68,7 +87,7 @@ public final class DeckViewModel: ObservableObject {
         deepLinkOpener: @escaping DeepLinkOpener = { NSWorkspace.shared.open($0) }
     ) {
         self.client = client
-        self.snapshot = initialSnapshot
+        self.authoritativeSnapshot = initialSnapshot
         self.resumeBaseDirectory = resumeBaseDirectory
         self.resumeScriptOpener = resumeScriptOpener
         self.deepLinkOpener = deepLinkOpener
@@ -85,7 +104,30 @@ public final class DeckViewModel: ObservableObject {
         GajendraResumeScriptStore.cleanup(baseDirectory: resumeBaseDirectory)
     }
 
-    public func refresh() {
+    private var isCheckingRevision = false
+
+    public func syncRevision() {
+        guard let client, snapshot != nil, !isLoading, !isMutating, !isCheckingRevision else { return }
+        isCheckingRevision = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer { isCheckingRevision = false }
+            do {
+                if let state = try await client.syncState() {
+                    errorChannels.syncSucceeded()
+                    if !isLoading, !isMutating,
+                       state.revision != snapshot?.revision || state.activityRevision != snapshot?.activityRevision
+                        || state.catalogRevision != snapshot?.catalogRevision {
+                        refresh(prepared: true)
+                    }
+                }
+            } catch {
+                errorChannels.syncFailed("Sync interrupted. Showing the last view. Refresh or reconnect your AI tools.")
+            }
+        }
+    }
+
+    public func refresh(prepared: Bool = false) {
         guard let client else { return }
         guard !isLoading else {
             refreshRequestedWhileBusy = true
@@ -95,17 +137,28 @@ public final class DeckViewModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                let next = try await client.snapshot()
+                // Populate the first opening without waiting for discovery. The backend combines
+                // this disposable projection with freshly read priorities and source preferences.
+                if snapshot == nil, let cached = try? await client.cachedSnapshot() {
+                    authoritativeSnapshot = cached
+                }
+                let next = try await (prepared ? client.readSnapshot() : client.snapshot())
                 try validateSnapshot(next, against: snapshot)
                 if let previous = snapshot, next.revision != previous.revision {
-                    let hadHistory = canUndo || canRedo
                     invalidateHistory()
-                    if hadHistory {
-                        errorChannels.mutationFailed("That change is no longer undoable because Gajendra changed elsewhere.")
-                    }
                 }
-                snapshot = next
-                errorChannels.clientSucceeded()
+                if next.error != nil {
+                    let preservesLastView = snapshot?.revision == next.revision
+                    // Metadata may be unavailable, but a newer revision still owns NOW, completion,
+                    // and continuation state. Keeping the old work map would undo external intent.
+                    if !preservesLastView { authoritativeSnapshot = next }
+                    errorChannels.clientFailed(preservesLastView
+                        ? "Thread sources are unavailable. Showing the last view. Refresh or reconnect your AI tools."
+                        : "Thread sources are unavailable. Latest saved work is shown. Refresh or reconnect your AI tools.")
+                } else {
+                    authoritativeSnapshot = next
+                    errorChannels.clientSucceeded()
+                }
                 openPendingThreadIfAvailable()
             } catch {
                 errorChannels.clientFailed(genericClientError(error))
@@ -199,18 +252,34 @@ public final class DeckViewModel: ObservableObject {
     }
 
     public func setReviewAcknowledged(_ thread: DeckThread, acknowledged: Bool) {
-        guard thread.isReadyForReview,
-              let review = thread.review,
-              let reviewIdentity = review.identity else { return }
-        apply(
-            .setReviewAcknowledged(
-                threadId: thread.id,
-                reviewUpdatedAt: review.updatedAt,
-                reviewIdentity: reviewIdentity,
-                acknowledged: acknowledged
-            ),
-            actionName: acknowledged ? "Mark reviewed" : "Restore review"
-        )
+        guard canAcknowledgeReviews, thread.isReadyForReview,
+              let review = thread.review, let identity = review.identity,
+              authoritativeSnapshot?.allThreads.contains(where: {
+                  $0.id == thread.id && $0.review?.identity == identity && $0.isReadyForReview
+              }) == true else { return }
+        let receipt = GajendraReviewReceipt(threadId: thread.id, identity: identity)
+        guard !pendingReviewReceipts.contains(receipt) else { return }
+        if acknowledged { pendingReviewReceipts.insert(receipt) }
+        failedReviewAction = nil
+        reviewFeedback = nil
+        errorChannels.mutationSucceeded()
+        apply(.setReviewAcknowledged(threadId: thread.id, reviewUpdatedAt: review.updatedAt,
+            reviewIdentity: identity, acknowledged: acknowledged),
+            actionName: acknowledged ? "Mark reviewed" : "Restore review")
+    }
+
+    public func retryReviewAcknowledgement() {
+        guard canRetryReview, let action = failedReviewAction else { return }
+        failedReviewAction = nil
+        if let receipt = acknowledgementReceipt(action) { pendingReviewReceipts.insert(receipt) }
+        errorChannels.mutationSucceeded()
+        // Keep the operation key: a transport failure may have happened AFTER the durable write.
+        dispatch(action)
+    }
+
+    private func acknowledgementReceipt(_ action: QueuedMutation) -> GajendraReviewReceipt? {
+        guard case let .raw(.setReviewAcknowledged(threadId, _, identity, true)) = action.kind else { return nil }
+        return GajendraReviewReceipt(threadId: threadId, identity: identity)
     }
 
     public func undo() {
@@ -266,6 +335,11 @@ public final class DeckViewModel: ObservableObject {
             historyOperation: action.historyOperation
         )
         activeMutation = dispatchedAction
+        if let receipt = acknowledgementReceipt(dispatchedAction) {
+            pendingReviewReceipts.insert(receipt)
+        } else {
+            reviewFeedback = nil
+        }
         isLoading = true
         isMutating = true
         let request = DeckMutationRequest(
@@ -278,20 +352,41 @@ public final class DeckViewModel: ObservableObject {
             do {
                 let result = try await client.mutate(request)
                 try validateMutationResult(result, against: baseRevision)
-                snapshot = result.snapshot
+                if let receipt = acknowledgementReceipt(dispatchedAction) {
+                    authoritativeSnapshot = result.snapshot.preservingReviewEvidence(from: authoritativeSnapshot, receipt: receipt)
+                } else {
+                    authoritativeSnapshot = result.snapshot
+                }
                 switch result.outcome {
                 case .applied, .replayed:
                     errorChannels.mutationSucceeded()
+                    if acknowledgementReceipt(dispatchedAction) != nil {
+                        failedReviewAction = nil
+                        reviewFeedback = "Review saved."
+                    }
                     completeHistorySuccess(for: dispatchedAction, committedRevision: result.revision)
                 case .conflict, .rejected:
-                    errorChannels.mutationFailed(result.genericUserMessage)
+                    if acknowledgementReceipt(dispatchedAction) != nil {
+                        failedReviewAction = result.outcome == .conflict || result.error?.code == "store-busy" ? dispatchedAction : nil
+                        reviewFeedback = nil
+                        errorChannels.mutationFailed("Review was not saved. The latest result is shown. " + result.genericUserMessage)
+                    } else {
+                        errorChannels.mutationFailed(result.genericUserMessage)
+                    }
                     if result.outcome == .conflict { invalidateHistory() }
                     restoreHistoryAfterFailureIfNeeded(dispatchedAction, invalidate: result.outcome == .conflict)
                 }
             } catch {
-                errorChannels.mutationFailed(genericMutationError(error))
+                if acknowledgementReceipt(dispatchedAction) != nil {
+                    failedReviewAction = dispatchedAction
+                    reviewFeedback = nil
+                    errorChannels.mutationFailed("Couldn’t confirm the review was saved. Retry to check and save it.")
+                } else {
+                    errorChannels.mutationFailed(genericMutationError(error))
+                }
                 restoreHistoryAfterFailureIfNeeded(dispatchedAction, invalidate: false)
             }
+            if let receipt = acknowledgementReceipt(dispatchedAction) { pendingReviewReceipts.remove(receipt) }
             activeMutation = nil
             isLoading = false
             isMutating = false
@@ -390,6 +485,12 @@ public final class DeckViewModel: ObservableObject {
                 reviewIdentity: reviewIdentity,
                 acknowledged: !acknowledged
             )
+        case let .setWorkCompleted(threadId, _, _):
+            guard let thread = snapshot.allThreads.first(where: { $0.id == threadId }) else { return nil }
+            return .setWorkCompleted(threadId: threadId, completed: thread.workState == "completed", currentThreadId: snapshot.current?.id)
+        case let .linkContinuation(threadId, _):
+            guard let thread = snapshot.allThreads.first(where: { $0.id == threadId }) else { return nil }
+            return .linkContinuation(threadId: threadId, currentThreadId: thread.continuationThreadId)
         case let .setCollapsed(level, _):
             let collapsed = level == .focus ? snapshot.collapsed.focus : snapshot.collapsed.important
             return .setCollapsed(level: level, collapsed: collapsed)
@@ -436,6 +537,13 @@ public final class DeckViewModel: ObservableObject {
     }
 
     public func open(_ thread: DeckThread) {
+        // CLI commands are intentionally absent from the launch cache. Wait for fresh discovery
+        // instead of opening our own resume route recursively with an incomplete cached row.
+        if thread.resumeCommand == nil && URL(string: thread.deepLink)?.scheme == "gajendra" {
+            pendingThreadId = thread.id
+            if !isLoading { refresh() }
+            return
+        }
         if let command = thread.resumeCommand {
             openInTerminal(command)
             return
@@ -500,9 +608,15 @@ public final class DeckViewModel: ObservableObject {
 
     private func openPendingThreadIfAvailable() {
         guard let id = pendingThreadId else { return }
-        pendingThreadId = nil
         guard let thread = allThreads.first(where: { $0.id == id }) else {
+            pendingThreadId = nil
             errorChannels.openFailed("That thread is no longer available.")
+            return
+        }
+        guard thread.status != "cached" else { return }
+        pendingThreadId = nil
+        if thread.resumeCommand == nil && URL(string: thread.deepLink)?.scheme == "gajendra" {
+            errorChannels.openFailed("Fresh metadata did not provide a safe resume command for this thread.")
             return
         }
         open(thread)

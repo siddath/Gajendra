@@ -14,11 +14,15 @@ import {
   type DeckMutationResult,
   type DeckSnapshot,
 } from "../shared/contracts.js";
+import { ingestLifecycleEvent, readBoundedLifecycleInput } from "./lifecycle-events.js";
 import { GajendraService } from "./service.js";
+import { ThreadMetadataCache } from "./metadata-cache.js";
+import { resolveCodexExecutable } from "./codex-app-server.js";
+import { callSharedBackend, serveSharedBackend } from "./shared-backend.js";
 
 export const RESOURCE_URI = "ui://gajendra/app-v1.html";
 
-type DeckService = Pick<GajendraService, "snapshot" | "mutate">;
+type DeckService = Pick<GajendraService, "snapshot" | "mutate"> & Partial<Pick<GajendraService, "cachedSnapshot" | "sync" | "readSnapshot">>;
 
 const mutationOptionsSchema = {
   expectedRevision: z.number().int().nonnegative().optional(),
@@ -26,6 +30,8 @@ const mutationOptionsSchema = {
 };
 
 const deckMutationSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("set-work-completed"), threadId: z.string().min(1).max(512), completed: z.boolean(), currentThreadId: z.string().min(1).max(512).nullable().optional() }),
+  z.object({ type: z.literal("link-continuation"), threadId: z.string().min(1).max(512), currentThreadId: z.string().min(1).max(512).nullable() }),
   z.object({ type: z.literal("set-level"), threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable() }),
   z.object({ type: z.literal("set-current"), threadId: z.string().min(1) }),
   z.object({ type: z.literal("move"), threadId: z.string().min(1), direction: z.enum(["up", "down"]) }),
@@ -57,24 +63,57 @@ const deckMutationRequestSchema = z.object({
 });
 
 export function createGajendraServer(service: DeckService = new GajendraService()): McpServer {
-  const server = new McpServer({ name: "gajendra", version: "0.3.1" });
+  const server = new McpServer({ name: "gajendra", version: "0.4.0" });
 
   registerAppResource(server, "gajendra-ui", RESOURCE_URI, { mimeType: RESOURCE_MIME_TYPE }, async () => ({
-    contents: [{ uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: await loadUiHtml() }],
+    contents: [{
+      uri: RESOURCE_URI, mimeType: RESOURCE_MIME_TYPE, text: await loadUiHtml(),
+      _meta: {
+        "openai/ui": { preferredDisplayMode: "fullscreen", availableDisplayModes: ["inline", "fullscreen"] },
+      },
+    }],
   }));
 
   registerAppTool(server, "gajendra_open", {
-    title: "Gajendra",
+    title: "Gajendra priorities",
     description: "Read Gajendra priorities and available task metadata. Resolve the exact canonical thread ID here before changing focus or review state; never guess an ID from a title.",
-    inputSchema: {},
+    inputSchema: { refresh: z.boolean().optional() },
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
       ui: { resourceUri: RESOURCE_URI, visibility: ["app", "model"] },
       "openai/outputTemplate": RESOURCE_URI,
       "openai/widgetAccessible": true,
-      "openai/ui": { entrypoints: [{ type: "global" }] },
+      "openai/ui": { entrypoints: [{ type: "global" }, { type: "thread" }] },
     },
-  }, async () => snapshotToolResult(await service.snapshot()));
+  }, async ({ refresh }) => snapshotToolResult(!refresh && service.readSnapshot
+    ? await service.readSnapshot() : ((!refresh ? await service.cachedSnapshot?.() : null) ?? await service.snapshot())));
+
+  registerAppTool(server, "gajendra_sync", {
+    title: "Check Gajendra revision", description: "Read only the local authoritative revision without scanning providers.",
+    inputSchema: {}, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app"] } },
+  }, async () => {
+    const value = service.sync ? await service.sync() : { revision: (await service.snapshot()).revision };
+    return { structuredContent: value, content: [{ type: "text" as const, text: `Gajendra revision ${value.revision}.` }] };
+  });
+
+  registerAppTool(server, "gajendra_set_work_completed", {
+    title: "Finish or reopen work", description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Finishing NOW clears NOW; priorities and pending review evidence are retained.",
+    inputSchema: { threadId: z.string().min(1).max(512), completed: z.boolean(), currentThreadId: z.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app", "model"] } },
+  }, async ({ threadId, completed, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "set-work-completed", threadId, completed, ...(currentThreadId === undefined ? {} : { currentThreadId }) }, expectedRevision, idempotencyKey,
+  ))));
+
+  registerAppTool(server, "gajendra_link_continuation", {
+    title: "Select exact continuation chat", description: "Only when the user selects an exact successor chat, link its canonical ID to an exact predecessor. Never match titles or infer a continuation. Transfers priority and NOW atomically; old chat remains in History. Null unlinks the most recent edge and transfers priority back. Read gajendra_open first and use its revision.",
+    inputSchema: { threadId: z.string().min(1).max(512), currentThreadId: z.string().min(1).max(512).nullable(), ...mutationOptionsSchema },
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    _meta: { ui: { visibility: ["app", "model"] } },
+  }, async ({ threadId, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
+    { type: "link-continuation", threadId, currentThreadId }, expectedRevision, idempotencyKey,
+  ))));
 
   registerAppTool(server, "gajendra_set_level", {
     title: "Set thread priority",
@@ -232,10 +271,13 @@ async function loadUiHtml(): Promise<string> {
 }
 
 export async function runCompanionCommand(
-  command: "snapshot" | "mutate",
+  command: "snapshot" | "cached-snapshot" | "read" | "sync" | "mutate",
   input: string,
   service: DeckService,
-): Promise<DeckSnapshot | DeckMutationResult> {
+): Promise<DeckSnapshot | DeckMutationResult | { revision: number } | null> {
+  if (command === "sync") return service.sync ? service.sync() : { revision: (await service.snapshot()).revision };
+  if (command === "read") return service.readSnapshot ? service.readSnapshot() : service.snapshot();
+  if (command === "cached-snapshot") return service.cachedSnapshot?.() ?? null;
   if (command === "snapshot") return service.snapshot();
   const parsed = JSON.parse(input) as unknown;
   const request = deckMutationRequestSchema.safeParse(parsed);
@@ -248,10 +290,41 @@ export async function runCompanionCommand(
 
 const companionCommand = process.argv.includes("--snapshot-json")
   ? "snapshot"
-  : process.argv.includes("--mutate-json") ? "mutate" : null;
+  : process.argv.includes("--read-json") ? "read"
+  : process.argv.includes("--cached-snapshot-json") ? "cached-snapshot"
+    : process.argv.includes("--sync-json") ? "sync"
+      : process.argv.includes("--mutate-json") ? "mutate" : null;
 
-if (companionCommand) {
-  const service = new GajendraService();
+function localService(sharedCatalog = false): GajendraService {
+  return new GajendraService(undefined, undefined, { sharedCatalog: sharedCatalog && process.env.GAJENDRA_METADATA_CACHE !== "off",
+    metadataCache: new ThreadMetadataCache({ ...process.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable() }) });
+}
+
+function runtimeService(): DeckService & { close(): Promise<void> } {
+  if (process.env.GAJENDRA_SHARED_BACKEND === "off" || process.platform === "win32") return localService();
+  const env = { ...process.env, GAJENDRA_CODEX_BIN: resolveCodexExecutable() };
+  return {
+    snapshot: () => callSharedBackend("snapshot", "", env) as Promise<DeckSnapshot>,
+    cachedSnapshot: () => callSharedBackend("cached-snapshot", "", env) as Promise<DeckSnapshot | null>,
+    readSnapshot: () => callSharedBackend("read", "", env) as Promise<DeckSnapshot>,
+    sync: () => callSharedBackend("sync", "", env) as ReturnType<GajendraService["sync"]>,
+    mutate: request => callSharedBackend("mutate", JSON.stringify("mutation" in request ? request
+      : { protocolVersion: MUTATION_PROTOCOL_VERSION, mutation: request }), env) as Promise<DeckMutationResult>,
+    close: async () => {},
+  };
+}
+
+if (process.argv.includes("--shared-backend")) {
+  const service = localService(true);
+  await serveSharedBackend((command, input) => runCompanionCommand(command, input, service), () => service.close());
+} else if (process.argv.includes("--lifecycle-event")) {
+  try {
+    const input = await readBoundedLifecycleInput(process.stdin);
+    if (input !== null) await ingestLifecycleEvent(input);
+  } catch { /* Hooks must never block or steer the owning conversation. */ }
+  process.stdout.write("{}\n");
+} else if (companionCommand) {
+  const service = runtimeService();
   try {
     const input = companionCommand === "mutate" ? await readStandardInput() : "";
     process.stdout.write(`${JSON.stringify(await runCompanionCommand(companionCommand, input, service))}\n`);
@@ -262,7 +335,7 @@ if (companionCommand) {
     await service.close();
   }
 } else if (process.argv.includes("--stdio")) {
-  const service = new GajendraService();
+  const service = runtimeService();
   const server = createGajendraServer(service);
   const shutdown = async () => {
     await service.close();

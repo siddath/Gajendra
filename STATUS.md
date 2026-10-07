@@ -4,7 +4,147 @@
 
 **Promise:** One NOW. One short queue. One click back to the exact thread.
 
-**Reconciled:** 2026-09-06
+**Reconciled:** 2026-10-05 (local 0.4.0 implementation accepted; installed parity verified; owner confirmed live navigation)
+
+## 0.4.0 source prerelease preparation — 2026-10-06
+
+The native app and Codex plugin have been updated with title emphasis crossfades, row feedback and
+pointer press response. Navigation and disclosure now dispatch immediately while cosmetic motion
+runs independently. Keyboard and Reduce Motion paths remain immediate. Release review fixed a
+relative-config/provider/catalog scope collision in the shared backend; regression coverage
+preserves sharing for equivalent absolute configurations.
+
+The candidate has 169 passing source tests and 31 passing browser journeys, plus five source-suite
+repetitions and 155 passing repeated browser cases. The partial gauntlet has 18 passing gates and
+three native driver gates not run; the separate CUA checks do not replace those broader gates.
+Coverage includes immediate
+action dispatch, newer-response handling, Undo and accessibility. Native self-tests, release build,
+strict signature and bundle validation pass. Separate CUA journeys verified installed native
+review/Undo and priority changes plus plugin review/Undo. The installed app was returned to real
+metadata; user state stayed byte-identical. An in-place bundle overwrite caused the installed Node
+runtime to be killed; replacing the entire bundle with a fresh copy restored execution. Rollback
+copies remain private. Updated plugin parity includes bundled license notices.
+
+The GitHub update is a source prerelease attached to the PR candidate, not an unreviewed merge or a
+notarized download. [Release changes](docs/releases/0.4.0.md),
+[Codex publication readiness](docs/CODEX_PLUGIN_PUBLICATION.md) and [privacy information](PRIVACY.md)
+cover the current package. Directory submission still needs a supported local-MCP route or approved
+remote architecture, verified publisher and review materials; no official approval is claimed.
+The LinkedIn update is a local owner-review draft and has not been posted. Runtime dependency
+patches clear the production audit. The unpatched build-only braces advisory and its unused
+pattern-matching path are documented in the release notes.
+
+## Shared workflow candidate
+
+The local 0.4.0 candidate gives the native utility and embedded extension the same Ready for Review,
+Needs input, Running, Continue, and History projection. Ready does not expire with age. Explicit
+Finish/Reopen persists across clients/restarts and preserves pending review; finishing NOW clears it
+without silently selecting another task. Exact continuation selection transfers priority/context/
+order/NOW and retains predecessor chats. Opening remains read-only; idle never means finished.
+
+Both surfaces can show a neutral cached view before live refresh, check local revisions about every
+five seconds while visible, and request source refreshes about every thirty seconds plus provider
+latency. Optional lifecycle hooks write one private invalidation token and do not steer Codex or
+mutate work. Installation does not grant hook trust; ordinary polling remains the fallback.
+
+Current verification: `npm run check` passed 139 tests plus TypeScript/build/package checks;
+28 browser journeys passed, including external-sync Undo safety; native self-tests, production
+build/signature and local bundle validation passed. Independent MCP/CLI process synchronization
+passed. Real native synthetic journeys covered Finish/Undo, exact continuation, review, search,
+and an externally written change appearing automatically. The installed native interface was
+then checked against real metadata. User priority state remained byte-for-byte unchanged.
+
+The app and plugin are installed as 0.4.0 with matching artifacts and a private rollback backup.
+A fresh Codex app-server advertises all 12 tools and the UI resource. After the owner's October 5
+reload, this conversation exposes the new lifecycle tools and the embedded panel renders the
+Review/Running/Continue/History navigation. An initial source failure showed saved metadata and
+an explicit diagnostic; a subsequent live refresh returned 245 Codex chats, 75 Ready and one
+Running, with no cached marker. Its exact initial failure cause is unproven. The corrected live
+probe now requires the Codex source itself to be ready and also passes with 245 chats. All 139
+source tests/build checks passed again, installed runtime hashes match, and private state bytes
+remain unchanged. Panel interaction inspection timed out after the initial rendered observation.
+The owner then confirmed the requested Open thread and return/NOW-preservation journey with
+“It works, resume the goal and finish it.” This closes live navigation acceptance through owner
+confirmation, not an automated click receipt. Final checks reconfirmed all 11 plugin artifacts,
+four native artifacts, the shared backend, and unchanged private state at revision 218. Optional
+hooks remain untrusted. The local implementation goal is complete; no public release is claimed.
+
+On October 5 the owner separately reported that the native launcher does not open over fullscreen
+Codex. A [focused recovery patch](worksheets/2026-10-05-fullscreen-launcher.md) reconciles the logical
+open flag with AppKit visibility and active-Space state. Native tests and repository checks pass;
+the owner's exact fullscreen case remains unconfirmed. Earlier chat-navigation acceptance does not
+close this new report. The owner subsequently confirmed that the recovery patch did not resolve
+it. A temporary metadata-only diagnostic build then captured a successful physical click, and the
+owner reported that opening now works. The cause of the earlier failure remains unproven; temporary
+diagnostics have been removed. The subsequent installed cleanup removes compact row More controls
+and the duplicate Continue shortcut, labels open priorities Your priorities, and gives Ready for
+Review a tray mark. The plugin uses matching labels. Source/native checks and installed parity pass;
+the seven saved priorities remain unchanged. Details and limitations are in the worksheet.
+
+The next owner-requested layout refinement removes the remaining top work navigation from both
+surfaces. Your priorities is centered in primary text; Edit remains on the right, and Focus and
+Important have equally emphasized, aligned headers. The local app/plugin are updated and all
+nine native files and eleven plugin artifacts match. All 139 source tests, native self-tests and
+bundle/signature checks pass. Browser verification covered normal and 360px widths; native layout
+was checked with synthetic SwiftUI renders. Automated launcher clicks did not leave the Details
+card visible for live inspection in this pass, so live opening is not reconfirmed. Priority state
+remains byte-for-byte unchanged at revision 218.
+
+The October 5 [Review and History UX pass](worksheets/2026-10-05-review-history-ux.md) is implemented
+and installed locally. Review/Running headings share aligned geometry; review rows use named
+checkmark actions and omit the orange Task ornament. Exact-response dismissal is immediate, with
+asynchronous durable saving, failure restoration, idempotent Retry, Undo, and protection for newer
+responses. History separates All/Reviewed/Finished and provides direct return paths. Emil-family
+audit findings and evidence are recorded in the worksheet. All 156 source tests, final TypeScript/
+build checks, native self-tests and local bundle/signature validation passed. Synthetic browser
+journeys covered delayed success/failure, retry, keyboard focus, newer responses, filters, Undo, and
+360px layout. Installed native Details/Organizer were visually inspected; no real review was changed.
+Nine native and eleven plugin artifacts match; private state remains unchanged at revision 220.
+Existing embedded panels need reopening to load the new UI. No public release is claimed.
+
+The follow-up hover pass is also installed locally. Ready, Running, Focus and Important have
+full heading highlights and brief icon feedback; rows gain weight without moving their controls.
+Reduce Motion uses static feedback. Keyboard collapse and History filters preserve focus after
+rendering. Final review preserved the previous multiline NOW allowance. All 156 source tests,
+native self-tests, production build, strict signature and local readiness checks passed. Synthetic
+CUA journeys verified save/failure/Retry/Undo and narrow layout; the final installed widget opens
+with real metadata. All nine native files and eleven plugin artifacts match the final build; private
+state remains byte-identical at revision 220. The worksheet records hashes, rollback paths, audit
+closure and the physical accessibility/system-toggle limits. No publication or provider mutation.
+
+The October 5 [shared backend/cache performance pass](worksheets/2026-10-05-backend-cache-performance.md)
+is implemented and installed locally. Native and MCP clients share a private session backend with
+prepared catalog reads, coalesced refreshes, revision synchronization and durable local writes.
+Supported Codex metadata-only listing removes the measured rollout-scan bottleneck; periodic full
+reconciliation remains. Controlled three-sample medians improved full refresh from 15.05 seconds
+to 0.797 seconds (94.7% lower) and local writes from 15.92 seconds to 0.113 seconds (99.3% lower).
+Final installed warm refreshes took 646–671 ms, prepared reads 90–94 ms and writes 101–117 ms;
+the new-owner cold refresh took 2.86 seconds. These are backend CLI timings, not UI-render latency.
+All 167 source tests, TypeScript/build checks, native self-tests and signature/bundle validation
+passed. Synthetic native priority, review and Undo interactions passed. The normal installed widget
+then rendered 449 real threads; state remained byte-identical at revision 220. Nine native and
+eleven plugin artifacts match, with rollback copies retained. Existing embedded panels need
+reopening. This remains the bounded local trial; no public release or provider mutation occurred.
+
+The [daily workflow trial](docs/DAILY-WIDGET.md) retains the October 1 cache receipts and the owner's
+one-week adoption decision. Preserve private state and its backup before rollback: older v3 writers
+can discard lifecycle/continuation/cleared-NOW fields. No source publication is authorized here.
+
+## Local Codex extension recovery
+
+Version 0.3.2 adds supported sidebar/conversation entrypoints, initial-result rendering, connection
+retry and visible navigation errors. It repairs Claude directory-budget exhaustion, recognizes
+Codex's new bundled CLI path, and explains provider failures/unresolved saved priorities in both
+surfaces. The state investigation found preserved priorities, not an erased store; one saved task
+is archived in Codex. See [extension use](docs/CODEX_EXTENSION.md) and the
+[current verification worksheet](worksheets/2026-10-03-product-experience.md).
+The 0.4.0 local acceptance is recorded above; this is not a new public release. The dated release
+receipts below describe earlier builds.
+
+The embedded refinement follows host style variables in Native/Auto appearance, retains search
+through updates, and moves source switches into explicit settings. The installed Codex conversation
+panel was observed and its navigation was owner-confirmed. Advertised entrypoints alone do not
+establish availability in other hosts or accounts, or OpenAI first-party ownership.
 
 **Public state:** source is public on `main`; no signed/notarized binary or mobile release is
 claimed.
@@ -64,7 +204,7 @@ in [PR #23](https://github.com/siddath/Gajendra/pull/23), including explicit ben
 runner ownership, asset types, source-build Node requirements, rebuilt artifacts, and current
 validation evidence. Earlier dated launch receipts below do not substitute for these checks.
 
-## Current user-facing state
+## Historical merged user-facing state (before the local 0.4.0 candidate)
 
 | Area | Current merged behavior | Boundary that remains open |
 | --- | --- | --- |
@@ -136,8 +276,8 @@ distribution, mobile, or publication gates.
 
 ## Open gates
 
-- Reload the Codex desktop host, which was already running when the plugin was installed, then
-  complete the visible in-host icon, open, Search, exact-task return, and persistent-NOW proof.
+- Optional hook trust remains a separate owner decision; normal polling already operates without it.
+
 - Clean-Mac installation and independent offline-path proof.
 - Physical VoiceOver, status-item accessibility, manual drag, keyboard/system-toggle, and login-item
   receipts.
