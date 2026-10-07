@@ -1,0 +1,6 @@
+{
+  "extends": "../plugins/gajendra/tsconfig.json",
+  "include": [
+    "./run.mts"
+  ]
+}

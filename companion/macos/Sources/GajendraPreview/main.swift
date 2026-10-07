@@ -144,7 +144,7 @@ enum GajendraPreview {
         // The titles mirror common Codex and Claude workflows without copying any private thread.
         let launchReviewSignal = reviewSignal(
             kind: .diff,
-            updatedAt: 1_786_475_030,
+            updatedAt: 1_791_331_030,
             destination: ReviewDestination(
                 type: .url,
                 url: "https://example.invalid/reviews/gajendra-launch"
@@ -161,7 +161,7 @@ enum GajendraPreview {
             sourceId: "codex",
             sourceName: "Codex",
             status: "working",
-            updatedAt: 1_786_475_100
+            updatedAt: 1_791_331_100
         )
         let launchClaudeStory = thread(
             "launch-story",
@@ -171,8 +171,8 @@ enum GajendraPreview {
             context: .design,
             sourceId: "claude",
             sourceName: "Claude",
-            status: "working",
-            updatedAt: 1_786_475_080
+            status: "idle",
+            updatedAt: 1_791_331_080
         )
         let launchCodexInteraction = thread(
             "launch-interaction",
@@ -182,7 +182,7 @@ enum GajendraPreview {
             context: .engineering,
             sourceId: "codex",
             sourceName: "Codex",
-            updatedAt: 1_786_475_060
+            updatedAt: 1_791_331_060
         )
         let launchClaudeSetup = thread(
             "launch-setup",
@@ -192,7 +192,7 @@ enum GajendraPreview {
             context: .design,
             sourceId: "claude",
             sourceName: "Claude",
-            updatedAt: 1_786_475_040
+            updatedAt: 1_791_331_040
         )
         let launchCodexRelease = thread(
             "launch-release",
@@ -202,7 +202,7 @@ enum GajendraPreview {
             context: .engineering,
             sourceId: "codex",
             sourceName: "Codex",
-            updatedAt: 1_786_475_020
+            updatedAt: 1_791_331_020
         )
         let launchReviewThread = thread(
             "launch-review",
@@ -210,7 +210,7 @@ enum GajendraPreview {
             "Launch",
             sourceId: "demo-review",
             sourceName: "Demo Review Feed",
-            updatedAt: 1_786_475_010,
+            updatedAt: 1_791_331_010,
             review: launchReviewSignal
         )
         let launchSources = [
@@ -228,7 +228,7 @@ enum GajendraPreview {
             ),
         ]
         let launchSnapshot = DeckSnapshot(
-            generatedAt: "2026-08-18T00:00:00Z",
+            generatedAt: "2026-10-07T00:00:00Z",
             current: launchNow,
             focus: [launchNow, launchClaudeStory, launchCodexInteraction],
             important: [launchClaudeSetup, launchCodexRelease],
@@ -250,7 +250,7 @@ enum GajendraPreview {
             context: .design,
             sourceId: "codex",
             sourceName: "Codex",
-            updatedAt: 1_786_475_100
+            updatedAt: 1_791_331_100
         )
         let launchReviewSnapshot = DeckSnapshot(
             generatedAt: launchSnapshot.generatedAt,
@@ -393,15 +393,15 @@ enum GajendraPreview {
         )
         try renderCard(
             model: launchModel,
-            theme: .nativePopover,
-            appearance: .light,
+            theme: .focusDeck,
+            appearance: .dark,
             size: .expanded,
             destination: launchOverviewDestination
         )
         try renderCard(
             model: launchReviewModel,
-            theme: .nativePopover,
-            appearance: .light,
+            theme: .focusDeck,
+            appearance: .dark,
             size: .expanded,
             destination: launchReviewDestination
         )
@@ -428,8 +428,8 @@ enum GajendraPreview {
                 usesScrollView: false,
                 isPreview: true
             ),
-            width: 620,
-            height: 900,
+            width: 820,
+            height: 980,
             destination: launchOrganizerDestination,
             colorScheme: .light
         )

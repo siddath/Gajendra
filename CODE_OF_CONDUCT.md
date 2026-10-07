@@ -19,6 +19,17 @@ This standard applies in the repository, issue tracker, pull requests, discussio
 
 ## Enforcement
 
-Report conduct concerns privately to the maintainer through [GitHub's private vulnerability-reporting channel](https://github.com/siddath/Gajendra/security/advisories/new), marking the report as a conduct matter. Reports will be reviewed confidentially and in good faith. Maintainers may edit or remove contributions and may temporarily or permanently restrict participation when behavior threatens the community or project.
+For abuse on GitHub, use the affected issue, pull request or comment's **Report content** menu.
+Choose **Report to repository admins** when that option is available, or **Report abuse to GitHub
+Support**. GitHub also provides a [direct reporting route](https://docs.github.com/en/communities/maintaining-your-safety-on-github/reporting-abuse-or-spam).
+These reports go to the recipient you select; a report to GitHub Support is not a report to this
+project's maintainer. Do not post sensitive allegations, private conversations or personal details
+in a public issue. Security vulnerability reporting is reserved for security issues, as described
+in [SECURITY.md](SECURITY.md).
+
+Maintainers review reports they receive in good faith and limit unnecessary disclosure. They may
+request more context, remove harmful content, warn a participant, or temporarily or permanently
+restrict participation. A maintainer involved in a report should not decide its outcome; use
+GitHub Support when an independent repository maintainer is unavailable.
 
 Enforcement decisions will consider context, impact, repair, and the safety of affected participants. Retaliation against a reporter is prohibited.

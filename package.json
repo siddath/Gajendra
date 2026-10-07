@@ -2,14 +2,14 @@
   "name": "gajendra-repository",
   "version": "0.4.0",
   "private": true,
-  "description": "Gajendra — One clear focus across your AI tools. One NOW. One short queue. One click back to the exact thread.",
+  "description": "Gajendra \u2014 One clear focus across your AI tools. One NOW. One short queue. One click back to the exact thread.",
   "workspaces": [
     "plugins/gajendra"
   ],
   "scripts": {
     "build": "npm --workspace gajendra run build",
     "check": "npm run check:scripts && npm --workspace gajendra run check && npm run validate:plugin",
-    "check:scripts": "node --check scripts/verify-product-sync.mjs && node --check scripts/host-preflight.mjs && node --check scripts/install-local.mjs && node --check scripts/live-mcp-probe.mjs && node --check scripts/release-readiness.mjs && node --check scripts/release-readiness.test.mjs && node --check scripts/render-launch-hero.mjs && node --check scripts/run-gauntlet.mjs && node --check scripts/validate-companion.mjs && node --check scripts/validate-launch-assets.mjs && node --check scripts/validate-plugin.mjs && npm run test:release-readiness && npm run validate:launch-assets",
+    "check:scripts": "node --check scripts/run-evals.mjs && node --check scripts/verify-product-sync.mjs && node --check scripts/host-preflight.mjs && node --check scripts/install-local.mjs && node --check scripts/live-mcp-probe.mjs && node --check scripts/release-readiness.mjs && node --check scripts/release-readiness.test.mjs && node --check scripts/render-launch-hero.mjs && node --check scripts/run-gauntlet.mjs && node --check scripts/validate-companion.mjs && node --check scripts/validate-launch-assets.mjs && node --check scripts/validate-plugin.mjs && npm run test:release-readiness && npm run validate:launch-assets",
     "companion:build": "zsh companion/macos/scripts/build-app.zsh",
     "companion:bundle-readiness": "node scripts/release-readiness.mjs local",
     "companion:preview": "zsh companion/macos/scripts/render-preview.zsh",
@@ -30,7 +30,8 @@
     "probe:live": "node scripts/live-mcp-probe.mjs",
     "release:distribution-readiness": "node scripts/release-readiness.mjs distribution",
     "test:release-readiness": "node scripts/release-readiness.test.mjs",
-    "validate:plugin": "node scripts/validate-plugin.mjs"
+    "validate:plugin": "node scripts/validate-plugin.mjs",
+    "evals": "node scripts/run-evals.mjs"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

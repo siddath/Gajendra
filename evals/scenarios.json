@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "prepared-work",
+      "intent": "Read often and change priorities without waiting for a provider scan.",
+      "acceptance": "Seven prepared reads and seven local writes preserve current revisions with one initial provider collection; report service timings without a machine-specific latency gate."
+    },
+    {
+      "id": "concurrent-intent",
+      "intent": "Keep the chosen NOW when another client submits stale state.",
+      "acceptance": "Exactly one NOW in Focus, stale write rejected, retry replayed without another revision."
+    },
+    {
+      "id": "response-review",
+      "intent": "Review exactly the response I saw, with Undo.",
+      "acceptance": "Opening leaves Ready intact; acknowledgement obtains fresh evidence; Undo restores; later responses reappear and old evidence is rejected."
+    },
+    {
+      "id": "explicit-lifecycle",
+      "intent": "Finish, reopen and continue work in an exact successor chat.",
+      "acceptance": "Finish clears NOW without auto-promotion, keeps pending review, Reopen leaves NOW unselected, exact continuation preserves predecessor history."
+    },
+    {
+      "id": "private-restart",
+      "intent": "Keep useful saved metadata without claiming stale provider activity.",
+      "acceptance": "Disk cache is neutral with no live review or commands; account scopes cannot reuse it; priority store excludes titles; cache is owner-readable only."
+    },
+    {
+      "id": "cross-client",
+      "intent": "Use the native widget and Codex plugin interchangeably.",
+      "acceptance": "The compiled native CLI and MCP tools see shared revisions, preserve concurrent winners, and agree on Finish/Reopen/continuation/history."
+    }
+  ]
+}

@@ -12,6 +12,7 @@ const gates = [
   { id: "static", command: "npm", args: ["--workspace", "gajendra", "run", "typecheck"] },
   { id: "behavior", command: "npm", args: ["test"] },
   { id: "build", command: "npm", args: ["run", "build"] },
+  { id: "product-evals", command: "npm", args: ["run", "evals"] },
   { id: "plugin", command: "npm", args: ["run", "validate:plugin"] },
   { id: "live-mcp", command: "npm", args: ["run", "probe:live"] },
   { id: "companion-self-test", command: "npm", args: ["run", "companion:test"] },

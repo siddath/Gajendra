@@ -25,7 +25,7 @@ private last-known-good copy can restore it. Legacy Aadi/Priority Deck data is c
 Setting `GAJENDRA_DATA_DIR` creates an isolated state scope. It does not discover or consume legacy
 `~/.codex` data unless a migration was explicitly requested.
 
-The local 0.4.0 candidate retains store version 3 and the existing file path. Optional
+Version 0.4.0 retains store version 3 and the existing file path. Optional
 `completedThreadIds`, `continuations`, and `nowSelection` fields add bounded IDs/relationships and
 an enum; existing source/collapse preferences retain boolean values. Legacy files remain readable.
 Finish can clear NOW even when other Focus rows remain. Older clients cannot represent that choice.

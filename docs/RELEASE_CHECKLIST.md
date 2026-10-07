@@ -1,9 +1,13 @@
 # Release checklist
 
-Checked items have a current 2026-08-24 working-candidate receipt. They are not a binary-release
-claim.
+Current 0.4.0 evidence is linked from [Status](../STATUS.md), [product evals](EVALS.md) and the
+[gauntlet report](../evidence/gauntlet/report.json). The current restricted gauntlet is **partial**,
+with native AX-driver gates not run.
 
-## Frozen local candidate
+The checked list below preserves the **historical 2026-08-24** working-candidate receipt; it is not
+current-code verification or a binary-release claim.
+
+## Historical frozen local candidate
 
 - [x] Freeze writers and record exact candidate state.
 - [x] Run focused source suites, npm run check, and npm run test:e2e.

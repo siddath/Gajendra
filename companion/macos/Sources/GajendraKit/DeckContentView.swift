@@ -1038,16 +1038,21 @@ public struct DeckContentView: View {
                     .font(.subheadline.weight(.semibold))
                 Spacer()
                 if normalizedQuery.isEmpty {
-                    Picker("History filter", selection: $historyFilter) {
-                        ForEach(GajendraHistoryFilter.allCases) { filter in
-                            Text(filter.title).tag(filter)
+                    if isPreview {
+                        // ImageRenderer cannot draw the AppKit-backed segmented picker.
+                        Text(historyFilter.title).font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Picker("History filter", selection: $historyFilter) {
+                            ForEach(GajendraHistoryFilter.allCases) { filter in
+                                Text(filter.title).tag(filter)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .controlSize(.small)
+                        .labelsHidden()
+                        .frame(maxWidth: 250)
+                        .accessibilityLabel("Filter History")
                     }
-                    .pickerStyle(.segmented)
-                    .controlSize(.small)
-                    .labelsHidden()
-                    .frame(maxWidth: 250)
-                    .accessibilityLabel("Filter History")
                 }
             }
             ForEach(Array(matches.prefix(historyVisibleCount))) { thread in

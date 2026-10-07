@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.4.0 release candidate — 2026-10-06
+## 0.4.0 — 2026-10-07
 
 - Native and Codex plugin now share one local backend, prepared metadata reads and durable
   revision-aware writes. A controlled three-sample local benchmark reduced median full refresh
@@ -18,7 +18,9 @@
 - Added bounded lifecycle invalidation, cache configuration isolation, offline saved views and
   cross-process concurrency regression coverage.
 
-- Patched three runtime dependency advisories; the production audit reports zero findings.
+- Added six reproducible product evals with acceptance criteria, per-case JSON results and CI/release gates.
+- Refreshed the README screenshots and hero with the current Focus Deck UI and a warm ivory backdrop; updated contribution and conduct guidance. The MIT license remains unchanged.
+- Updated the development toolchain and patched runtime dependency advisories; the production audit reports zero findings.
   The unpatched build-only braces advisory remains documented with its unused matching path.
 
 See [release details and known limits](docs/releases/0.4.0.md).
