@@ -6,6 +6,24 @@
 
 **Reconciled:** 2026-10-05 (local 0.4.0 implementation accepted; installed parity verified; owner confirmed live navigation)
 
+## 0.4.0 source release closure — 2026-10-07
+
+The five pending PRs were resolved in ascending order: #34 merged (`e37d370`), #38 merged
+(`cb37ac4`), #39 closed because its ip-address update was already included, #40 merged (`b8495bb`),
+and #41 merged (`e523ddb`). Each merge followed passing current hosted checks; no admin bypass.
+MCP Apps stays on compatible 1.7.5; SDK 1.31.0 and current transitives carry the runtime fixes.
+
+The release update adds six explicit product evals to CI and the gauntlet, current SwiftUI renders,
+a new ivory Focus Deck hero, fresh isolated native/plugin screenshots, corrected community docs,
+and current third-party notices. Both 2026 MIT license copies were reviewed and remain unchanged.
+The source release uses `v0.4.0`; the earlier RC tag remains historical. See
+[release notes](docs/releases/0.4.0.md), [eval workflow](docs/EVALS.md), and
+[capture provenance](evidence/launch/README.md). The [LinkedIn draft](worksheets/2026-10-07-gajendra-040-linkedin-draft.md) remains unpublished.
+
+The release gauntlet remains partial in this environment, with three native AX-driver gates not
+run. Separate CUA review/Undo checks do not establish those broader native latency/fullscreen gates.
+The following dated sections retain earlier implementation and prerelease context.
+
 ## 0.4.0 source prerelease preparation — 2026-10-06
 
 The native app and Codex plugin have been updated with title emphasis crossfades, row feedback and

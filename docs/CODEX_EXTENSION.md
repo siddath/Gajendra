@@ -1,6 +1,6 @@
 # Local Codex extension
 
-The local Gajendra 0.4.0 candidate advertises MCP App extension metadata for a sidebar entry and a
+The Gajendra 0.4.0 plugin advertises MCP App extension metadata for a sidebar entry and a
 conversation panel, with inline and fullscreen display support. OpenAI's extension guide
 currently describes these surfaces for ChatGPT; availability in a particular Codex build
 must be checked in that host. Both entrypoints accept empty
@@ -92,7 +92,7 @@ does not establish full native release acceptance; Developer ID, notarization, p
 
 ## Public repository package and directory status
 
-The 0.4.0 candidate includes the shared backend, workflow controls and motion feedback in the
+Version 0.4.0 includes the shared backend, workflow controls and motion feedback in the
 Codex plugin. Plugin-only users need Node.js matching `plugins/gajendra/package.json` and locally
 installed providers. Reopen panels and reload the host after an update.
 

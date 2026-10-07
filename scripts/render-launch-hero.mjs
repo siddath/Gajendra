@@ -33,7 +33,7 @@ const heroCopy = reviewVariant
       tagline: "One clear focus across your AI tools.",
       promise: "One NOW. One short queue. One click back to the exact thread.",
       features: ["NOW", "Running", "Ready for Review"],
-      sources: "Local-first macOS utility for Codex and Claude workflows",
+      sources: "macOS utility + Codex plugin · v0.4.0",
       productAlt: "Gajendra app overview with synthetic data",
     };
 const background = await pngDataUrl(path.join(launchRoot, backgroundName));
@@ -54,19 +54,19 @@ try {
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
       color: #171b20;
-      background: #edf4f7 url("${background}") center / cover no-repeat;
+      background: #eee9df url("${background}") center / cover no-repeat;
     }
     .veil {
       position: absolute;
       inset: 0;
       background:
-        linear-gradient(90deg, rgba(247, 250, 250, .92) 0%, rgba(247, 250, 250, .8) 34%, rgba(247, 250, 250, .12) 68%),
+        linear-gradient(90deg, rgba(247, 244, 236, .7) 0%, rgba(247, 244, 236, .4) 34%, rgba(247, 244, 236, 0) 68%),
         radial-gradient(circle at 18% 64%, rgba(255, 204, 100, .22), transparent 31%);
     }
     .copy {
       position: absolute;
       left: 92px;
-      top: 104px;
+      top: 136px;
       width: 540px;
       z-index: 2;
     }
@@ -77,7 +77,7 @@ try {
       padding: 14px;
       border-radius: 25px;
       background: rgba(255,255,255,.7);
-      box-shadow: 0 18px 55px rgba(38, 54, 68, .12), inset 0 0 0 1px rgba(255,255,255,.82);
+      box-shadow: 0 18px 55px rgba(65, 51, 25, .08), inset 0 0 0 1px rgba(255,255,255,.82);
     }
     h1 { margin: 0; font-size: 72px; line-height: .98; letter-spacing: -3.5px; }
     .tagline {
@@ -117,7 +117,7 @@ try {
       width: ${reviewVariant ? "760px" : "800px"};
       right: ${reviewVariant ? "42px" : "52px"};
       top: ${reviewVariant ? "46px" : "72px"};
-      filter: drop-shadow(0 35px 55px rgba(20, 35, 50, .27));
+      filter: drop-shadow(0 35px 55px rgba(50, 40, 22, .24));
     }
     .caption {
       position: absolute;

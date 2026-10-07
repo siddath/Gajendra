@@ -13,7 +13,7 @@ const assets = new Map([
   ["gajendra-launch-ready-for-review.png", [1520, 1360]],
   ["gajendra-launch-search.png", [1320, 1220]],
   ["gajendra-launch-queue-editing.png", [1320, 1220]],
-  ["gajendra-launch-organizer.png", [1240, 1800]],
+  ["gajendra-launch-organizer.png", [1640, 1960]],
   ["gajendra-linkedin-ready-review-v2.png", [1536, 1024]],
   ["gajendra-ready-review-hero-background-v2.png", [1536, 1024]],
 ]);
@@ -77,7 +77,7 @@ for (const required of [
   "gajendra-launch-overview.png",
   "Actual app UI · Synthetic demo data",
   "One clear focus across your AI tools.",
-  "Local-first macOS utility for Codex and Claude workflows",
+  "macOS utility + Codex plugin · v0.4.0",
   "Review is a decision, not an unread badge.",
   "gajendra-launch-ready-for-review.png",
   "gajendra-linkedin-ready-review-v2.png",

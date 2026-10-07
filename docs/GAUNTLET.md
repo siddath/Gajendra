@@ -1,31 +1,23 @@
 # Release gauntlet
 
-The widget-sizing and settings-polish candidate has a **passing local gauntlet receipt**:
-[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json) records all 21 gates passing on
-2026-09-05 (20:09–20:18 UTC; September 6 locally) for implementation/test commit
-`bd43025d94bf46264c9be8c3517e7266cf8503bf`. It covers 115 source tests plus five complete repeats,
-17 primary browser journeys plus 85 repeated journeys, live MCP, native self-test/build, real-window
-interaction including aligned dropdown selection and independent layout/size controls, synthetic
-full-screen reopen, strict widget performance, final artifacts, and zero production vulnerabilities.
+The current 0.4.0 source-release run is recorded in
+[`evidence/gauntlet/report.json`](../evidence/gauntlet/report.json). It uses `--non-native-ui` and
+reports **partial**: the three AX-driver native UI/fullscreen/performance gates are not run in
+this restricted UI-control environment. Product evals are now a separate required gate. Narrow
+CUA interaction checks are recorded separately and do not replace those three gates.
 
-The [widget-sizing notes](WIDGET-SIZING-2026-09-06.md) record the initial sizing receipt, earlier
-failed timing sample, unchanged-code recheck, final settings-polish timings, and installed result.
-Publication, hosted CI, and merge receipts are tracked in
-[PR #33](https://github.com/siddath/Gajendra/pull/33), separately from this local receipt. The previous dependency gauntlet remains available in
-[the merged PR #23 receipt](https://github.com/siddath/Gajendra/blob/fbb9e608eaaec53a15054c537439528ceef94376/evidence/gauntlet/report.json).
+The September 5 all-gates pass is historical evidence for the earlier sizing/settings build,
+linked from [PR #33](https://github.com/siddath/Gajendra/pull/33) and the
+[widget-sizing notes](WIDGET-SIZING-2026-09-06.md). It is not a pass for the current code.
 
-This is local candidate evidence, not a clean-Mac, physical VoiceOver/login/manual-drag,
-Developer ID, notarization, distribution, publication, or mobile receipt. The procedure below is
-the required rerun sequence if the candidate changes.
-
-After the earlier August run, a [privacy-reviewed synthetic image](../evidence/launch/README.md) and an
-evidence-bounded [local post draft](../worksheets/GAJENDRA_LINKEDIN_POST_DRAFT.md) were created.
-They remain unapproved and unpublished, and do not extend the gauntlet's proof boundary.
+Source checks, hosted CI, installed behavior, signing/notarization, clean-Mac acceptance and
+publication are distinct receipts. The procedure below is the required rerun sequence when a
+change invalidates a gate.
 
 ## Required sequence
 
 1. Freeze all writers; capture the exact worktree/commit boundary.
-2. Run focused server/store/source tests, npm run check, and npm run test:e2e.
+2. Run focused server/store/source tests, `npm run check`, `npm run evals`, and `npm run test:e2e`.
 3. Freeze native source, then run companion self-tests, build, isolated real-window launcher UI,
    the synthetic full-screen launcher and Dock/reopen journey (`npm run companion:ui-fullscreen-test`),
    measured widget-performance journey, companion validator, and local bundle-readiness.

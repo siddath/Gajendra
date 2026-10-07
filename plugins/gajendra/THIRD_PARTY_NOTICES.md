@@ -5,9 +5,9 @@ Gajendra's generated UI and server bundles include code from these direct runtim
 | Package | Version | Upstream | Declared license |
 | --- | --- | --- | --- |
 | `@modelcontextprotocol/ext-apps` | 1.7.5 | https://github.com/modelcontextprotocol/ext-apps | Package metadata: MIT; upstream LICENSE records an Apache-2.0 transition with remaining MIT contributions |
-| `@modelcontextprotocol/sdk` | 1.30.0 | https://github.com/modelcontextprotocol/typescript-sdk | MIT |
+| `@modelcontextprotocol/sdk` | 1.31.0 | https://github.com/modelcontextprotocol/typescript-sdk | MIT |
 | `gsap` | 3.15.0 | https://gsap.com | GreenSock standard no-charge license: https://gsap.com/standard-license |
-| `zod` | 4.4.3 | https://github.com/colinhacks/zod | MIT |
+| `zod` | 4.6.5 | https://github.com/colinhacks/zod | MIT |
 
 Exact upstream license texts from installed versions are distributed in `third_party_licenses/` when
 the package ships a license file. GSAP's npm package identifies its online standard no-charge

@@ -9,12 +9,14 @@ One NOW. One short queue. One click back to the exact thread.</p>
 
 ![Gajendra product hero showing the real macOS app UI with synthetic Codex and Claude workflow data](evidence/launch/gajendra-hero.png)
 
-Gajendra is a local-first macOS focus utility for AI-agent threads. It gives you one place to decide
+Gajendra is a local-first macOS focus utility and Codex plugin for AI-agent threads. It gives you one place to decide
 what deserves attention across Codex, Claude Code, and other explicitly enabled local sources—then
 returns you to the owning tool when it is time to work.
 
 It does not replace those tools or copy their conversations. It adds a small, quiet attention layer
 above them.
+
+**[v0.4.0 source release and Codex plugin](https://github.com/siddath/Gajendra/releases/tag/v0.4.0)** · [Release notes](docs/releases/0.4.0.md) · [Product evals](docs/EVALS.md)
 
 ## Why Gajendra exists
 
@@ -29,7 +31,7 @@ the missing piece is a trusted answer to four simple questions:
 
 Gajendra keeps those answers close without becoming another project-management system.
 
-The local **0.4.0 candidate** gives the Mac utility and Codex extension one shared view of Ready
+**Version 0.4.0** gives the Mac utility and Codex extension one shared view of Ready
 for Review, verified Needs input, Running, Your priorities, and History. Finish work and Reopen are explicit
 choices. An exact continuation moves priority to its selected successor and preserves the earlier
 chat in History. Age is only a history grouping; it never hides pending review or finishes work.
@@ -37,7 +39,8 @@ See the [daily workflow trial](docs/DAILY-WIDGET.md) for acceptance and rollback
 
 ## Product tour
 
-These are historical deterministic screenshots of the real SwiftUI views, not proof of the 0.4.0 layout. Every title, project, ID, and status
+Fresh 0.4.0 captures rendered on October 7, 2026, from the real SwiftUI views. The main image uses
+the dark Focus Deck style; search and editing show the native light style. Every title, project, ID, and status
 comes from a public synthetic fixture shaped like common Codex and Claude workflows; no private
 thread content is used.
 
@@ -94,6 +97,7 @@ priority actions; the source project still makes no signed/notarized binary clai
 ```sh
 git clone https://github.com/siddath/Gajendra.git gajendra
 cd gajendra
+git checkout v0.4.0
 npm ci
 npm run companion:build
 open build/Gajendra.app
@@ -133,23 +137,35 @@ refresh the loaded MCP server. Open **Gajendra priorities** from the plugin's si
 from a conversation's panel menu. Calling `gajendra_open` also works in compatible inline MCP App
 hosts. The extension shares the Mac app's private priority store; opening it does not reset NOW.
 
+![Gajendra Codex plugin UI captured from the 0.4.0 synthetic browser preview](evidence/launch/gajendra-plugin-040.jpg)
+
 Both surfaces can first show a labeled neutral cached view, then refresh from providers. While
 visible, they check local revisions about every five seconds and request source refreshes about
 every thirty seconds. Provider latency still applies. Optional plugin lifecycle hooks can invalidate
 completion reuse sooner, but require explicit host review and trust; ordinary polling still works
 when hooks are skipped. This is a custom local plugin, not an OpenAI first-party feature.
 
-The October 5 performance candidate shares a private session backend between the Mac app and
+Version 0.4.0 shares a private session backend between the Mac app and
 plugin. Prepared reads and local changes use its catalog; provider discovery runs separately.
 Codex listing uses its supported metadata-only API with periodic full reconciliation. In the local
 three-run comparison, median refresh fell from 15.05 seconds to 0.80 seconds and local writes from
-15.92 seconds to 0.11 seconds. These are backend timings, not popup latency guarantees. See the
+15.92 seconds to 0.11 seconds: **94.7%** and **99.3%** reductions respectively. Cutting repeated
+provider scans and retaining metadata drove the improvement. These are backend timings, including
+CLI process overhead, not popup latency guarantees. See the
 [performance receipt](worksheets/2026-10-05-backend-cache-performance.md) for scope and rollback.
 
 Sources must be available on the Mac where the MCP server runs. If a source cannot load, its
 diagnostic and the count of unavailable saved priorities remain visible. Archived provider tasks
 can be absent from active results while their saved Gajendra choices remain intact. Do not reset
 the store to fix a blank view. See the [extension recovery notes](docs/CODEX_EXTENSION.md).
+
+## Development with evals
+
+`npm run build && npm run evals` runs six synthetic product scenarios for cache reuse, concurrent
+intent, review/Undo, Finish/Reopen/continuation, private saved metadata, and MCP/native consistency.
+CI and the release gauntlet run them too. Every case has an explicit acceptance criterion and a
+machine-readable outcome; measured timings stay separate from correctness. See the
+[eval-driven development workflow](docs/EVALS.md) and [contribution guide](CONTRIBUTING.md).
 
 ## Local-first privacy
 
@@ -197,10 +213,11 @@ captured in the [adversarial launch review](evidence/verification/2026-08-24-adv
 
 ## Release boundary
 
-The source repository is public and the current local candidate has source, browser, native,
-real-window launcher, bundle, and local-gauntlet receipts. There is no downloadable release claimed
-here: the app has not yet completed Developer ID signing, notarization, stapling, Gatekeeper, and
-clean-Mac distribution proof. Build from source if you want to try it today.
+The public **v0.4.0 source and Codex plugin ZIP** are available from the release page. The native
+macOS app is built from source; no notarized native installer is included. Source/browser checks,
+product evals, native builds and narrow CUA journeys have separate receipts. The current gauntlet
+is **partial**, with three native AX-driver gates not run. Developer ID signing, notarization,
+stapling, Gatekeeper and clean-Mac distribution proof remain separate requirements.
 
 The retained mobile work is a documentation-only protocol and security plan, not a shipped iOS or
 Android companion. See the [mobile plan](worksheets/GAJENDRA_MOBILE_APP_PLAN.md).

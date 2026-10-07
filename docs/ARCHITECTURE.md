@@ -4,8 +4,8 @@ Gajendra — **One clear focus across your AI tools.** — keeps at most one sel
 and an Important queue while each provider retains its own sessions and credentials. Its promise is
 **One NOW. One short queue. One click back to the exact thread.**
 
-This describes the local **0.4.0 source candidate**. Earlier installed receipts do not prove this
-candidate. Current installation/host acceptance, clean-Mac, physical accessibility, signing,
+This describes the **0.4.0 source release**. Earlier installed receipts do not prove this
+release. Current installation/host acceptance, clean-Mac, physical accessibility, signing,
 notarization, and distribution require their own evidence.
 
 ```mermaid
@@ -131,7 +131,7 @@ the optional batch. Other built-ins and remote adapters remain outside that auth
 Each source declares safe destination schemes. URLs are normalized and checked when catalog data is
 accepted and again immediately before a host/native open. The web surface also binds immutable
 thread/review intent at render time and re-resolves that exact destination from the current
-authoritative snapshot after its press animation, so mutable DOM attributes or a concurrent refresh
+authoritative snapshot at dispatch, without waiting for decorative press feedback, so mutable DOM attributes or a concurrent refresh
 cannot redirect an Open action. Unknown, whitespace-padded, encoded, `javascript:`, `data:`, and
 `file:` URLs fail closed.
 

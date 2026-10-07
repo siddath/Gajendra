@@ -16,4 +16,4 @@ Preserve these hard boundaries:
 - the standard inline MCP App must survive removal of the experimental global entry point;
 - the floating utility must not be described as a WidgetKit extension;
 - do not claim native behavior, provider resume, publication, signing, or notarization without matching proof;
-- run `npm run check` for ordinary changes and `npm run gauntlet` before release claims.
+- run `npm run check` and `npm run evals` for behavior changes; use the acceptance criteria in `docs/EVALS.md`; run `npm run gauntlet` before release claims and retain explicit not-run gates.
