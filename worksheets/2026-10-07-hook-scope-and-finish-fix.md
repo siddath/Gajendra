@@ -42,3 +42,11 @@ native/MCP readers used the shared app directory. Existing Finish semantics reta
 
 The app and state backups remain local and private. Reload Codex to adopt updated skill/tool copy.
 The existing v0.4.0 tag and published release artifacts are unchanged by this repair.
+
+## CI follow-up
+
+The first Linux CI run passed 169/170 tests, but a process-tree fixture missed its 1.5-second
+startup deadline under concurrent file execution. The test runner now runs files sequentially;
+all process termination assertions and time budgets remain unchanged. `VITEST_MAX_WORKERS`
+is not a supported setting in this installed Vitest version, so the earlier command did not
+actually bound concurrency. The runner configuration makes that bound explicit.
