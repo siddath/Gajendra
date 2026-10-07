@@ -1,0 +1,137 @@
+{
+  "suite": "gajendra-product-evals-v1",
+  "status": "passed",
+  "revision": "504901b125bb953d2ff4e56230037e9ffc580d0b",
+  "dirty": false,
+  "serverSha256": "91aa39c8a2f400d77e37d28a6b7e84c80edab01eb83d83d63acd308f966ffb32",
+  "suiteSha256": "3ffb521f417b7bbbd5814db8c78b09f76ea92c656aa1d915df0f311f6187f830",
+  "timestamp": "2026-10-07T08:40:36.526Z",
+  "runtime": "v26.3.0",
+  "platform": "darwin-arm64",
+  "scope": "Synthetic service scenarios plus compiled MCP/CLI journey. Service timings exclude process startup, providers and UI rendering; no LLM routing is evaluated.",
+  "criteria": [
+    {
+      "id": "prepared-work",
+      "intent": "Read often and change priorities without waiting for a provider scan.",
+      "acceptance": "Seven prepared reads and seven local writes preserve current revisions with one initial provider collection; report service timings without a machine-specific latency gate."
+    },
+    {
+      "id": "concurrent-intent",
+      "intent": "Keep the chosen NOW when another client submits stale state.",
+      "acceptance": "Exactly one NOW in Focus, stale write rejected, retry replayed without another revision."
+    },
+    {
+      "id": "response-review",
+      "intent": "Review exactly the response I saw, with Undo.",
+      "acceptance": "Opening leaves Ready intact; acknowledgement obtains fresh evidence; Undo restores; later responses reappear and old evidence is rejected."
+    },
+    {
+      "id": "explicit-lifecycle",
+      "intent": "Finish, reopen and continue work in an exact successor chat.",
+      "acceptance": "Finish clears NOW without auto-promotion, keeps pending review, Reopen leaves NOW unselected, exact continuation preserves predecessor history."
+    },
+    {
+      "id": "private-restart",
+      "intent": "Keep useful saved metadata without claiming stale provider activity.",
+      "acceptance": "Disk cache is neutral with no live review or commands; account scopes cannot reuse it; priority store excludes titles; cache is owner-readable only."
+    },
+    {
+      "id": "cross-client",
+      "intent": "Use the native widget and Codex plugin interchangeably.",
+      "acceptance": "The compiled native CLI and MCP tools see shared revisions, preserve concurrent winners, and agree on Finish/Reopen/continuation/history."
+    }
+  ],
+  "results": [
+    {
+      "id": "prepared-work",
+      "status": "passed",
+      "durationMs": 293.77,
+      "evidence": {
+        "providerCollections": 1,
+        "operations": {
+          "reads": 8,
+          "writes": 7
+        },
+        "serviceReadMs": {
+          "median": 14.72,
+          "samples": [
+            19.78,
+            14.37,
+            14.72,
+            14.37,
+            16.32,
+            20.36,
+            13.92
+          ]
+        },
+        "serviceWriteMs": {
+          "median": 18.99,
+          "samples": [
+            18.99,
+            17.46,
+            17.3,
+            20.56,
+            21.6,
+            29.91,
+            16.7
+          ]
+        }
+      }
+    },
+    {
+      "id": "concurrent-intent",
+      "status": "passed",
+      "durationMs": 60.87,
+      "evidence": {
+        "winner": "codex:one",
+        "revision": 1,
+        "replay": "preserved",
+        "staleWrite": "rejected"
+      }
+    },
+    {
+      "id": "response-review",
+      "status": "passed",
+      "durationMs": 133.07,
+      "evidence": {
+        "openDoesNotAcknowledge": true,
+        "undoRestores": true,
+        "newResponseVisible": true,
+        "staleEvidence": "rejected"
+      }
+    },
+    {
+      "id": "explicit-lifecycle",
+      "status": "passed",
+      "durationMs": 225.72,
+      "evidence": {
+        "finishClearsNow": true,
+        "pendingReviewPreserved": true,
+        "continuation": "codex:next"
+      }
+    },
+    {
+      "id": "private-restart",
+      "status": "passed",
+      "durationMs": 73.26,
+      "evidence": {
+        "cacheActivity": "neutral",
+        "accountIsolation": true,
+        "durableTitles": false,
+        "cacheMode": "0600"
+      }
+    },
+    {
+      "id": "cross-client",
+      "status": "passed",
+      "durationMs": 2294.96,
+      "evidence": {
+        "clients": [
+          "MCP stdio",
+          "native CLI"
+        ],
+        "sharedRevisionAndLifecycle": true
+      }
+    }
+  ]
+}
