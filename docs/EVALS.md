@@ -61,6 +61,22 @@ the real CLI/backend path: three samples per operation, 15.0501 s to 0.7969 s me
 lower), and 15.9177 s to 0.1128 s local write (99.3% lower). Repeat that method with the same source
 scope, runtime and private copied state before making a new real-source performance claim.
 
+## Native Space and launcher journey
+
+On a Mac, verify the installed native surface separately from the deterministic service evals:
+
+1. Open the card with one launcher click, switch between a desktop and a full-screen app, and
+   confirm that both launcher and card remain visible and usable without activating Gajendra.
+2. Dismiss the card, repeat the transition, and confirm only the launcher follows. Reopen it with
+   one click and use search immediately. Repeat close/reopen while metadata refreshes.
+3. Check the launcher in light/dark themes: no refractive glass ripple or refresh opacity pulse;
+   keep its full click target and Reduce Motion behavior.
+
+The existing `companion:ui-fullscreen-test` journey now opens the card **before** the full-screen
+transition and checks actual active-Space membership and full opacity. Its bounded Space receipt
+is emitted only with the existing UI probe enabled and an isolated test defaults suite/data path.
+Retain native UI evidence separately: compiling that harness is not running its journey.
+
 ## Codex host evals
 
 The plugin's [reviewer cases](CODEX_PLUGIN_PUBLICATION.md) include tool choice, ambiguous requests,

@@ -110,7 +110,7 @@ enum GajendraUITest {
         Thread.sleep(forTimeInterval: 0.3)
 
         if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "full-screen" {
-            try verifyFullScreenOverlay(pid: rawPID, appURL: appURL)
+            try verifyFullScreenOverlay(pid: rawPID, appURL: appURL, stateURL: stateURL)
             return GajendraUIJourneyMetrics(
                 prewarmedRevealMilliseconds: 0, coldPopupMilliseconds: 0,
                 warmPopupMilliseconds: 0, statusItemCompactSurfaceObserved: false,
@@ -1510,7 +1510,7 @@ enum GajendraUITest {
     }
 
     /// Own the full-screen host in this test process so no user's app or document is changed.
-    private static func verifyFullScreenOverlay(pid: pid_t, appURL: URL) throws {
+    private static func verifyFullScreenOverlay(pid: pid_t, appURL: URL, stateURL: URL) throws {
         let application = NSApplication.shared
         application.setActivationPolicy(.regular)
         application.finishLaunching()
@@ -1554,6 +1554,9 @@ enum GajendraUITest {
             try tapWithoutSettling(frame.center)
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: true, label: "card before Space transition")
+        let transitionStartedAt = ProcessInfo.processInfo.systemUptime
         host.toggleFullScreen(nil)
         let deadline = Date().addingTimeInterval(10)
         while !(enteredFullScreen && host.isOnActiveSpace
@@ -1567,6 +1570,27 @@ enum GajendraUITest {
                 "synthetic host did not enter full-screen readiness; entered=\(enteredFullScreen) activeSpace=\(host.isOnActiveSpace) frontPID=\(NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0) hostPID=\(getpid())"
             )
         }
+        try waitForCard(pid: pid, visible: true, label: "open card follows full-screen Space")
+        let spaceProbe = stateURL.deletingLastPathComponent().appendingPathComponent(".gajendra-ui-space.json")
+        let probeDeadline = Date().addingTimeInterval(5)
+        var followedSpace = false
+        repeat {
+            if let data = try? Data(contentsOf: spaceProbe),
+               let evidence = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+                followedSpace = (evidence["uptime"] as? Double ?? 0) >= transitionStartedAt
+                    && evidence["pillOnActiveSpace"] as? Bool == true
+                    && evidence["cardPresented"] as? Bool == true
+                    && evidence["cardVisible"] as? Bool == true
+                    && evidence["cardOnActiveSpace"] as? Bool == true
+                    && evidence["cardAlpha"] as? Double == 1
+            }
+            if !followedSpace { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+        } while !followedSpace && Date() < probeDeadline
+        guard followedSpace else {
+            throw GajendraUITestError.failed("open card did not follow the full-screen Space at full opacity")
+        }
+        try tapCurrentPill(pid: pid)
+        try waitForCard(pid: pid, visible: false, label: "dismiss followed card")
         try tapCurrentPill(pid: pid)
         try waitForCard(pid: pid, visible: true, label: "card over full-screen host")
         guard host.isOnActiveSpace, host.styleMask.contains(.fullScreen),

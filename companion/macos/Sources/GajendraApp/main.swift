@@ -7,7 +7,7 @@ import SwiftUI
 private final class GajendraOverlayPanel: NSPanel {
     private let acceptsKeyboardInput: Bool
     var onPointerEvent: ((NSEvent) -> Void)?
-    var cardAnimationGeneration = 0
+    var cardPresentationGeneration = 0
 
     init(contentRect: NSRect, acceptsKeyboardInput: Bool) {
         self.acceptsKeyboardInput = acceptsKeyboardInput
@@ -134,6 +134,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var cardWindow: GajendraOverlayPanel?
     private var statusItem: NSStatusItem?
     private var workspaceActivationObserver: NSObjectProtocol?
+    private var activeSpaceObserver: NSObjectProtocol?
     private var lastExternalApplication: NSRunningApplication?
     private var screenParametersObserver: NSObjectProtocol?
     private var cardPresentation = GajendraCardPresentationState()
@@ -236,6 +237,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         removePillEditDismissalMonitors()
         let center = NSWorkspace.shared.notificationCenter
         if let workspaceActivationObserver { center.removeObserver(workspaceActivationObserver) }
+        if let activeSpaceObserver { center.removeObserver(activeSpaceObserver) }
         if let screenParametersObserver {
             NotificationCenter.default.removeObserver(screenParametersObserver)
         }
@@ -260,7 +262,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             }
         }
         recordUIReopenProbe()
-        presentCardFromPillOrReopen(prewarmed: true)
+        presentCardFromPillOrReopen()
         return true
     }
 
@@ -355,7 +357,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func presentStatusPopover(from button: NSStatusBarButton) {
-        dismissPresentedCard(animated: false)
+        dismissPresentedCard()
         updatePopoverSize(for: preferredScreen())
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
@@ -365,7 +367,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func showOrganizer() {
-        dismissPresentedCard(animated: false)
+        dismissPresentedCard()
         popover.performClose(nil)
         stopSurfaceRefresh()
         let window = organizerWindow ?? makeOrganizerWindow()
@@ -375,7 +377,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func showSourceOnboarding(refresh: Bool = true) {
-        dismissPresentedCard(animated: false)
+        dismissPresentedCard()
         popover.performClose(nil)
         stopSurfaceRefresh()
         if refresh { model.refresh() }
@@ -419,7 +421,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
 
     private func hidePill() {
         pillEditController.exit()
-        dismissPresentedCard(animated: false)
+        dismissPresentedCard()
         pillWindow?.orderOut(nil)
         UserDefaults.standard.set(true, forKey: pillHiddenKey)
         updatePillVisibilityMenuState()
@@ -446,7 +448,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             // jump by the threshold distance on the first accepted drag sample.
             pillDragStart = panel.frame.origin
             pillDragPointerStart = pointerLocation
-            dismissPresentedCard(animated: false)
+            dismissPresentedCard()
             if !ended { return }
         }
         let proposed = GajendraOverlayPlacement.draggedOrigin(
@@ -542,7 +544,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         }
     }
 
-    private func presentCardFromPillOrReopen(prewarmed: Bool = false) {
+    private func presentCardFromPillOrReopen() {
         guard !pillEditController.isEditing else { return }
         if UserDefaults.standard.bool(forKey: pillHiddenKey),
            let button = statusItem?.button {
@@ -552,52 +554,40 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         if !cardPresentation.isPresented {
             _ = cardPresentation.toggle(isVisibleOnActiveSpace: false)
         }
-        presentCardSurface(animated: !prewarmed)
+        presentCardSurface()
     }
 
-    private func presentCardSurface(animated: Bool = true) {
+    private func presentCardSurface() {
         if popover.isShown {
             popover.performClose(nil)
         }
-        showCard(animated: animated)
+        showCard()
         surfaceRefreshLifecycle.handoffToCard()
         installCardDismissalMonitors()
         refreshPresentedCardAfterReveal()
         startSurfaceRefresh()
     }
 
-    private func dismissPresentedCard(animated: Bool = true) {
+    private func dismissPresentedCard() {
         guard cardPresentation.dismiss() else { return }
         removeCardDismissalMonitors()
         cardWindow?.makeFirstResponder(nil)
-        if animated {
-            hideCard()
-        } else {
-            hideCardImmediately()
-        }
+        hideCard()
     }
 
-    private func showCard(animated: Bool = true) {
+    private func showCard() {
         guard !pillEditController.isEditing else { return }
         cardInteractionSession.resetTransientState()
         let panel = cardWindow ?? makeCardPanel()
-        let wasVisible = panel.isVisible
         cardWindow = panel
-        panel.cardAnimationGeneration += 1
+        panel.cardPresentationGeneration += 1
         resizeCard(for: pillWindow?.screen ?? preferredScreen(), animated: false)
         positionCard()
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || !animated {
-            panel.alphaValue = 1
-            orderCardFront(panel)
-        } else {
-            orderCardFront(panel)
-            if !wasVisible { panel.alphaValue = 0 }
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                context.allowsImplicitAnimation = true
-                panel.animator().alphaValue = 1
-            }
-        }
+        // Window-level fades can overlap a quick reopen or a Space transition, leaving a
+        // transparent panel that still takes clicks. Keep the window immediately usable;
+        // hover/press feedback remains within the content and respects Reduce Motion.
+        panel.alphaValue = 1
+        orderCardFront(panel)
     }
 
     private func orderCardFront(_ panel: GajendraOverlayPanel) {
@@ -628,52 +618,27 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     }
 
     private func refreshPresentedCardAfterReveal() {
-        let generation = cardWindow?.cardAnimationGeneration ?? 0
+        let generation = cardWindow?.cardPresentationGeneration ?? 0
         // Yield one main-loop turn so the prebuilt card can paint first. Calling refresh even when
         // another load is active is intentional: DeckViewModel coalesces it into one follow-up,
         // which prevents an in-flight launch read from swallowing the visible-surface refresh.
         DispatchQueue.main.async { [weak self] in
             guard let self,
                   self.cardPresentation.isPresented,
-                  self.cardWindow?.cardAnimationGeneration == generation else { return }
+                  self.cardWindow?.cardPresentationGeneration == generation else { return }
             self.model.refresh(prepared: true)
         }
     }
 
     private func togglePillEditModeFromPointer() {
-        dismissPresentedCard(animated: false)
+        dismissPresentedCard()
         pillEditController.toggle()
     }
 
     private func hideCard() {
         stopSurfaceRefresh()
         cardInteractionSession.resetTransientState()
-        guard let panel = cardWindow, panel.isVisible else { return }
-        panel.cardAnimationGeneration += 1
-        let generation = panel.cardAnimationGeneration
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            panel.orderOut(nil)
-            panel.alphaValue = 1
-            return
-        }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.14
-            context.allowsImplicitAnimation = true
-            panel.animator().alphaValue = 0
-        } completionHandler: { [weak panel] in
-            guard let panel, panel.cardAnimationGeneration == generation else { return }
-            // The AX/UI harness (and a real user) may act as soon as the fade reaches zero.
-            // Complete the visibility transition in this main-thread callback so a following
-            // click cannot observe a transparent-but-still-ordered panel as the warm surface.
-            panel.orderOut(nil)
-            panel.alphaValue = 1
-        }
-    }
-
-    private func hideCardImmediately() {
-        stopSurfaceRefresh()
-        cardInteractionSession.resetTransientState()
-        cardWindow?.cardAnimationGeneration += 1
+        cardWindow?.cardPresentationGeneration += 1
         cardWindow?.orderOut(nil)
         cardWindow?.alphaValue = 1
     }
@@ -991,7 +956,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey),
                       let panel = self.pillWindow else { return }
                 let screen = panel.screen ?? self.preferredScreen()
-                self.dismissPresentedCard(animated: false)
+                self.dismissPresentedCard()
                 panel.setFrameOrigin(GajendraOverlayPlacement.origin(
                     for: anchor,
                     windowSize: panel.frame.size,
@@ -1011,7 +976,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                 guard let self else { return }
                 self.resetPillDrag()
                 if isEditing {
-                    self.dismissPresentedCard(animated: false)
+                    self.dismissPresentedCard()
                     self.installPillEditDismissalMonitors()
                 } else {
                     self.removePillEditDismissalMonitors()
@@ -1292,7 +1257,6 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         panel.setAccessibilityLabel("Gajendra focus pill")
         let hostingView = GajendraPillHostingView(
             rootView: GajendraPillView(
-                model: model,
                 visualSettings: visualSettings,
                 editController: pillEditController,
                 onActivate: { [weak self] in self?.toggleCardFromPill() },
@@ -1384,12 +1348,48 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         // Full-screen eligibility applies on every supported OS, independently of the newer
         // Stage Manager/all-apps role. Both the launcher and prewarmed card need this policy.
         var behavior: NSWindow.CollectionBehavior = [
-            .canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle,
+            .canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle,
         ]
         if #available(macOS 15.0, *) {
             behavior.insert(.canJoinAllApplications)
         }
         panel.collectionBehavior = behavior
+    }
+
+    private func restoreOverlaysOnActiveSpace() {
+        guard !UserDefaults.standard.bool(forKey: pillHiddenKey) else { return }
+        // A swipe between Spaces need not activate a different application. Reassert the
+        // floating surfaces after that transition without activating Gajendra or taking focus.
+        // Logical presentation, not isVisible, prevents a dismissed card from coming back.
+        pillWindow?.orderFrontRegardless()
+        if cardPresentation.isPresented, let panel = cardWindow {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        }
+    }
+
+    private func recordUISpaceProbe() {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["GAJENDRA_UI_TEST_PROBE"] == "1",
+              environment["GAJENDRA_UI_TEST_DEFAULTS_SUITE"]?.hasPrefix("dev.sid.gajendra.ui-test.") == true,
+              let directory = environment["GAJENDRA_DATA_DIR"] else { return }
+        // Opt-in test evidence only: no titles, provider data, or user preferences. Waiting one
+        // turn lets AppKit finish applying the Space membership before the harness reads it.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let evidence: [String: Any] = [
+                "uptime": ProcessInfo.processInfo.systemUptime,
+                "pillVisible": self.pillWindow?.isVisible ?? false,
+                "pillOnActiveSpace": self.pillWindow?.isOnActiveSpace ?? false,
+                "cardPresented": self.cardPresentation.isPresented,
+                "cardVisible": self.cardWindow?.isVisible ?? false,
+                "cardOnActiveSpace": self.cardWindow?.isOnActiveSpace ?? false,
+                "cardAlpha": self.cardWindow?.alphaValue ?? 0,
+            ]
+            guard let data = try? JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys]) else { return }
+            let marker = URL(fileURLWithPath: directory).appendingPathComponent(".gajendra-ui-space.json")
+            try? data.write(to: marker, options: .atomic)
+        }
     }
 
     private func preferredScreen() -> NSScreen {
@@ -1436,9 +1436,18 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
                    activated.processIdentifier != ProcessInfo.processInfo.processIdentifier {
                     self.lastExternalApplication = activated
                 }
-                guard !UserDefaults.standard.bool(forKey: self.pillHiddenKey) else { return }
-                self.pillWindow?.orderFrontRegardless()
-                if self.cardWindow?.isVisible == true { self.cardWindow?.orderFrontRegardless() }
+                self.restoreOverlaysOnActiveSpace()
+            }
+        }
+
+        activeSpaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.restoreOverlaysOnActiveSpace()
+                self?.recordUISpaceProbe()
             }
         }
 

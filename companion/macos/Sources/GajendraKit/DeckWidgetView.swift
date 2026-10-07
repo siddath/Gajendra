@@ -490,7 +490,6 @@ public struct GajendraGlassSurface: View {
 }
 
 public struct GajendraPillView: View {
-    @ObservedObject private var model: DeckViewModel
     @ObservedObject private var visualSettings: GajendraVisualSettings
     @ObservedObject private var editController: GajendraPillEditController
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -503,7 +502,6 @@ public struct GajendraPillView: View {
     private let onRequestUninstall: () -> Void
 
     public init(
-        model: DeckViewModel,
         visualSettings: GajendraVisualSettings,
         editController: GajendraPillEditController,
         onActivate: @escaping () -> Void = {},
@@ -512,7 +510,6 @@ public struct GajendraPillView: View {
         onHide: @escaping () -> Void = {},
         onRequestUninstall: @escaping () -> Void = {}
     ) {
-        self.model = model
         self.visualSettings = visualSettings
         self.editController = editController
         self.onActivate = onActivate
@@ -527,7 +524,6 @@ public struct GajendraPillView: View {
             pillLabel
                 .frame(width: 60, height: 60)
                 .contentShape(Rectangle())
-                .opacity(model.isLoading ? 0.72 : 1)
                 .scaleEffect(isHovered && !editController.isEditing ? 1.05 : 1)
 
             if editController.isEditing {
@@ -552,7 +548,6 @@ public struct GajendraPillView: View {
         .onHover { hovered in
             isHovered = hovered
         }
-        .animation(reduceMotion ? nil : .spring(response: 0.24, dampingFraction: 0.82), value: model.isLoading)
         .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.78), value: isHovered)
         .simultaneousGesture(
             DragGesture(minimumDistance: GajendraOverlayPlacement.dragThreshold)
@@ -626,22 +621,14 @@ public struct GajendraPillView: View {
     private var pillSurface: some View {
         let radius: CGFloat = visualSettings.theme == .focusDeck ? 14 : 24
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        Group {
-            if #available(macOS 26.0, *) {
-                shape
-                    .fill(.clear)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: radius))
-                    .background(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.62 : 0.14) : Color.clear, in: shape)
-            } else {
-                shape
-                    .fill(.ultraThinMaterial)
-                    .overlay(shape.fill(visualSettings.theme == .focusDeck ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.58 : 0.14) : (colorScheme == .dark ? Color.gajendraIndigo.opacity(0.28) : Color.white.opacity(0.2))))
-            }
-        }
-        // This view lives inside a fixed 60x60 transparent panel. A wide outer blur is clipped to
-        // that rectangular boundary, which is the occasional rectangular shadow users could see
-        // behind the rounded mark. Keep the material and border, but no window-edge blur.
-        .clipShape(shape)
+        // A fixed, opaque surface avoids Liquid Glass refraction and a disabled-looking fade
+        // on every background refresh. The 60x60 launcher remains available while data loads.
+        shape
+            .fill(Color(nsColor: .windowBackgroundColor))
+            .overlay(shape.fill(visualSettings.theme == .focusDeck
+                ? Color.gajendraIndigoSoft.opacity(colorScheme == .dark ? 0.58 : 0.14)
+                : Color.clear))
+            .allowsHitTesting(false)
     }
 
     private var pillBorder: some View {
@@ -653,6 +640,7 @@ public struct GajendraPillView: View {
                     : (colorScheme == .dark ? Color.white.opacity(0.2) : Color.gajendraIndigo.opacity(0.18)),
                 lineWidth: 1
             )
+            .allowsHitTesting(false)
     }
 }
 
