@@ -861,6 +861,25 @@ enum GajendraSelfTest {
             "launcher drag engagement must consume its recognition dead zone without jumping"
         )
         var cardPresentation = GajendraCardPresentationState()
+        var clickSequence = GajendraPillClickSequence()
+        try require(!clickSequence.entersEditMode(clickCount: 1, firstClickClosesCard: true), "closing must remain an immediate primary action")
+        try require(!clickSequence.entersEditMode(clickCount: 2, firstClickClosesCard: false), "rapid close/reopen must not enter move mode")
+        for count in 3...6 {
+            try require(!clickSequence.entersEditMode(clickCount: count, firstClickClosesCard: count.isMultiple(of: 2)), "continued rapid clicks must remain actionable")
+        }
+        try require(!clickSequence.entersEditMode(clickCount: 1, firstClickClosesCard: false), "a fresh launcher sequence must open immediately")
+        try require(clickSequence.entersEditMode(clickCount: 2, firstClickClosesCard: true), "a deliberate double-click starting closed must retain move mode")
+        try require(GajendraHoverMotion.runs(hovered: true, reduceMotion: false, visible: true), "visible pointer feedback should loop")
+        try require(!GajendraHoverMotion.runs(hovered: false, reduceMotion: false, visible: true)
+            && !GajendraHoverMotion.runs(hovered: true, reduceMotion: true, visible: true)
+            && !GajendraHoverMotion.runs(hovered: true, reduceMotion: false, visible: false),
+            "hover loops must stop on pointer exit, Reduce Motion, and hidden surfaces")
+        let earlyPhase = GajendraHoverMotion.phase(elapsed: 0.1)
+        let repeatedPhase = GajendraHoverMotion.phase(elapsed: 0.1 + GajendraHoverMotion.loopDuration * 3)
+        try require(abs(earlyPhase - repeatedPhase) < 0.0001, "status artwork must repeat across multiple loop cycles")
+        try require(abs(GajendraHoverMotion.barScale(index: 0, phase: earlyPhase)
+            - GajendraHoverMotion.barScale(index: 0, phase: 0.6)) > 0.1,
+            "Running artwork must continue changing while hovered")
         try require(!cardPresentation.isPresented, "card must start hidden")
         try require(cardPresentation.toggle(isVisibleOnActiveSpace: false), "the first icon click must present the card")
         try require(cardPresentation.isPresented, "the card must stay presented without hover state")

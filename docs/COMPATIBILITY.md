@@ -76,7 +76,14 @@ the transient Mission Control role rather than desktop-like stationary behavior.
 
 The launcher uses an opaque theme surface across supported macOS versions. Background refreshes
 do not fade it, and card visibility changes are immediate so a transparent window cannot intercept
-clicks. Local hover/press feedback still respects Reduce Motion.
+clicks. Rapid clicks that start by closing the card remain show/hide actions, including the
+second and later clicks in the same sequence. A double-click starting with the card closed
+still enters move mode.
+
+Row hover backgrounds span the complete record, including its provider and action area. Title
+emphasis reserves the bold text footprint to avoid reflow. Running and Ready for Review artwork
+loops only while hovered on a visible surface; pointer exit, a hidden window, and Reduce Motion
+stop the loop. Only the small artwork updates on the animation timeline.
 
 ## Build versus binary compatibility
 

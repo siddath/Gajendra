@@ -126,6 +126,7 @@ public struct DeckContentView: View {
         .padding(16)
         .frame(minWidth: usesScrollView ? 520 : 430, minHeight: 650, alignment: .topLeading)
         .background(organizerSurface)
+        .gajendraMotionVisibility()
         .coordinateSpace(name: "gajendra-organizer")
         .onPreferenceChange(GajendraOrganizerTaskFramePreferenceKey.self) { frames in
             DispatchQueue.main.async {
