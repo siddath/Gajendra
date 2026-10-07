@@ -161,6 +161,7 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
     private var pillDragDidMove = false
     private var pillPointerDownLocation: NSPoint?
     private var pillPointerMoved = false
+    private var pillClickSequence = GajendraPillClickSequence()
     private let popover = NSPopover()
     private let pillSize = NSSize(width: 60, height: 60)
     private let pillHiddenKey = "gajendra.pill.hidden"
@@ -1013,9 +1014,11 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
             pillPointerDownLocation = nil
             pillPointerMoved = false
             guard shouldClick else { return }
-            if clickCount == 2 {
+            let closesVisibleCard = cardPresentation.isPresented
+                && cardWindow.map { $0.isVisible && $0.isOnActiveSpace } == true
+            if pillClickSequence.entersEditMode(clickCount: clickCount, firstClickClosesCard: closesVisibleCard) {
                 togglePillEditModeFromPointer()
-            } else if clickCount == 1 {
+            } else {
                 pillEditController.performPrimaryAction { toggleCardFromPill() }
             }
         default:

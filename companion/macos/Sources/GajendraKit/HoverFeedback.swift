@@ -5,10 +5,79 @@ private struct GajendraHoverKey: EnvironmentKey {
     static let defaultValue = false
 }
 
+private struct GajendraMotionVisibleKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
 extension EnvironmentValues {
     var gajendraHovered: Bool {
         get { self[GajendraHoverKey.self] }
         set { self[GajendraHoverKey.self] = newValue }
+    }
+    var gajendraMotionVisible: Bool {
+        get { self[GajendraMotionVisibleKey.self] }
+        set { self[GajendraMotionVisibleKey.self] = newValue }
+    }
+}
+
+/// Prewarmed NSHostingViews stay mounted when their panel is ordered out. Observe the owning
+/// window once per surface so hover loops stop even when SwiftUI never sends onDisappear.
+private struct GajendraMotionVisibility: ViewModifier {
+    @State private var visible = false
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.gajendraMotionVisible, visible)
+            .background(GajendraWindowVisibilityReader { visible = $0 }.allowsHitTesting(false))
+    }
+}
+
+private struct GajendraWindowVisibilityReader: NSViewRepresentable {
+    var onChange: (Bool) -> Void
+
+    func makeNSView(context: Context) -> VisibilityView {
+        let view = VisibilityView()
+        view.onChange = onChange
+        return view
+    }
+
+    func updateNSView(_ view: VisibilityView, context: Context) {
+        view.onChange = onChange
+        view.publishVisibility()
+    }
+
+    final class VisibilityView: NSView {
+        var onChange: ((Bool) -> Void)?
+        private var observer: NSObjectProtocol?
+        private var lastVisible: Bool?
+
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            if let window {
+                observer = NotificationCenter.default.addObserver(
+                    forName: NSWindow.didChangeOcclusionStateNotification, object: window, queue: .main
+                ) { [weak self] _ in self?.publishVisibility() }
+            }
+            publishVisibility()
+        }
+
+        func publishVisibility() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let visible = self.window.map { $0.isVisible && $0.occlusionState.contains(.visible) } ?? false
+                guard self.lastVisible != visible else { return }
+                self.lastVisible = visible
+                self.onChange?(visible)
+            }
+        }
     }
 }
 
@@ -18,11 +87,12 @@ private struct GajendraHoverFeedback: ViewModifier {
     let drawsBackground: Bool
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.gajendraMotionVisible) private var surfaceVisible
     @State private var hovered = false
 
     func body(content: Content) -> some View {
         content
-            .environment(\.gajendraHovered, hovered)
+            .environment(\.gajendraHovered, hovered && surfaceVisible)
             .background {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(tint.opacity(colorScheme == .dark ? 0.16 : 0.10))
@@ -32,10 +102,16 @@ private struct GajendraHoverFeedback: ViewModifier {
             }
             .contentShape(Rectangle())
             .onHover { hovered = $0 }
+            .onChange(of: surfaceVisible) { if !$0 { hovered = false } }
+            .onDisappear { hovered = false }
     }
 }
 
 extension View {
+    func gajendraMotionVisibility() -> some View {
+        modifier(GajendraMotionVisibility())
+    }
+
     func gajendraHoverFeedback(tint: Color = .primary, drawsBackground: Bool = true) -> some View {
         modifier(GajendraHoverFeedback(tint: tint, drawsBackground: drawsBackground))
     }
@@ -57,7 +133,7 @@ struct GajendraRecordTitle: View {
             .opacity(0)
             .overlay(alignment: .leading) {
                 Text(title)
-                    .font(font.weight(.medium))
+                    .font(font)
                     .lineLimit(lineLimit)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .opacity(hovered ? 0 : 1)
@@ -95,34 +171,59 @@ enum GajendraHoverIconKind {
     case running, review, focus, important
 }
 
-/// A single reversible hover transition, with no timers, repeating animation, or layout changes.
+public enum GajendraHoverMotion {
+    public static let loopDuration: TimeInterval = 0.96
+
+    public static func runs(hovered: Bool, reduceMotion: Bool, visible: Bool) -> Bool {
+        hovered && !reduceMotion && visible
+    }
+
+    public static func phase(elapsed: TimeInterval) -> Double {
+        max(0, elapsed).truncatingRemainder(dividingBy: loopDuration) / loopDuration
+    }
+
+    public static func barScale(index: Int, phase: Double) -> Double {
+        1 + 0.24 * sin(2 * .pi * phase + Double(index) * .pi / 2)
+    }
+}
+
+/// Only the small status artwork updates during a hover. Text, row geometry, and actions do
+/// not animate on the timeline; hidden surfaces and Reduce Motion pause it completely.
 struct GajendraHoverIcon: View {
     let kind: GajendraHoverIconKind
     let tint: Color
     var size: CGFloat = 12
     @Environment(\.gajendraHovered) private var hovered
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.gajendraMotionVisible) private var surfaceVisible
+    @State private var hoverStart = Date()
 
     private var moves: Bool { hovered && !reduceMotion }
+    private var loops: Bool {
+        (kind == .running || kind == .review)
+            && GajendraHoverMotion.runs(hovered: hovered, reduceMotion: reduceMotion, visible: surfaceVisible)
+    }
 
     var body: some View {
-        artwork
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !loops)) { timeline in
+            artwork(phase: loops ? GajendraHoverMotion.phase(elapsed: timeline.date.timeIntervalSince(hoverStart)) : 0)
+        }
             .foregroundStyle(tint)
             .frame(width: size * 1.5, height: size * 1.5)
             .animation(reduceMotion ? nil : .timingCurve(0.23, 1, 0.32, 1, duration: hovered ? 0.22 : 0.16), value: hovered)
+            .onChange(of: loops) { if $0 { hoverStart = Date() } }
             .accessibilityHidden(true)
             .allowsHitTesting(false)
     }
 
-    @ViewBuilder private var artwork: some View {
+    @ViewBuilder private func artwork(phase: Double) -> some View {
         switch kind {
         case .running:
             HStack(spacing: size * 0.13) {
                 ForEach(0..<5) { index in
                     Capsule()
                         .frame(width: size * 0.13, height: size * [0.35, 0.7, 1, 0.7, 0.35][index])
-                        .scaleEffect(x: 1, y: moves ? [1.35, 0.72, 0.84, 1.2, 1.45][index] : 1)
-                        .offset(y: moves ? (index.isMultiple(of: 2) ? -size * 0.08 : size * 0.08) : 0)
+                        .scaleEffect(x: 1, y: loops ? GajendraHoverMotion.barScale(index: index, phase: phase) : 1)
                 }
             }
             .opacity(hovered ? 1 : 0.8)
@@ -132,8 +233,8 @@ struct GajendraHoverIcon: View {
                     .font(.system(size: size, weight: .semibold))
                 Image(systemName: "envelope.fill")
                     .font(.system(size: size * 0.55, weight: .semibold))
-                    .offset(y: reduceMotion ? -size * 0.28 : (hovered ? -size * 0.28 : -size * 0.7))
-                    .opacity(hovered ? 1 : 0)
+                    .offset(y: -size * (loops ? 0.7 - 0.42 * phase : (hovered ? 0.28 : 0.7)))
+                    .opacity(loops ? min(1, min(phase / 0.15, (1 - phase) / 0.2)) : (hovered ? 1 : 0))
             }
         case .focus:
             Image(systemName: "star.fill")

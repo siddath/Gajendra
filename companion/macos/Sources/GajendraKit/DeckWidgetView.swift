@@ -231,6 +231,22 @@ public struct GajendraCardPresentationState: Equatable, Sendable {
     }
 }
 
+/// AppKit increments clickCount across a rapid close/reopen sequence. Only a double-click
+/// that starts with a closed card is the move gesture; closing must never lock out reopening.
+public struct GajendraPillClickSequence {
+    private var startedByClosing = false
+
+    public init() {}
+
+    public mutating func entersEditMode(clickCount: Int, firstClickClosesCard: Bool) -> Bool {
+        if clickCount <= 1 {
+            startedByClosing = firstClickClosesCard
+            return false
+        }
+        return clickCount == 2 && !startedByClosing
+    }
+}
+
 public final class GajendraPillEditController: ObservableObject {
     @Published public private(set) var isEditing = false
 
@@ -1040,7 +1056,8 @@ private final class GajendraQueueDragGeometry: ObservableObject {
 
 struct GajendraLiveActivityMark: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulseExpanded = false
+    @Environment(\.gajendraHovered) private var hovered
+    @Environment(\.gajendraMotionVisible) private var surfaceVisible
     let scale: CGFloat
     let animated: Bool
 
@@ -1050,25 +1067,22 @@ struct GajendraLiveActivityMark: View {
     }
 
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color.green.opacity(animated && !reduceMotion ? (pulseExpanded ? 0 : 0.28) : 0.14))
-                .scaleEffect(animated && !reduceMotion ? (pulseExpanded ? 1.7 : 0.72) : 1)
-            Circle()
-                .stroke(Color.green.opacity(0.34), lineWidth: 0.7)
-                .padding(2.25 * scale)
-            Circle()
-                .fill(Color.green)
-                .padding(3.8 * scale)
-        }
-        .frame(width: 12 * scale, height: 12 * scale)
-        .onAppear {
-            guard animated, !reduceMotion else { return }
-            pulseExpanded = false
-            withAnimation(.easeOut(duration: 0.82)) {
-                pulseExpanded = true
+        let loops = animated && GajendraHoverMotion.runs(hovered: hovered, reduceMotion: reduceMotion, visible: surfaceVisible)
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !loops)) { timeline in
+            let phase = GajendraHoverMotion.phase(elapsed: timeline.date.timeIntervalSinceReferenceDate)
+            ZStack {
+                Circle()
+                    .fill(Color.green.opacity(loops ? 0.28 * (1 - phase) : 0.14))
+                    .scaleEffect(loops ? 0.72 + 0.98 * phase : 1)
+                Circle()
+                    .stroke(Color.green.opacity(0.34), lineWidth: 0.7)
+                    .padding(2.25 * scale)
+                Circle()
+                    .fill(Color.green)
+                    .padding(3.8 * scale)
             }
         }
+        .frame(width: 12 * scale, height: 12 * scale)
         .accessibilityLabel("Running now")
         .help("Provider reports active work")
     }
@@ -1082,9 +1096,9 @@ struct GajendraReviewStatusMark: View {
     }
 
     var body: some View {
-        Image(systemName: "tray.full.fill")
-            .font(.system(size: 11 * scale, weight: .semibold))
-            .foregroundStyle(Color.orange)
+        GajendraHoverIcon(kind: .review, tint: .orange, size: 11 * scale)
+            .frame(width: 14 * scale, height: 14 * scale)
+            .accessibilityHidden(false)
             .accessibilityLabel("Ready for Review")
             .help("Provider reports work ready for review")
     }
@@ -1201,6 +1215,7 @@ public struct GajendraHoverCardView: View {
                 }
             }
         }
+        .gajendraMotionVisibility()
         .coordinateSpace(name: "gajendra-hover-card")
         .contentShape(Rectangle())
         .simultaneousGesture(
@@ -1782,10 +1797,6 @@ public struct GajendraHoverCardView: View {
                     rowLabel,
                     thread: thread
                 )
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(hoveredThreadId == thread.id ? rowHoverColor : Color.clear)
-                    )
             } else {
                 HStack(spacing: 0) {
                     Button {
@@ -1801,7 +1812,7 @@ public struct GajendraHoverCardView: View {
                     .buttonStyle(
                         GajendraThreadRowButtonStyle(
                             isHovered: hoveredThreadId == thread.id,
-                            hoverColor: rowHoverColor,
+                            hoverColor: .clear,
                             pressedColor: rowPressedColor
                         )
                     )
@@ -1908,7 +1919,7 @@ public struct GajendraHoverCardView: View {
         )
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHeld ? rowPressedColor.opacity(0.9) : Color.clear)
+                .fill(isHeld ? rowPressedColor.opacity(0.9) : (hoveredThreadId == thread.id ? rowHoverColor : Color.clear))
                 .allowsHitTesting(false)
         )
         .gajendraHoverFeedback(drawsBackground: false)
@@ -2483,7 +2494,7 @@ public struct GajendraHoverCardView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .buttonStyle(.gajendraPress)
-                            .gajendraHoverSurface(cornerRadius: 6)
+                            .padding(2)
                             .help("Open \(thread.title) in \(thread.sourceName)")
                             .accessibilityLabel("\(thread.title), \(thread.sourceName), Running now")
 
@@ -2756,7 +2767,7 @@ public struct GajendraHoverCardView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.gajendraPress)
-            .gajendraHoverSurface(cornerRadius: 6)
+            .padding(2)
             .help("Open \(thread.review?.destination.actionLabel.lowercased() ?? "review") for \(thread.title)")
             .accessibilityLabel("\(thread.title), Ready for Review, \(thread.review?.destination.actionLabel ?? "Review") destination")
 

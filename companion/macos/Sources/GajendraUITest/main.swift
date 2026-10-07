@@ -172,6 +172,11 @@ enum GajendraUITest {
         )
         try waitForFocusedCard(pid: rawPID, label: "cold first-interaction card")
         try verifyFirstPresentedPointerInteraction(pid: rawPID)
+        // Unlike ordinary taps (which explicitly reset clickState to 1), this reproduces
+        // AppKit's real close/reopen click counts inside the double-click interval.
+        try doubleTapCurrentPill(pid: rawPID)
+        try waitForCard(pid: rawPID, visible: true, label: "rapid close/reopen stays actionable")
+        _ = try waitForPillHelp(pid: rawPID, containing: "Click to show or hide priorities")
         try tapCurrentPill(pid: rawPID)
         try waitForCard(pid: rawPID, visible: false, label: "stationary close")
 
