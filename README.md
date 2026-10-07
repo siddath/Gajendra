@@ -7,7 +7,15 @@
 <p align="center"><strong>One clear focus across your AI tools.</strong><br />
 One NOW. One short queue. One click back to the exact thread.</p>
 
+<p align="center">
+  <a href="#set-it-up-on-macos"><img src="docs/assets/icons/mac.svg" width="20" height="20" alt="" /> Mac setup</a> &nbsp; · &nbsp;
+  <a href="#use-the-codex-extension"><img src="docs/assets/icons/plugin.svg" width="20" height="20" alt="" /> Codex plugin</a> &nbsp; · &nbsp;
+  <a href="docs/USER_GUIDE.md"><img src="docs/assets/icons/book.svg" width="20" height="20" alt="" /> User guide</a>
+</p>
+
 ![Gajendra product hero showing the real macOS app UI with synthetic Codex and Claude workflow data](evidence/launch/gajendra-hero.png)
+
+<p align="center"><sub>The macOS Focus Deck · v0.4.0 · Synthetic example tasks</sub></p>
 
 Gajendra is a local-first macOS focus utility and Codex plugin for AI-agent threads. It gives you one place to decide
 what deserves attention across Codex, Claude Code, and other explicitly enabled local sources—then
@@ -17,6 +25,15 @@ It does not replace those tools or copy their conversations. It adds a small, qu
 above them.
 
 **[v0.4.0 source release and Codex plugin](https://github.com/siddath/Gajendra/releases/tag/v0.4.0)** · [Release notes](docs/releases/0.4.0.md) · [Product evals](docs/EVALS.md)
+
+## Start here
+
+- <img src="docs/assets/icons/mac.svg" width="20" height="20" alt="Mac icon" />&nbsp;**On your Mac:** [build and open the app](#set-it-up-on-macos), then choose your local sources.
+- <img src="docs/assets/icons/plugin.svg" width="20" height="20" alt="Plugin icon" />&nbsp;**Inside Codex:** [install the plugin](#use-the-codex-extension) to use the same priorities in a panel. The native app is optional.
+- <img src="docs/assets/icons/book.svg" width="20" height="20" alt="Guide icon" />&nbsp;**Already using it?** Read the [daily user guide](docs/USER_GUIDE.md) or [what changed in 0.4.0](docs/releases/0.4.0.md).
+
+The native app is built from source; the release includes a Codex plugin ZIP. Both keep Gajendra's
+state on your Mac. Your AI tools continue to own the conversations and transcripts.
 
 ## Why Gajendra exists
 
@@ -47,6 +64,10 @@ thread content is used.
 | Focus overview | Ready for Review |
 | --- | --- |
 | ![Gajendra overview with one NOW, Focus, Important, Running, and Ready for Review](evidence/launch/gajendra-launch-overview.png) | ![Gajendra Ready for Review disclosure with a synthetic configured review feed](evidence/launch/gajendra-launch-ready-for-review.png) |
+| Choose one current thread and keep the next few close. | Review a specific response, then mark it reviewed or Undo. |
+
+<details>
+<summary><strong>More screenshots: search, priority editing and Organizer</strong></summary>
 
 | Search | Edit priorities |
 | --- | --- |
@@ -54,7 +75,24 @@ thread content is used.
 
 ![Gajendra Organizer showing sources, NOW, ordered queues, Running, and Ready for Review](evidence/launch/gajendra-launch-organizer.png)
 
+Organizer gives you the full queues, source controls and searchable history in one window.
+
+</details>
+
 ## What you can do
+
+| In the widget | Your next action |
+| --- | --- |
+| <img src="docs/assets/icons/focus.svg" width="20" height="20" alt="Focus icon" />&nbsp;**NOW and Focus** | Choose one current thread and keep a short queue of what comes next. |
+| <img src="docs/assets/icons/important.svg" width="20" height="20" alt="Important icon" />&nbsp;**Important** | Keep work within reach without making it your current focus. |
+| <img src="docs/assets/icons/running.svg" width="20" height="20" alt="Activity icon" />&nbsp;**Running** | See work that a provider reports as active. |
+| <img src="docs/assets/icons/review.svg" width="20" height="20" alt="Review tray icon" />&nbsp;**Ready for Review** | Open the exact response. Mark it reviewed when you are ready; Undo is available. |
+| <img src="docs/assets/icons/history.svg" width="20" height="20" alt="History icon" />&nbsp;**Finish, Reopen and History** | Finish intentionally, return later, or link an exact successor while retaining the earlier chat. |
+
+Opening a thread never marks it reviewed or finished. Provider activity and your priorities stay separate.
+
+<details>
+<summary><strong>Interaction details and provider behavior</strong></summary>
 
 | Capability | What it is for |
 | --- | --- |
@@ -82,6 +120,8 @@ Claude Code, Cursor, and Grok are never guessed ready from idle time, recency, o
 explicitly configured bounded catalog can also supply a validated live review signal. Focused unit,
 native self-test, and real-window journeys cover the mixed-candidate review boundary and compact
 priority actions; the source project still makes no signed/notarized binary claim.
+
+</details>
 
 ## Set it up on macOS
 
@@ -139,6 +179,8 @@ hosts. The extension shares the Mac app's private priority store; opening it doe
 
 ![Gajendra Codex plugin UI captured from the 0.4.0 synthetic browser preview](evidence/launch/gajendra-plugin-040.jpg)
 
+<p align="center"><sub>The Codex plugin UI · Same local priorities · Synthetic browser capture</sub></p>
+
 Both surfaces can first show a labeled neutral cached view, then refresh from providers. While
 visible, they check local revisions about every five seconds and request source refreshes about
 every thirty seconds. Provider latency still applies. Optional plugin lifecycle hooks can invalidate
@@ -147,11 +189,16 @@ when hooks are skipped. This is a custom local plugin, not an OpenAI first-party
 
 Version 0.4.0 shares a private session backend between the Mac app and
 plugin. Prepared reads and local changes use its catalog; provider discovery runs separately.
-Codex listing uses its supported metadata-only API with periodic full reconciliation. In the local
-three-run comparison, median refresh fell from 15.05 seconds to 0.80 seconds and local writes from
-15.92 seconds to 0.11 seconds: **94.7%** and **99.3%** reductions respectively. Cutting repeated
-provider scans and retaining metadata drove the improvement. These are backend timings, including
-CLI process overhead, not popup latency guarantees. See the
+Codex listing uses its supported metadata-only API with periodic full reconciliation. Cutting
+repeated provider scans and retaining metadata drove the improvement:
+
+| Operation | Before → after, median | Reduction |
+| --- | --- | ---: |
+| Refresh | 15.05 s → 0.80 s | **94.7%** |
+| Local changes | 15.92 s → 0.11 s | **99.3%** |
+
+Three local runs per operation. These are backend timings, including CLI process overhead, not
+popup latency guarantees. See the
 [performance receipt](worksheets/2026-10-05-backend-cache-performance.md) for scope and rollback.
 
 Sources must be available on the Mac where the MCP server runs. If a source cannot load, its
@@ -236,7 +283,7 @@ Use [GitHub Discussions](https://github.com/siddath/Gajendra/discussions) for su
 [private security reporting](https://github.com/siddath/Gajendra/security/advisories/new) for
 vulnerabilities.
 
-## 0.4.0 candidate update
+## Updating to 0.4.0
 
 The native app and Codex plugin now share prepared metadata and durable work state, with explicit
 Finish/Reopen, exact continuation links, review Retry/Undo and restrained pointer feedback.
