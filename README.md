@@ -28,9 +28,9 @@ above them.
 
 ## Start here
 
-- <img src="docs/assets/icons/mac.svg" width="20" height="20" alt="" /> **On your Mac:** [build and open the app](#set-it-up-on-macos), then choose your local sources.
-- <img src="docs/assets/icons/plugin.svg" width="20" height="20" alt="" /> **Inside Codex:** [install the plugin](#use-the-codex-extension) to use the same priorities in a panel. The native app is optional.
-- <img src="docs/assets/icons/book.svg" width="20" height="20" alt="" /> **Already using it?** Read the [daily user guide](docs/USER_GUIDE.md) or [what changed in 0.4.0](docs/releases/0.4.0.md).
+- <img src="docs/assets/icons/mac.svg" width="20" height="20" alt="Mac icon" />&nbsp;**On your Mac:** [build and open the app](#set-it-up-on-macos), then choose your local sources.
+- <img src="docs/assets/icons/plugin.svg" width="20" height="20" alt="Plugin icon" />&nbsp;**Inside Codex:** [install the plugin](#use-the-codex-extension) to use the same priorities in a panel. The native app is optional.
+- <img src="docs/assets/icons/book.svg" width="20" height="20" alt="Guide icon" />&nbsp;**Already using it?** Read the [daily user guide](docs/USER_GUIDE.md) or [what changed in 0.4.0](docs/releases/0.4.0.md).
 
 The native app is built from source; the release includes a Codex plugin ZIP. Both keep Gajendra's
 state on your Mac. Your AI tools continue to own the conversations and transcripts.
@@ -83,11 +83,11 @@ Organizer gives you the full queues, source controls and searchable history in o
 
 | In the widget | Your next action |
 | --- | --- |
-| <img src="docs/assets/icons/focus.svg" width="20" height="20" alt="" /> **NOW and Focus** | Choose one current thread and keep a short queue of what comes next. |
-| <img src="docs/assets/icons/important.svg" width="20" height="20" alt="" /> **Important** | Keep work within reach without making it your current focus. |
-| <img src="docs/assets/icons/running.svg" width="20" height="20" alt="" /> **Running** | See work that a provider reports as active. |
-| <img src="docs/assets/icons/review.svg" width="20" height="20" alt="" /> **Ready for Review** | Open the exact response. Mark it reviewed when you are ready; Undo is available. |
-| <img src="docs/assets/icons/history.svg" width="20" height="20" alt="" /> **Finish, Reopen and History** | Finish intentionally, return later, or link an exact successor while retaining the earlier chat. |
+| <img src="docs/assets/icons/focus.svg" width="20" height="20" alt="Focus icon" />&nbsp;**NOW and Focus** | Choose one current thread and keep a short queue of what comes next. |
+| <img src="docs/assets/icons/important.svg" width="20" height="20" alt="Important icon" />&nbsp;**Important** | Keep work within reach without making it your current focus. |
+| <img src="docs/assets/icons/running.svg" width="20" height="20" alt="Activity icon" />&nbsp;**Running** | See work that a provider reports as active. |
+| <img src="docs/assets/icons/review.svg" width="20" height="20" alt="Review tray icon" />&nbsp;**Ready for Review** | Open the exact response. Mark it reviewed when you are ready; Undo is available. |
+| <img src="docs/assets/icons/history.svg" width="20" height="20" alt="History icon" />&nbsp;**Finish, Reopen and History** | Finish intentionally, return later, or link an exact successor while retaining the earlier chat. |
 
 Opening a thread never marks it reviewed or finished. Provider activity and your priorities stay separate.
 
