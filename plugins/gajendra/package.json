@@ -15,8 +15,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "1.7.5",
-    "@modelcontextprotocol/sdk": "1.31.0",
+    "@modelcontextprotocol/ext-apps": "2.0.3",
+    "@modelcontextprotocol/sdk": "1.32.0",
     "gsap": "^3.15.0",
     "zod": "^4.6.5"
   },
