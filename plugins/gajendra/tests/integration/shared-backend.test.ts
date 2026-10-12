@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { build } from "esbuild";
 import { expect, it } from "vitest";
+// Keep a v1 client on stdio to verify wire compatibility with the v2 server.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { backendDirectory } from "../../src/server/shared-backend.js";
