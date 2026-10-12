@@ -59,10 +59,10 @@ their next write, causing handled Ready rows to reappear without changing priori
 
 ## MCP SDK compatibility
 
-The plugin runtime uses ext-apps 2.0.3 with the matching split MCP client/server SDK 2.3.0
+The plugin runtime uses ext-apps 2.0.3 with the matching split MCP client/server SDK 2.3.1
 packages and Zod object schemas. The standard inline resource URI, tool names, metadata,
 validation and mutation envelopes remain unchanged. SDK v1 classes are never passed into v2
-helpers. The v1 SDK 1.32.0 is a development-only dependency: the compiled-server stdio
+helpers. The v1 SDK 1.32.1 is a development-only dependency: the compiled-server stdio
 integration test and cross-client product evals retain it to verify older clients over the wire.
 The in-memory MCP contract tests use the v2 client with the v2 server.
 
