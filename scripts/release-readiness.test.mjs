@@ -1,5 +1,7 @@
+import assert from "node:assert/strict";
+import { validateBundledPluginNotices } from "./plugin-notices.mjs";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, cp, mkdtemp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +14,16 @@ async function main() {
   const root = await mkdtemp(path.join(tmpdir(), "gajendra-release-readiness-test-"));
   try {
     const sourceApp = await makeFakeApp(path.join(root, "source"), "source-marker");
+    const noticeApp = await makeFakeApp(path.join(root, "notice-check"), "notice-marker");
+    const noticeRoot = path.join(noticeApp, "Contents/Resources/ThirdPartyNotices");
+    const pluginRoot = path.resolve(scriptsDirectory, "../plugins/gajendra");
+    await mkdir(noticeRoot, { recursive: true });
+    await copyFile(path.join(pluginRoot, "THIRD_PARTY_NOTICES.md"), path.join(noticeRoot, "THIRD_PARTY_NOTICES.md"));
+    await cp(path.join(pluginRoot, "third_party_licenses"), path.join(noticeRoot, "third_party_licenses"), { recursive: true });
+    await validateBundledPluginNotices(noticeApp, pluginRoot);
+    await writeFile(path.join(noticeRoot, "third_party_licenses/modelcontextprotocol-server-LICENSE"), "incorrect license\n");
+    await assert.rejects(validateBundledPluginNotices(noticeApp, pluginRoot), /Bundled dependency notice does not match source:.*server-LICENSE/u);
+
     const mismatchedApp = await makeFakeApp(path.join(root, "archive"), "older-marker");
     const mismatchedArchive = path.join(root, "older-gajendra.zip");
     zipDirectory(mismatchedApp, mismatchedArchive);

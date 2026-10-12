@@ -1,3 +1,4 @@
+import { pluginNoticeArtifacts, validateBundledPluginNotices } from "./plugin-notices.mjs";
 import { spawnSync } from "node:child_process";
 import { constants, createReadStream } from "node:fs";
 import {
@@ -366,6 +367,8 @@ async function inspectBundle(app) {
     access(sourceRuntimeNotices, constants.R_OK),
   ]);
 
+  await validateBundledPluginNotices(app, path.join(repositoryRoot, "plugins/gajendra"));
+
   const plistChecks = [
     ["CFBundleDisplayName", bundleContract.displayName],
     ["CFBundleName", bundleContract.bundleName],
@@ -407,6 +410,10 @@ async function inspectBundle(app) {
   }
 
   const checksums = Object.fromEntries(await Promise.all([
+    ...pluginNoticeArtifacts.map((relativePath) => [
+      `Contents/Resources/ThirdPartyNotices/${relativePath}`,
+      path.join(contents, "Resources/ThirdPartyNotices", relativePath),
+    ]),
     ["Contents/Info.plist", info],
     ["Contents/MacOS/Gajendra", executable],
     ["Contents/Resources/server.mjs", service],
