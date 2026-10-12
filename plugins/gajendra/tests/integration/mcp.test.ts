@@ -1,5 +1,4 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { fixtureSnapshot } from "../../src/ui/fixtures.js";
@@ -130,6 +129,7 @@ describe("Gajendra MCP contract", () => {
     expect(mutations.at(-1)).toEqual(expect.objectContaining({
       mutation: expect.objectContaining({ type: "move-before", currentThreadId: "claude:focus-2" }),
     }));
+    const acceptedMutationCount = mutations.length;
     const invalid = await client.callTool({
       name: "gajendra_set_context",
       arguments: { threadId: "claude:focus-2", context: "strategy" },
@@ -140,6 +140,7 @@ describe("Gajendra MCP contract", () => {
       arguments: { threadId: "codex:review-1", reviewUpdatedAt: -1, reviewIdentity: "a".repeat(64), acknowledged: true },
     });
     expect(invalidReview.isError).toBe(true);
+    expect(mutations).toHaveLength(acceptedMutationCount);
   });
 
   it("exposes the same service through the companion JSON command", async () => {

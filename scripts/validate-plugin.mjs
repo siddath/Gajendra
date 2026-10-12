@@ -1,3 +1,4 @@
+import { pluginNoticeArtifacts } from "./plugin-notices.mjs";
 import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -45,11 +46,7 @@ for (const relativePath of [
   "assets/gajendra-menubar.svg",
   "assets/gajendra-icon.png",
   "LICENSE",
-  "THIRD_PARTY_NOTICES.md",
-  "third_party_licenses/modelcontextprotocol-ext-apps-LICENSE",
-  "third_party_licenses/modelcontextprotocol-sdk-LICENSE",
-  "third_party_licenses/gsap-LICENSE-NOTICE",
-  "third_party_licenses/zod-LICENSE",
+  ...pluginNoticeArtifacts,
   "dist/server.mjs",
   "dist/gajendra.html",
   "skills/gajendra/SKILL.md",

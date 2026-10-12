@@ -41,7 +41,7 @@ const systemDarkMode = window.matchMedia("(prefers-color-scheme: dark)");
 let visualTheme: VisualTheme = readEnumPreference(themeStorageKey, ["native", "focus-deck"], "native");
 let appearancePreference: AppearancePreference = readEnumPreference(appearanceStorageKey, ["auto", "light", "dark"], "auto");
 let hostAppearance: ResolvedAppearance | null = null;
-let hostStyles: Parameters<typeof applyHostStyleVariables>[0] = {};
+let hostStyles: Partial<Parameters<typeof applyHostStyleVariables>[0]> = {};
 const hostStyleMap = {
   "--canvas": "--color-background-primary",
   "--surface": "--color-background-secondary",

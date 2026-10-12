@@ -57,6 +57,19 @@ explicit acknowledgement adds only bounded identity digests to an optional versi
 creates no new priority level. Older v3 writers can read the file but will drop the unknown field on
 their next write, causing handled Ready rows to reappear without changing priority state.
 
+## MCP SDK compatibility
+
+The plugin runtime uses ext-apps 2.0.3 with the matching split MCP client/server SDK 2.3.1
+packages and Zod object schemas. The standard inline resource URI, tool names, metadata,
+validation and mutation envelopes remain unchanged. SDK v1 classes are never passed into v2
+helpers. The v1 SDK 1.32.1 is a development-only dependency: the compiled-server stdio
+integration test and cross-client product evals retain it to verify older clients over the wire.
+The in-memory MCP contract tests use the v2 client with the v2 server.
+
+The [upstream migration guide](https://apps.extensions.modelcontextprotocol.io/api/documents/migrate-to-v2.html)
+documents unchanged MCP Apps wire messages and changed dependency/type APIs. Synthetic protocol
+and browser tests do not replace fresh installed-host or native UI acceptance.
+
 ## Optional hook compatibility
 
 The package's default `hooks/hooks.json` targets SessionStart, UserPromptSubmit, Stop, and SessionEnd

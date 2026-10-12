@@ -1,3 +1,4 @@
+import { validateBundledPluginNotices } from "./plugin-notices.mjs";
 import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -57,6 +58,8 @@ await Promise.all([
   access(codexSource, constants.R_OK),
   access(threadSourcesSource, constants.R_OK),
 ]);
+
+await validateBundledPluginNotices(app, path.resolve("plugins/gajendra"));
 
 run("codesign", ["--verify", "--deep", "--strict", app]);
 const plist = (key) => run("plutil", ["-extract", key, "raw", info]).stdout.trim();

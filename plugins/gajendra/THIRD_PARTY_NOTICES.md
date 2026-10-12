@@ -1,11 +1,13 @@
 # Third-party notices
 
-Gajendra's generated UI and server bundles include code from these direct runtime dependencies:
+Gajendra's generated UI and server bundles include code from these runtime dependencies (including the shared MCP core):
 
 | Package | Version | Upstream | Declared license |
 | --- | --- | --- | --- |
-| `@modelcontextprotocol/ext-apps` | 1.7.5 | https://github.com/modelcontextprotocol/ext-apps | Package metadata: MIT; upstream LICENSE records an Apache-2.0 transition with remaining MIT contributions |
-| `@modelcontextprotocol/sdk` | 1.31.0 | https://github.com/modelcontextprotocol/typescript-sdk | MIT |
+| `@modelcontextprotocol/ext-apps` | 2.0.3 | https://github.com/modelcontextprotocol/ext-apps | Package metadata: MIT; upstream LICENSE records an Apache-2.0 transition with remaining MIT contributions |
+| `@modelcontextprotocol/client` | 2.3.1 | https://github.com/modelcontextprotocol/typescript-sdk | Package metadata: Apache-2.0; upstream LICENSE retains the transition notice for remaining MIT contributions |
+| `@modelcontextprotocol/server` | 2.3.1 | https://github.com/modelcontextprotocol/typescript-sdk | Package metadata: Apache-2.0; upstream LICENSE retains the transition notice for remaining MIT contributions |
+| `@modelcontextprotocol/core` | 2.3.1 | https://github.com/modelcontextprotocol/typescript-sdk | Package metadata: Apache-2.0; upstream LICENSE retains the transition notice for remaining MIT contributions |
 | `gsap` | 3.15.0 | https://gsap.com | GreenSock standard no-charge license: https://gsap.com/standard-license |
 | `zod` | 4.6.5 | https://github.com/colinhacks/zod | MIT |
 

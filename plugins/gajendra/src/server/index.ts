@@ -3,8 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { McpServer } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 
 import {
@@ -77,7 +77,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_open", {
     title: "Gajendra priorities",
     description: "Read Gajendra priorities and available task metadata. Resolve the exact canonical thread ID here before changing focus or review state; never guess an ID from a title.",
-    inputSchema: { refresh: z.boolean().optional() },
+    inputSchema: z.object({ refresh: z.boolean().optional() }),
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: {
       ui: { resourceUri: RESOURCE_URI, visibility: ["app", "model"] },
@@ -90,7 +90,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
 
   registerAppTool(server, "gajendra_sync", {
     title: "Check Gajendra revision", description: "Read only the local authoritative revision without scanning providers.",
-    inputSchema: {}, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
+    inputSchema: z.object({}), annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
   }, async () => {
     const value = service.sync ? await service.sync() : { revision: (await service.snapshot()).revision };
@@ -99,7 +99,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
 
   registerAppTool(server, "gajendra_set_work_completed", {
     title: "Finish or reopen work", description: "Only when the user explicitly finishes or reopens work, update this exact canonical chat ID. Read gajendra_open first and use its revision. Opening or provider completion never finishes work. Explicit done-with-this-thread or close-this-chat requests mean Finish. Finish clears NOW and removes Ready/Continue; priorities and pending review remain in History until Reopen. It does not archive the provider chat.",
-    inputSchema: { threadId: z.string().min(1).max(512), completed: z.boolean(), currentThreadId: z.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1).max(512), completed: z.boolean(), currentThreadId: z.string().min(1).max(512).nullable().optional(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, completed, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -108,7 +108,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
 
   registerAppTool(server, "gajendra_link_continuation", {
     title: "Select exact continuation chat", description: "Only when the user selects an exact successor chat, link its canonical ID to an exact predecessor. Never match titles or infer a continuation. Transfers priority and NOW atomically; old chat remains in History. Null unlinks the most recent edge and transfers priority back. Read gajendra_open first and use its revision.",
-    inputSchema: { threadId: z.string().min(1).max(512), currentThreadId: z.string().min(1).max(512).nullable(), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1).max(512), currentThreadId: z.string().min(1).max(512).nullable(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, currentThreadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -118,7 +118,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_level", {
     title: "Set thread priority",
     description: "When the user asks, add, move, or remove one exact agent thread in Gajendra Focus or Important. Read gajendra_open first; use its canonical ID and revision. Do not infer priority from conversation content.",
-    inputSchema: { threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable(), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1), level: z.enum(["focus", "important"]).nullable(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, level, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -128,7 +128,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_current", {
     title: "Set current focus",
     description: "When the user asks to focus now on an exact task, make it the single Gajendra NOW item and include it in Focus. Read gajendra_open first; resolve this task from reliable host identity or ask if ambiguous. Use the snapshot revision.",
-    inputSchema: { threadId: z.string().min(1), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -138,7 +138,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_move", {
     title: "Move prioritized thread",
     description: "Move one thread up or down within its Gajendra section.",
-    inputSchema: { threadId: z.string().min(1), direction: z.enum(["up", "down"]), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1), direction: z.enum(["up", "down"]), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: false },
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ threadId, direction, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -148,7 +148,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_move_before", {
     title: "Move thread before target",
     description: "Atomically place, append, or remove a thread while preserving one Gajendra NOW item.",
-    inputSchema: {
+    inputSchema: z.object({
       threadId: z.string().min(1),
       level: z.enum(["focus", "important"]).nullable(),
       beforeThreadId: z.string().min(1).nullable().optional(),
@@ -156,7 +156,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
       isCurrent: z.boolean().optional(),
       currentThreadId: z.string().min(1).nullable().optional(),
       ...mutationOptionsSchema,
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ threadId, level, beforeThreadId, context, isCurrent, currentThreadId, expectedRevision, idempotencyKey }) => {
@@ -175,7 +175,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_context", {
     title: "Set thread context",
     description: "Assign or clear one bounded Gajendra context label on a prioritized thread.",
-    inputSchema: { threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable(), ...mutationOptionsSchema },
+    inputSchema: z.object({ threadId: z.string().min(1), context: z.enum(["design", "engineering", "life"]).nullable(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ threadId, context, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -185,13 +185,13 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_review_acknowledged", {
     title: "Set review acknowledgement",
     description: "Mark one exact Ready for Review response handled or restore it without changing task priority.",
-    inputSchema: {
+    inputSchema: z.object({
       threadId: z.string().min(1),
       reviewUpdatedAt: z.number().finite().nonnegative(),
       reviewIdentity: z.string().regex(/^[a-f0-9]{64}$/iu),
       acknowledged: z.boolean(),
       ...mutationOptionsSchema,
-    },
+    }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app", "model"] } },
   }, async ({ threadId, reviewUpdatedAt, reviewIdentity, acknowledged, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -201,7 +201,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_collapsed", {
     title: "Set section visibility",
     description: "Persist whether a Gajendra priority section is collapsed.",
-    inputSchema: { level: z.enum(["focus", "important"]), collapsed: z.boolean(), ...mutationOptionsSchema },
+    inputSchema: z.object({ level: z.enum(["focus", "important"]), collapsed: z.boolean(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ level, collapsed, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(
@@ -211,7 +211,7 @@ export function createGajendraServer(service: DeckService = new GajendraService(
   registerAppTool(server, "gajendra_set_source_enabled", {
     title: "Set thread source availability",
     description: "Enable or disable a local Gajendra thread source. Claude metadata discovery remains opt-in.",
-    inputSchema: { sourceId: z.string().min(1), enabled: z.boolean(), ...mutationOptionsSchema },
+    inputSchema: z.object({ sourceId: z.string().min(1), enabled: z.boolean(), ...mutationOptionsSchema }),
     annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, idempotentHint: true },
     _meta: { ui: { visibility: ["app"] } },
   }, async ({ sourceId, enabled, expectedRevision, idempotencyKey }) => mutationToolResult(await service.mutate(requestFor(

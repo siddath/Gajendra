@@ -48,6 +48,8 @@ fi
 /usr/bin/install -m 0755 "$runtime_binary" "$app_dir/Contents/Resources/Runtime/node/bin/node"
 /usr/bin/install -m 0644 "$runtime_license" "$app_dir/Contents/Resources/ThirdPartyNotices/Node-24.19.0-LICENSE"
 /usr/bin/install -m 0644 "$runtime_notice" "$app_dir/Contents/Resources/ThirdPartyNotices/Node-24.19.0-NOTICES.md"
+/usr/bin/install -m 0644 "$repo_root/plugins/gajendra/THIRD_PARTY_NOTICES.md" "$app_dir/Contents/Resources/ThirdPartyNotices/THIRD_PARTY_NOTICES.md"
+/bin/cp -R "$repo_root/plugins/gajendra/third_party_licenses" "$app_dir/Contents/Resources/ThirdPartyNotices/"
 /usr/bin/codesign --force --sign - "$app_dir/Contents/Resources/Runtime/node/bin/node"
 /usr/bin/codesign --force --deep --sign - "$app_dir"
 /usr/bin/codesign --verify --deep --strict "$app_dir"
