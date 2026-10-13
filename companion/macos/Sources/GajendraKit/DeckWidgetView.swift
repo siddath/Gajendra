@@ -1643,7 +1643,9 @@ public struct GajendraHoverCardView: View {
         .foregroundStyle(Color.gajendraAccent(for: colorScheme))
         .padding(.leading, 10 * contentScale)
         .padding(.trailing, 6 * contentScale)
-        .frame(maxWidth: .infinity, minHeight: 30 * contentScale)
+        .frame(maxWidth: .infinity)
+        // Editing must keep the queue in place beneath the stationary held pointer.
+        .frame(height: 32 * contentScale)
         .background(
             Color.gajendraAccent(for: colorScheme).opacity(colorScheme == .dark ? 0.1 : 0.075),
             in: RoundedRectangle(cornerRadius: 9, style: .continuous)
