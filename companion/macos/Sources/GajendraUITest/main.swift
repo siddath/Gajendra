@@ -2045,16 +2045,12 @@ enum GajendraUITest {
             }
             Thread.sleep(forTimeInterval: 0.05)
         } while Date() < deadline
-        let nearby = accessibilityLabels(in: AXUIElementCreateApplication(pid), depth: 0)
-            .filter { candidate in
-                label.split(separator: " ").contains { candidate.localizedCaseInsensitiveContains($0) }
-            }
-            .prefix(20)
+        // The application AX tree also contains system menus and recent-document labels.
+        // Keep timeout evidence limited to the requested fixture target and exact-match values.
         throw GajendraUITestError.failed(
             "timed out waiting for accessibility element \(label)"
                 + (value.map { " with value \($0); observed=\(observedValues.suffix(5))" } ?? "")
                 + (enabled.map { " with enabled=\($0)" } ?? "")
-                + "; nearby=\(Array(nearby))"
         )
     }
 
@@ -2135,20 +2131,20 @@ enum GajendraUITest {
         label: String,
         value: String
     ) throws -> AXUIElement {
-        let header = try waitForElement(pid: pid, label: label, value: value)
-        try raiseContainingWindow(of: header, context: "dock header")
-
         // AXScrollToVisible invalidates SwiftUI's LazyVStack accessibility subtree. First prove
         // that the current header is already pointer-stable without asking the scroll view to lay
-        // itself out again. If it really is outside the viewport, request visibility once, then
-        // reacquire it from the rebuilt AX tree.
-        if let stableVisibleHeader = try? waitForStableHittableElement(
-            pid: pid,
-            label: label,
-            value: value,
-            maximumWait: 0.3
-        ) {
-            return stableVisibleHeader
+        // itself out again. An offscreen lazy header may be absent from AX entirely; let that
+        // case reach the same bounded reveal path before requiring the exact target again.
+        if let header = element(pid: pid, label: label, value: value) {
+            try raiseContainingWindow(of: header, context: "dock header")
+            if let stableVisibleHeader = try? waitForStableHittableElement(
+                pid: pid,
+                label: label,
+                value: value,
+                maximumWait: 0.3
+            ) {
+                return stableVisibleHeader
+            }
         }
 
         // This is the same scroll-wheel path a user takes. AXScrollToVisible invalidates the
