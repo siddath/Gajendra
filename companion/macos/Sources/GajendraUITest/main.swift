@@ -2605,25 +2605,28 @@ enum GajendraUITest {
         return pid
     }
 
-    private static func requireUndisturbedPointer() throws {
+    private static func requireUndisturbedPointer(phase: String = #function) throws {
         guard !pointerInterferenceDetected else {
             throw GajendraUITestError.failed("pointer interference; native result is inconclusive")
         }
         guard let expected = lastCommandedPointer else { return }
-        guard let actual = CGEvent(source: nil)?.location,
+        let observed = CGEvent(source: nil)?.location
+        guard let actual = observed,
               abs(actual.x - expected.x) <= stableFrameTolerance,
               abs(actual.y - expected.y) <= stableFrameTolerance else {
-            try abortForPointerInterference("cursor moved away from its last commanded position")
+            try abortForPointerInterference(
+                "cursor moved away from its last commanded position; phase=\(phase); expected=\(expected); observed=\(String(describing: observed))"
+            )
         }
         if let owner = driverMouseDownOwner, pointerOwner(at: expected) != owner {
-            try abortForPointerInterference("AX target ownership changed while the driver held the mouse button")
+            try abortForPointerInterference("AX target ownership changed while the driver held the mouse button; phase=\(phase)")
         }
     }
 
     private static func stationaryPointerHold(for interval: TimeInterval) throws {
         let deadline = ContinuousClock.now.advanced(by: .seconds(interval))
         repeat {
-            try requireUndisturbedPointer()
+            try requireUndisturbedPointer(phase: "stationary hold for \(interval)s")
             let remaining = ContinuousClock.now.duration(to: deadline)
             if remaining <= .zero { return }
             let seconds = Double(remaining.components.seconds)
@@ -2755,7 +2758,7 @@ enum GajendraUITest {
     }
 
     private static func postMouse(_ type: CGEventType, at point: CGPoint, clickState: Int64) throws {
-        try requireUndisturbedPointer()
+        try requireUndisturbedPointer(phase: "before mouse event \(type.rawValue)")
         if type == .leftMouseDown {
             guard let expectedPointerOwner,
                   pointerOwner(at: point) == expectedPointerOwner else {
