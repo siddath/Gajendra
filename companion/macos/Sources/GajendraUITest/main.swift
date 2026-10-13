@@ -50,6 +50,11 @@ private struct GajendraUIJourneyMetrics {
 enum GajendraUITest {
     private static let timeout: TimeInterval = 5
     private static let stableFrameTolerance: CGFloat = 0.5
+    private static var lastCommandedPointer: CGPoint?
+    private static var expectedPointerOwner: pid_t?
+    private static var driverMouseDownOwner: pid_t?
+    private static var driverMouseReleaseAttempted = false
+    private static var pointerInterferenceDetected = false
     // The pre-fix real-window baseline was 454-552 ms. This budget is less than half of the
     // fastest baseline while retaining more than 2x headroom over the measured 80-94 ms repair.
     private static let popupLatencyBudgetMilliseconds = 200
@@ -57,6 +62,9 @@ enum GajendraUITest {
     static func main() {
         do {
             let metrics = try run()
+            guard !pointerInterferenceDetected else {
+                throw GajendraUITestError.failed("pointer interference; native result is inconclusive")
+            }
             let scope = ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"]
             if scope == "full-screen" {
                 print(#"{"status":"passed","scope":"full-screen","launcherHitOverFullScreen":true,"cardVisibleOnSameSpace":true,"fullScreenHostRemainsVisible":true,"dockReopenOnSameSpace":true}"#)
@@ -97,13 +105,20 @@ enum GajendraUITest {
         let stateURL = URL(fileURLWithPath: arguments[1])
         let catalogURL = URL(fileURLWithPath: arguments[2])
         let appURL = URL(fileURLWithPath: arguments[3])
+        expectedPointerOwner = rawPID
         guard CGPreflightPostEventAccess() else {
             throw GajendraUITestError.failed("the UI test host lacks permission to post pointer events")
+        }
+        guard !CGEventSource.buttonState(.combinedSessionState, button: .left) else {
+            try abortForPointerInterference("left mouse button was already held before the test")
         }
         NSRunningApplication(processIdentifier: rawPID)?.activate(options: .activateIgnoringOtherApps)
         Thread.sleep(forTimeInterval: 0.2)
         let originalPointer = CGEvent(source: nil)?.location ?? .zero
-        defer { postMove(to: originalPointer) }
+        defer {
+            releaseDriverMouseButton()
+            if !pointerInterferenceDetected { try? postMove(to: originalPointer) }
+        }
 
         let pill = try waitForPill(pid: rawPID)
         _ = try waitForPillHelp(pid: rawPID, containing: "Click to show or hide priorities")
@@ -164,6 +179,7 @@ enum GajendraUITest {
             pill: pill
         )
         let statusItemCompactSurfaceObserved = verifyStatusItemCompactSurface(pid: rawPID)
+        try requireUndisturbedPointer()
         try activateFinderAwayFromGajendra(pid: rawPID)
 
         let coldPopupMilliseconds = try measuredCardOpen(
@@ -1222,12 +1238,12 @@ enum GajendraUITest {
         from start: CGPoint,
         to end: CGPoint
     ) throws {
-        postMove(to: start)
+        try postMove(to: start)
         Thread.sleep(forTimeInterval: 0.08)
         try postMouse(.leftMouseDown, at: start, clickState: 1)
         // Keep the pointer stationary beyond the product's 280 ms recognition threshold before
         // moving, so this proves one continuous non-edit-mode hold-then-drag gesture.
-        Thread.sleep(forTimeInterval: 0.35)
+        try stationaryPointerHold(for: 0.35)
         var sawDragging = false
         var sawDropTarget = false
         for step in 1...14 {
@@ -1556,7 +1572,7 @@ enum GajendraUITest {
                 throw GajendraUITestError.failed("synthetic full-screen host activation target belongs to another app")
             }
             // Give this command-line AppKit host a real activation click before changing Spaces.
-            try tapWithoutSettling(frame.center)
+            try tapWithoutSettling(frame.center, ownerPID: getpid())
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         }
         try tapCurrentPill(pid: pid)
@@ -1803,7 +1819,7 @@ enum GajendraUITest {
                 + "pillFrame=\(describeFrame(receipt.pillFrame))\n",
             stderr
         )
-        postMove(to: point)
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         let started = ContinuousClock.now
         try postMouse(.leftMouseDown, at: point, clickState: 1)
@@ -2012,7 +2028,9 @@ enum GajendraUITest {
         var observedValues: [String] = []
         repeat {
             let application = AXUIElementCreateApplication(pid)
-            if let element = firstElement(in: application, depth: 0, label: label) {
+            // A thread can appear in both Running and a priority lane with the same label.
+            // Apply the requested value/enabled conditions to every exact-label candidate.
+            for element in matchingElements(in: application, depth: 0, label: label) {
                 let observedValue = attribute(element, kAXValueAttribute) as? String
                 if let observedValue { observedValues.append(observedValue) }
                 let observedEnabled = (attribute(element, kAXEnabledAttribute) as? NSNumber)?.boolValue
@@ -2492,8 +2510,11 @@ enum GajendraUITest {
         Thread.sleep(forTimeInterval: 0.7)
     }
 
-    private static func tapWithoutSettling(_ point: CGPoint) throws {
-        postMove(to: point)
+    private static func tapWithoutSettling(_ point: CGPoint, ownerPID: pid_t? = nil) throws {
+        let previousOwner = expectedPointerOwner
+        if let ownerPID { expectedPointerOwner = ownerPID }
+        defer { expectedPointerOwner = previousOwner }
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
         Thread.sleep(forTimeInterval: 0.06)
@@ -2504,7 +2525,7 @@ enum GajendraUITest {
         // Do not use the general tap helper here: its 700 ms settle allows a transient
         // refresh/layout pass to invalidate the field's AX identity after the pointer click.
         let point = try elementFrame(field).center
-        postMove(to: point)
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
         Thread.sleep(forTimeInterval: 0.06)
@@ -2528,7 +2549,7 @@ enum GajendraUITest {
 
     private static func microMovementTap(_ point: CGPoint) throws {
         let end = CGPoint(x: point.x + 2, y: point.y + 1)
-        postMove(to: point)
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
         Thread.sleep(forTimeInterval: 0.06)
@@ -2539,10 +2560,10 @@ enum GajendraUITest {
     }
 
     private static func drag(from start: CGPoint, to end: CGPoint) throws {
-        postMove(to: start)
+        try postMove(to: start)
         Thread.sleep(forTimeInterval: 0.08)
         try postMouse(.leftMouseDown, at: start, clickState: 1)
-        Thread.sleep(forTimeInterval: 0.18)
+        try stationaryPointerHold(for: 0.18)
         for step in 1...14 {
             let progress = CGFloat(step) / 14
             let point = CGPoint(
@@ -2558,16 +2579,16 @@ enum GajendraUITest {
     }
 
     private static func longPress(_ point: CGPoint) throws {
-        postMove(to: point)
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
-        Thread.sleep(forTimeInterval: 0.42)
+        try stationaryPointerHold(for: 0.42)
         try postMouse(.leftMouseUp, at: point, clickState: 1)
         Thread.sleep(forTimeInterval: 0.25)
     }
 
     private static func doubleTap(_ point: CGPoint) throws {
-        postMove(to: point)
+        try postMove(to: point)
         Thread.sleep(forTimeInterval: 0.04)
         try postMouse(.leftMouseDown, at: point, clickState: 1)
         try postMouse(.leftMouseUp, at: point, clickState: 1)
@@ -2577,7 +2598,85 @@ enum GajendraUITest {
         Thread.sleep(forTimeInterval: 0.7)
     }
 
-    private static func postMove(to point: CGPoint) {
+    private static func pointerOwner(at point: CGPoint) -> pid_t? {
+        guard let hit = systemElementAtPosition(point: point) else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(hit, &pid) == .success, pid > 0 else { return nil }
+        return pid
+    }
+
+    private static func requireUndisturbedPointer() throws {
+        guard !pointerInterferenceDetected else {
+            throw GajendraUITestError.failed("pointer interference; native result is inconclusive")
+        }
+        guard let expected = lastCommandedPointer else { return }
+        guard let actual = CGEvent(source: nil)?.location,
+              abs(actual.x - expected.x) <= stableFrameTolerance,
+              abs(actual.y - expected.y) <= stableFrameTolerance else {
+            try abortForPointerInterference("cursor moved away from its last commanded position")
+        }
+        if let owner = driverMouseDownOwner, pointerOwner(at: expected) != owner {
+            try abortForPointerInterference("AX target ownership changed while the driver held the mouse button")
+        }
+    }
+
+    private static func stationaryPointerHold(for interval: TimeInterval) throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(interval))
+        repeat {
+            try requireUndisturbedPointer()
+            let remaining = ContinuousClock.now.duration(to: deadline)
+            if remaining <= .zero { return }
+            let seconds = Double(remaining.components.seconds)
+                + Double(remaining.components.attoseconds) / 1_000_000_000_000_000_000
+            Thread.sleep(forTimeInterval: min(0.02, seconds))
+        } while true
+    }
+
+    private static func abortForPointerInterference(_ reason: String) throws -> Never {
+        pointerInterferenceDetected = true
+        releaseDriverMouseButton()
+        throw GajendraUITestError.failed("pointer interference; native result is inconclusive: \(reason)")
+    }
+
+    private static func releaseDriverMouseButton() {
+        guard let owner = driverMouseDownOwner, !driverMouseReleaseAttempted else { return }
+        driverMouseReleaseAttempted = true
+        // Attempt to balance this driver's down event directly to its original process.
+        // Do not post an up event globally over a different app or restore a disturbed cursor.
+        // This can finish an isolated fixture gesture; it never counts as product acceptance.
+        guard let event = CGEvent(
+            mouseEventSource: nil,
+            mouseType: .leftMouseUp,
+            mouseCursorPosition: lastCommandedPointer ?? .zero,
+            mouseButton: .left
+        ) else {
+            pointerInterferenceDetected = true
+            fputs("Gajendra UI cleanup: app-directed release could not be created; result inconclusive\n", stderr)
+            return
+        }
+        event.setIntegerValueField(.mouseEventClickState, value: 0)
+        event.postToPid(owner)
+        // Posting is asynchronous. Require the same three stable samples used by AX waits,
+        // rather than treating one immediate readback as evidence of a balanced button.
+        let deadline = Date().addingTimeInterval(timeout)
+        var releasedSamples = 0
+        repeat {
+            Thread.sleep(forTimeInterval: 0.05)
+            releasedSamples = CGEventSource.buttonState(.combinedSessionState, button: .left)
+                ? 0 : releasedSamples + 1
+            if releasedSamples >= 3 {
+                driverMouseDownOwner = nil
+                fputs("Gajendra UI cleanup: app-directed release attempted; combined-session button up observed\n", stderr)
+                return
+            }
+        } while Date() < deadline
+        pointerInterferenceDetected = true
+        fputs("Gajendra UI cleanup: app-directed release attempted; button release unconfirmed; result inconclusive\n", stderr)
+    }
+
+    private static func postMove(to point: CGPoint) throws {
+        try requireUndisturbedPointer()
+        lastCommandedPointer = point
         CGEvent(
             mouseEventSource: nil,
             mouseType: .mouseMoved,
@@ -2587,6 +2686,7 @@ enum GajendraUITest {
     }
 
     private static func pressEscape() throws {
+        try requireUndisturbedPointer()
         guard let keyDown = CGEvent(
             keyboardEventSource: nil,
             virtualKey: 53,
@@ -2604,6 +2704,7 @@ enum GajendraUITest {
     }
 
     private static func postKey(_ keyCode: CGKeyCode, flags: CGEventFlags = []) throws {
+        try requireUndisturbedPointer()
         guard let keyDown = CGEvent(
             keyboardEventSource: nil,
             virtualKey: keyCode,
@@ -2623,6 +2724,7 @@ enum GajendraUITest {
     }
 
     private static func postUnicodeText(_ text: String) throws {
+        try requireUndisturbedPointer()
         let characters = Array(text.utf16)
         guard !characters.isEmpty,
               let keyDown = CGEvent(
@@ -2653,6 +2755,13 @@ enum GajendraUITest {
     }
 
     private static func postMouse(_ type: CGEventType, at point: CGPoint, clickState: Int64) throws {
+        try requireUndisturbedPointer()
+        if type == .leftMouseDown {
+            guard let expectedPointerOwner,
+                  pointerOwner(at: point) == expectedPointerOwner else {
+                try abortForPointerInterference("AX target ownership changed before mouse down")
+            }
+        }
         guard let event = CGEvent(
             mouseEventSource: nil,
             mouseType: type,
@@ -2663,10 +2772,21 @@ enum GajendraUITest {
         }
         event.setIntegerValueField(.mouseEventClickState, value: clickState)
         event.post(tap: .cghidEventTap)
+        lastCommandedPointer = point
+        if type == .leftMouseDown {
+            driverMouseDownOwner = expectedPointerOwner
+            driverMouseReleaseAttempted = false
+        }
+        if type == .leftMouseUp { driverMouseDownOwner = nil }
     }
 
     private static func scrollVertically(at point: CGPoint, lines: Int32) throws {
-        postMove(to: point)
+        try postMove(to: point)
+        Thread.sleep(forTimeInterval: 0.04)
+        try requireUndisturbedPointer()
+        guard let expectedPointerOwner, pointerOwner(at: point) == expectedPointerOwner else {
+            try abortForPointerInterference("AX target ownership changed before scroll")
+        }
         guard let event = CGEvent(
             scrollWheelEvent2Source: nil,
             units: .line,
