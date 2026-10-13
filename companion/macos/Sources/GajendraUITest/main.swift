@@ -1125,7 +1125,9 @@ enum GajendraUITest {
 
         let reacquiredSource = try waitForStableHittableElement(
             pid: pid,
-            label: "Verify queue ordering, Synthetic UI Agent"
+            label: "Verify queue ordering, Synthetic UI Agent",
+            value: "Ready",
+            scrollToVisible: true
         )
         let target = try waitForStableHittableElement(
             pid: pid,
