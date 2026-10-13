@@ -1099,10 +1099,12 @@ enum GajendraUITest {
         )
         _ = try waitForElement(pid: pid, label: "Done editing priorities")
         let selectedFrame = try elementFrame(selected)
-        guard selectedFrame.midY == sourceFrame.midY else {
-            throw GajendraUITestError.failed("stationary hold moved the selected queue row")
-        }
         let afterHold = try readState(stateURL)
+        guard selectedFrame.midY == sourceFrame.midY else {
+            throw GajendraUITestError.failed(
+                "stationary hold moved the selected queue row; before=\(describeFrame(sourceFrame)); after=\(describeFrame(selectedFrame)); prioritiesUnchanged=\(priorityEntries(afterHold) == priorityEntries(before))"
+            )
+        }
         guard priorityEntries(afterHold) == priorityEntries(before) else {
             throw GajendraUITestError.failed("stationary hold changed persisted priority state")
         }
