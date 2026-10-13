@@ -2012,7 +2012,9 @@ enum GajendraUITest {
         var observedValues: [String] = []
         repeat {
             let application = AXUIElementCreateApplication(pid)
-            if let element = firstElement(in: application, depth: 0, label: label) {
+            // A thread can appear in both Running and a priority lane with the same label.
+            // Apply the requested value/enabled conditions to every exact-label candidate.
+            for element in matchingElements(in: application, depth: 0, label: label) {
                 let observedValue = attribute(element, kAXValueAttribute) as? String
                 if let observedValue { observedValues.append(observedValue) }
                 let observedEnabled = (attribute(element, kAXEnabledAttribute) as? NSNumber)?.boolValue
