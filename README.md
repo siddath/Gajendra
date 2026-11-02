@@ -143,7 +143,7 @@ npm run companion:build
 open build/Gajendra.app
 ```
 
-The tagged 0.4.0 source supports Node 20.19+ or 22.12+. Current-branch development tools require
+The v0.4.0 tag declares Node 20.19+ or 22.12+ as its source-build floor. Current development tools require
 Node 22.x (22.12+), 24.x, or 26+; the plugin production runtime retains its existing Node 20 support.
 
 The first build downloads and checksum-verifies the pinned Node runtime used inside the app bundle.

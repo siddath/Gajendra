@@ -101,8 +101,8 @@ stop the loop. Only the small artwork updates on the animation timeline.
 ## Build versus binary compatibility
 
 Source builds require macOS 13.5+ and Xcode/Swift. Current-branch development requires Node
-22.x (22.12+), 24.x, or 26+; CI uses Node 24. The tagged 0.4.0 source retains its Node 20.19+ or 22.12+
-build requirement, and the plugin production runtime retains Node 20 support. A production-style bundle is expected
+22.x (22.12+), 24.x, or 26+; CI and current development/tests use Node 24. The v0.4.0 tag declares a Node 20.19+ or
+22.12+ source-build floor; the plugin production runtime retains its Node 20 declaration. A production-style bundle is expected
 to carry Node v24.19.0 with a verified checksum and notices. Neither source compatibility, a local
 ad-hoc signature, nor the exact-installed automated interaction receipt proves a clean-Mac,
 Gatekeeper-accepted, Developer ID-signed, notarized, or distribution-ready binary. Those are
