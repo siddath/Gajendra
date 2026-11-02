@@ -106,6 +106,13 @@ enum GajendraUITest {
         let catalogURL = URL(fileURLWithPath: arguments[2])
         let appURL = URL(fileURLWithPath: arguments[3])
         expectedPointerOwner = rawPID
+        guard AXIsProcessTrusted() else {
+            let executable = Bundle.main.executableURL?.path ?? CommandLine.arguments[0]
+            throw GajendraUITestError.failed(
+                "the UI test executable is not a trusted accessibility client: \(executable); "
+                    + "enable its responsible host in System Settings > Privacy & Security > Accessibility, then retry; no permission prompt was requested"
+            )
+        }
         guard CGPreflightPostEventAccess() else {
             throw GajendraUITestError.failed("the UI test host lacks permission to post pointer events")
         }
@@ -1937,7 +1944,77 @@ enum GajendraUITest {
             }
             Thread.sleep(forTimeInterval: 0.05)
         } while Date() < deadline
-        throw GajendraUITestError.failed("timed out waiting for launcher state: \(expected); observed: \(observed)")
+        throw GajendraUITestError.failed(
+            "timed out waiting for launcher state: \(expected); observed: \(observed); "
+                + "AX diagnostics=\(launcherAXFailureDiagnostics(pid: pid))"
+        )
+    }
+
+    private static func launcherAXFailureDiagnostics(pid: pid_t) -> String {
+        // Failure-only evidence: inspect this fixture's launcher, never other apps or menu trees.
+        // Bound both the number of elements and AX messaging time; keep all acceptance checks intact.
+        let deadline = Date().addingTimeInterval(timeout)
+        var details: [String: Any] = ["trusted": AXIsProcessTrusted()]
+        func read(_ element: AXUIElement, _ name: String) -> (AXError, CFTypeRef?) {
+            guard Date() < deadline else { return (.cannotComplete, nil) }
+            AXUIElementSetMessagingTimeout(element, 0.1)
+            var value: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+            return (result, value)
+        }
+        func describe(_ element: AXUIElement) -> [String: Any] {
+            var owner: pid_t = 0
+            let ownerResult = AXUIElementGetPid(element, &owner)
+            var result: [String: Any] = ["ownerStatus": ownerResult.rawValue, "fixtureOwner": owner == pid]
+            guard ownerResult == .success, owner == pid else { return result }
+            for name in [kAXRoleAttribute, kAXDescriptionAttribute, kAXTitleAttribute, kAXHelpAttribute] {
+                let (status, value) = read(element, name)
+                result[name + "Status"] = status.rawValue
+                if let text = value as? String { result[name] = String(text.prefix(160)) }
+            }
+            if Date() < deadline, let frame = try? elementFrame(element) {
+                result["frame"] = describeFrame(frame)
+            }
+            return result
+        }
+        let application = AXUIElementCreateApplication(pid)
+        let (childrenStatus, children) = read(application, kAXChildrenAttribute)
+        details["appChildrenStatus"] = childrenStatus.rawValue
+        details["appChildrenCount"] = (children as? [AXUIElement])?.count
+        let (windowsStatus, rawWindows) = read(application, kAXWindowsAttribute)
+        details["appWindowsStatus"] = windowsStatus.rawValue
+        let appWindows = rawWindows as? [AXUIElement] ?? []
+        details["appWindowsCount"] = appWindows.count
+        if let frame = launcherWindow(pid: pid), Date() < deadline {
+            let system = AXUIElementCreateSystemWide()
+            AXUIElementSetMessagingTimeout(system, 0.1)
+            var hit: AXUIElement?
+            let hitStatus = AXUIElementCopyElementAtPosition(
+                system, Float(frame.midX), Float(frame.midY), &hit
+            )
+            details["launcherHitStatus"] = hitStatus.rawValue
+            if let hit { details["launcherHit"] = describe(hit) }
+        }
+        var launcherElements: [[String: Any]] = []
+        for window in appWindows.prefix(8) where Date() < deadline {
+            AXUIElementSetMessagingTimeout(window, 0.1)
+            var owner: pid_t = 0
+            guard AXUIElementGetPid(window, &owner) == .success, owner == pid,
+                  let frame = try? elementFrame(window),
+                  (48...61).contains(frame.width), (48...61).contains(frame.height) else { continue }
+            launcherElements.append(describe(window))
+            let (status, children) = read(window, kAXChildrenAttribute)
+            details["launcherChildrenStatus"] = status.rawValue
+            for child in (children as? [AXUIElement] ?? []).prefix(8) where Date() < deadline {
+                launcherElements.append(describe(child))
+            }
+            break
+        }
+        details["launcherElements"] = launcherElements
+        details["diagnosticBudgetExhausted"] = Date() >= deadline
+        guard let data = try? JSONSerialization.data(withJSONObject: details, options: [.sortedKeys]),
+              let result = String(data: data, encoding: .utf8) else { return "unavailable" }
+        return result
     }
 
     private static func waitForStatusItem(pid: pid_t) throws -> AXUIElement {
