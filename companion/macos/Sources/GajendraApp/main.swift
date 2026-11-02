@@ -1253,6 +1253,10 @@ final class GajendraAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         // it. This is AppKit's intended path for a non-activating panel to handle the first click
         // without making the user click once to "wake" the widget.
         let panel = makeOverlayPanel(title: "Gajendra Focus Pill", size: pillSize, acceptsKeyboardInput: true)
+        // A fully clear window backing can leave the rendered SwiftUI launcher outside the
+        // WindowServer mouse region. Keep the full 60-point target with a near-clear backing;
+        // the opaque SwiftUI pill still supplies its visible shape and appearance.
+        panel.backgroundColor = NSColor.black.withAlphaComponent(0.01)
         panel.becomesKeyOnlyIfNeeded = true
         panel.onPointerEvent = { [weak self] event in
             self?.handlePillPointerEvent(event)

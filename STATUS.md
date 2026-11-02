@@ -6,6 +6,29 @@
 
 **Reconciled:** 2026-10-05 (local 0.4.0 implementation accepted; installed parity verified; owner confirmed live navigation)
 
+## Launcher and priority source acceptance — 2026-11-02
+
+PR #55 keeps the launcher's backing in the native hit region and holds the edit
+bar at a stable height, preserving a stationary selected row. Its focused native
+regression now reuses the existing launcher/priority assertions and verifies
+that holds and drags emit no Open, while a quick tap opens the exact synthetic
+Important task. Default native-journey assertions remain intact.
+
+At source `183bd1f`, the focused regression passed with prewarmed/cold/warm
+opening at 46/84/88 ms, below the unchanged local 200 ms regression budget.
+An independent fullscreen run passed launcher hit, same-Space card visibility,
+host visibility and Dock reopen. Source checks (172 tests), seven product evals,
+native self-tests, driver compilation and a fresh app build passed. Final-head
+CI and independent appearance review are recorded in PR #55 and its
+[closeout worksheet](worksheets/2026-11-02-pr55-launcher-closeout.md).
+
+This is focused source acceptance. The earlier complete default/performance
+journey's later Running-header lookup remains an unresolved driver finding;
+the complete release gauntlet is not claimed passed. Status-item presentation,
+physical accessibility, installed-runtime acceptance and binary distribution
+remain separate. Synthetic tests restored preferences and left the real store
+unchanged; the original app is restored after the visual review.
+
 ## 0.4.0 source release closure — 2026-10-07
 
 The five pending PRs were resolved in ascending order: #34 merged (`e37d370`), #38 merged

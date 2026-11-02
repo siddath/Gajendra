@@ -167,6 +167,10 @@ refresh while its priority and exact destination stay unchanged. `npm run
 companion:ui-performance-test` separately enforces the measured launcher budget and checks the
 widget journey for SwiftUI dependency cycles.
 
+`npm run companion:ui-launcher-priority-test` runs the focused native regression
+for launcher clicks, stationary holds, exact task opening and priority dragging.
+Its scoped result is separate from the complete native journey and release gauntlet.
+
 ### Use the Codex extension
 
 If you also want Gajendra's MCP tools inside Codex, with the Codex CLI available locally:
