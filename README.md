@@ -129,7 +129,7 @@ priority actions; the source project still makes no signed/notarized binary clai
 
 - macOS **13.5 or later**
 - Xcode or the Xcode Command Line Tools
-- Node.js **22.12+, 24.x, or 26+** for current-branch development (CI uses 24.x)
+- Node.js **22.x (22.12+), 24.x, or 26+** for current-branch development (CI uses 24.x)
 - At least one supported local AI tool whose threads you want to see
 
 ### Build and open the app
@@ -144,7 +144,7 @@ open build/Gajendra.app
 ```
 
 The tagged 0.4.0 source supports Node 20.19+ or 22.12+. Current-branch development tools require
-Node 22.12+, 24.x, or 26+; the plugin production runtime retains its existing Node 20 support.
+Node 22.x (22.12+), 24.x, or 26+; the plugin production runtime retains its existing Node 20 support.
 
 The first build downloads and checksum-verifies the pinned Node runtime used inside the app bundle.
 The running app uses that bundled runtime; it does not depend on Homebrew or a separately installed
