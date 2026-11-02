@@ -78,6 +78,10 @@ enum GajendraUITest {
                 print(
                     #"{"status":"passed","scope":"running-to-ready","runningToReadyTransition":\#(metrics.runningToReadyTransition)}"#
                 )
+            } else if scope == "launcher-priority" {
+                print(
+                    #"{"status":"passed","scope":"launcher-priority","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
+                )
             } else if scope == "widget" {
                 print(
                     #"{"status":"passed","scope":"widget","compactReopen":true,"inactiveFirstInteraction":true,"nowCardDoubleClick":true,"statusItemCompactSurfaceObserved":\#(metrics.statusItemCompactSurfaceObserved),"compactRowsNoHandle":true,"stationaryToggle":true,"microMovementReopen":true,"editModeTapRecovery":true,"accessibilityPressRecovery":true,"outerEdgeTarget":true,"taskTapPreservesOpenMode":true,"taskLongPressSelected":true,"continuousHoldDrag":true,"taskRowDragInEditMode":true,"queueDragAndDrop":true,"priorityActions":true,"readyPriorityActions":true,"readyAcknowledgement":true,"runningDockControlClick":true,"runningDockDoubleClick":true,"earlierActivityDisclosure":true,"searchUsable":true,"visibleRefreshLifecycleContract":true,"independentWidgetSizing":true,"runningToReadyTransition":\#(metrics.runningToReadyTransition),"popupLatencyBudgetMet":true,"prewarmedRevealMilliseconds":\#(metrics.prewarmedRevealMilliseconds),"coldPopupMilliseconds":\#(metrics.coldPopupMilliseconds),"warmPopupMilliseconds":\#(metrics.warmPopupMilliseconds)}"#
@@ -256,7 +260,18 @@ enum GajendraUITest {
         try verifyCompactSurfaceRows(pid: rawPID)
         try verifyTaskLongPressAndRowDrag(pid: rawPID, stateURL: stateURL)
         try verifyQueueDrag(pid: rawPID, stateURL: stateURL)
-        try verifyTaskTapPreservesOpenMode(pid: rawPID)
+        try verifyTaskTapPreservesOpenMode(pid: rawPID, stateURL: stateURL)
+        // This regression scope covers the launcher hit region and stationary edit-row
+        // geometry. Keep every existing assertion and the complete default journey intact.
+        if ProcessInfo.processInfo.environment["GAJENDRA_UI_TEST_SCOPE"] == "launcher-priority" {
+            return GajendraUIJourneyMetrics(
+                prewarmedRevealMilliseconds: prewarmedRevealMilliseconds,
+                coldPopupMilliseconds: coldPopupMilliseconds,
+                warmPopupMilliseconds: warmPopupMilliseconds,
+                statusItemCompactSurfaceObserved: statusItemCompactSurfaceObserved,
+                runningToReadyTransition: false
+            )
+        }
         try verifySearch(pid: rawPID)
         try verifyDockControlClick(
             pid: rawPID,
@@ -1078,14 +1093,28 @@ enum GajendraUITest {
         }
     }
 
-    private static func verifyTaskTapPreservesOpenMode(pid: pid_t) throws {
-        let row = try waitForElement(
+    private static func verifyTaskTapPreservesOpenMode(pid: pid_t, stateURL: URL) throws {
+        let marker = stateURL.deletingLastPathComponent().appendingPathComponent(".gajendra-ui-opened-url")
+        if FileManager.default.fileExists(atPath: marker.path) {
+            try FileManager.default.removeItem(at: marker)
+        }
+        let row = try waitForStableHittableElement(
             pid: pid,
-            label: "Review the dock behavior, Synthetic UI Agent"
+            label: "Review the dock behavior, Synthetic UI Agent",
+            value: "Ready",
+            scrollToVisible: true
         )
         try tap(try elementFrame(row).center)
         _ = try waitForElement(pid: pid, label: "Edit priorities")
         try requireElementAbsent(pid: pid, label: "Done editing priorities", duration: 0.2)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if (try? String(contentsOf: marker, encoding: .utf8)) == "ui-agent://threads/important-a" {
+                return
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        } while Date() < deadline
+        throw GajendraUITestError.failed("quick tap did not open the exact synthetic Important task")
     }
 
     private static func verifyTaskLongPressAndRowDrag(pid: pid_t, stateURL: URL) throws {
@@ -1098,6 +1127,10 @@ enum GajendraUITest {
         )
         let sourceFrame = try elementFrame(source)
         let before = try readState(stateURL)
+        let marker = stateURL.deletingLastPathComponent().appendingPathComponent(".gajendra-ui-opened-url")
+        if FileManager.default.fileExists(atPath: marker.path) {
+            try FileManager.default.removeItem(at: marker)
+        }
         try longPress(sourceFrame.center)
         let selected = try waitForElement(
             pid: pid,
@@ -1120,6 +1153,7 @@ enum GajendraUITest {
             label: "Gajendra could not open this thread.",
             duration: 0.35
         )
+        try requireOpenMarkerAbsent(marker, phase: "stationary hold")
         let done = try waitForElement(pid: pid, label: "Done editing priorities")
         guard AXUIElementPerformAction(done, kAXPressAction as CFString) == .success else {
             throw GajendraUITestError.failed("stationary hold selection could not be exited")
@@ -1153,6 +1187,7 @@ enum GajendraUITest {
             state.entries.filter { $0.level == "focus" }.map(\.threadId)
                 == ["ui-agent:focus-a", "ui-agent:focus-c", "ui-agent:focus-b"]
         }
+        try requireOpenMarkerAbsent(marker, phase: "continuous hold and drag")
         let continuousDone = try waitForElement(pid: pid, label: "Done editing priorities")
         guard AXUIElementPerformAction(continuousDone, kAXPressAction as CFString) == .success else {
             throw GajendraUITestError.failed("continuous hold-then-drag could not exit edit mode")
@@ -1165,6 +1200,10 @@ enum GajendraUITest {
     }
 
     private static func verifyQueueDrag(pid: pid_t, stateURL: URL) throws {
+        let marker = stateURL.deletingLastPathComponent().appendingPathComponent(".gajendra-ui-opened-url")
+        if FileManager.default.fileExists(atPath: marker.path) {
+            try FileManager.default.removeItem(at: marker)
+        }
         let sourceLabel = "Run the drag regression, Synthetic UI Agent, Running now"
         let targetLabel = "Verify queue ordering, Synthetic UI Agent"
         // Enter edit mode with the same pointer route a user uses. The AX action remains
@@ -1200,6 +1239,7 @@ enum GajendraUITest {
             throw GajendraUITestError.failed("priority editing could not be closed after the drag")
         }
         Thread.sleep(forTimeInterval: 0.35)
+        try requireOpenMarkerAbsent(marker, phase: "edit-mode row drag")
     }
 
     private static func verifySearch(pid: pid_t) throws {
